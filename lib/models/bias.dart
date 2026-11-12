@@ -45,29 +45,29 @@ enum Bias {
   Color get color {
     switch (this) {
       case Bias.farLeft:
-        return const Color(0xFF0D3B8C);
+        return const Color(0xFF1E2F9E);
       case Bias.left:
-        return const Color(0xFF1E5BD8);
+        return const Color(0xFF3F5BEA);
       case Bias.leanLeft:
-        return const Color(0xFF6A9BF4);
+        return const Color(0xFF7D93FF);
       case Bias.center:
-        return const Color(0xFF8E8AA0);
+        return const Color(0xFFA08CFF);
       case Bias.leanRight:
-        return const Color(0xFFF08A8A);
+        return const Color(0xFFFF8FA8);
       case Bias.right:
-        return const Color(0xFFD93A3A);
+        return const Color(0xFFE0406A);
       case Bias.farRight:
-        return const Color(0xFF8C1414);
+        return const Color(0xFFA3123F);
       case Bias.unrated:
-        return const Color(0xFFBDBDBD);
+        return const Color(0xFFB9B3C9);
     }
   }
 }
 
 enum Side {
-  left('Left', Color(0xFF1E5BD8)),
-  center('Center', Color(0xFF8E8AA0)),
-  right('Right', Color(0xFFD93A3A));
+  left('Left', Color(0xFF3F5BEA)),
+  center('Center', Color(0xFFA08CFF)),
+  right('Right', Color(0xFFE0406A));
 
   const Side(this.label, this.color);
   final String label;

@@ -1,11 +1,17 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:provider/provider.dart';
 
+import 'services/home_widgets.dart';
 import 'state/app_state.dart';
 import 'ui/screens/explore_screens.dart';
 import 'ui/screens/feed_screens.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
+import 'ui/theme.dart';
 import 'ui/update_flow.dart';
 
 Future<void> main() async {
@@ -19,12 +25,11 @@ class ParallaxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF3B4CCA);
     return MaterialApp(
       title: 'Parallax News',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.light),
-      darkTheme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.dark),
+      theme: Brand.theme(Brightness.light),
+      darkTheme: Brand.theme(Brightness.dark),
       home: const HomeShell(),
     );
   }
@@ -52,9 +57,35 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     if (widget.pageOverride != null) return;
+    _listenToWidgets();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.read<AppState>().autoUpdate) checkForUpdate(context);
     });
+  }
+
+  StreamSubscription<Uri?>? _widgetSub;
+
+  /// Tapping a home-screen widget opens the matching tab.
+  Future<void> _listenToWidgets() async {
+    if (!Platform.isAndroid) return;
+    try {
+      _go(HomeWidgets.tabFor(await HomeWidget.initiallyLaunchedFromHomeWidget()));
+      _widgetSub = HomeWidget.widgetClicked.listen((uri) => _go(HomeWidgets.tabFor(uri)));
+    } catch (_) {}
+  }
+
+  void _go(int? tab) {
+    if (tab == null || !mounted) return;
+    setState(() {
+      _tab = tab;
+      _built.add(tab);
+    });
+  }
+
+  @override
+  void dispose() {
+    _widgetSub?.cancel();
+    super.dispose();
   }
 
   Widget _page(int i) {
@@ -78,7 +109,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_tab]),
+        title: _tab == 0 ? const Wordmark() : Text(_titles[_tab], style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),

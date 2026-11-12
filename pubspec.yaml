@@ -16,6 +16,8 @@ dependencies:
   url_launcher: ">=6.3.0 <7.0.0"
   package_info_plus: ">=8.0.0 <10.0.0"
   ota_update: ">=6.0.0 <9.0.0"
+  home_widget: ">=0.7.0 <1.0.0"
+  share_plus: ">=11.0.0 <13.0.0"
 
 dev_dependencies:
   flutter_test:

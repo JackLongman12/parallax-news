@@ -98,9 +98,43 @@ def main() -> None:
         else:
             text = text.replace("</manifest>", "    <queries>\n" + QUERIES + "    </queries>\n</manifest>", 1)
 
+    text = add_widgets(text)
     MANIFEST.write_text(text, encoding="utf-8")
     print("AndroidManifest.xml patched")
     patch_gradle()
+
+
+WIDGET_RECEIVER = """        <receiver android:name=".{cls}" android:exported="false" android:label="@string/{label}">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/{info}" />
+        </receiver>
+"""
+
+
+def add_widgets(text: str) -> str:
+    """Copy native home-screen widget code/resources and register receivers."""
+    import shutil
+    overlay = ROOT / "tool/android_overlay"
+    main = ROOT / "android/app/src/main"
+    kotlin_dir = next((p.parent for p in (main / "kotlin").rglob("MainActivity.kt")), None)
+    if kotlin_dir is None:
+        sys.exit("MainActivity.kt not found")
+    for f in (overlay / "kotlin").glob("*.kt"):
+        shutil.copy(f, kotlin_dir / f.name)
+    for f in (overlay / "res").rglob("*"):
+        if f.is_file():
+            dest = main / "res" / f.relative_to(overlay / "res")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(f, dest)
+    for cls, label, info in [
+        ("BriefingWidgetProvider", "widget_briefing_label", "briefing_widget_info"),
+        ("BlindspotWidgetProvider", "widget_blindspot_label", "blindspot_widget_info"),
+    ]:
+        if cls not in text:
+            text = text.replace("</application>", WIDGET_RECEIVER.format(cls=cls, label=label, info=info) + "    </application>", 1)
+    return text
 
 
 def patch_root_gradle() -> None:

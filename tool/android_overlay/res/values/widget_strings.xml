@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_briefing_label">Daily Briefing</string>
+    <string name="widget_briefing_desc">Your top curated stories with left/center/right coverage</string>
+    <string name="widget_blindspot_label">Blindspot</string>
+    <string name="widget_blindspot_desc">The top story one side of the spectrum is missing</string>
+</resources>

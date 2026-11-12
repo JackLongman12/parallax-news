@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Your briefing"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/updated"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#CCFFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <TextView android:id="@+id/title_0" style="@style/WidgetTitle" />
+    <TextView android:id="@+id/meta_0" style="@style/WidgetMeta" />
+    <TextView android:id="@+id/title_1" style="@style/WidgetTitle" />
+    <TextView android:id="@+id/meta_1" style="@style/WidgetMeta" />
+    <TextView android:id="@+id/title_2" style="@style/WidgetTitle" />
+    <TextView android:id="@+id/meta_2" style="@style/WidgetMeta" />
+    <TextView android:id="@+id/title_3" style="@style/WidgetTitle" />
+    <TextView android:id="@+id/meta_3" style="@style/WidgetMeta" />
+</LinearLayout>

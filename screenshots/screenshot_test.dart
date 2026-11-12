@@ -18,7 +18,9 @@ import 'package:parallax_news/models/place.dart';
 import 'package:parallax_news/models/source.dart';
 import 'package:parallax_news/models/story.dart';
 import 'package:parallax_news/state/app_state.dart';
+import 'package:parallax_news/ui/screens/feed_screens.dart';
 import 'package:parallax_news/ui/screens/story_list.dart';
+import 'package:parallax_news/ui/theme.dart';
 import 'package:parallax_news/ui/screens/story_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -111,7 +113,7 @@ Widget _app(AppState state, Widget home, {Brightness b = Brightness.light}) => C
       value: state,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(colorSchemeSeed: const Color(0xFF3B4CCA), useMaterial3: true, brightness: b),
+        theme: Brand.theme(b),
         home: home,
       ),
     );
@@ -122,10 +124,7 @@ Widget _feedShell(int tab, List<Story> stories, {bool blind = false}) => HomeShe
         if (i == 0) {
           return StoryList(
             loader: (_) async => stories,
-            header: const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text('Your daily briefing · 3 places · 4 topics', style: TextStyle(fontSize: 12)),
-            ),
+            header: const BriefingHeader(),
           );
         }
         if (i == 3) {
@@ -183,7 +182,7 @@ Widget _feature() => Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
         decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF1B2470), Color(0xFF3B4CCA), Color(0xFF7A3FC0)])),
+            gradient: LinearGradient(colors: [Brand.blue, Brand.deep, Brand.purple, Brand.deep, Brand.red], stops: [0, 0.25, 0.55, 0.8, 1])),
         padding: const EdgeInsets.all(48),
         child: Row(children: [
           Expanded(
@@ -226,6 +225,7 @@ void main() {
   Future<void> setup(WidgetTester tester, Size size, {double dpr = 2.625}) async {
     SharedPreferences.setMockInitialValues({
       'autoUpdate': false,
+      'topics': ['technology', 'ai', 'science', 'sports'],
       'followed': '[{"id":"cc:US","name":"United States","level":"country","cc":"US","cont":"NA","parents":["North America"]},'
           '{"id":"wd:Q1","name":"Oak Valley","level":"city","cc":"US","parents":["Plains County","United States"]}]',
     });
@@ -289,13 +289,13 @@ void main() {
   const promoSize = Size(540, 1080);
   final promos = <(String, String, String, Widget Function(), List<Color>)>[
     ('promo_1', 'See every side\nof every story', 'Coverage from left, center and right — side by side.',
-        () => _feedShell(0, stories), [const Color(0xFF1B2470), const Color(0xFF3B4CCA)]),
+        () => _feedShell(0, stories), [Brand.deep, Brand.purple, Brand.blue]),
     ('promo_2', 'Know who is\ntelling it', 'Bias, factuality, ownership and state affiliation for every outlet.',
-        () => StoryScreen(story: stories.first), [const Color(0xFF5B1F8F), const Color(0xFF9B3FC0)]),
+        () => StoryScreen(story: stories.first), [Brand.deep, Brand.purple, Brand.violet]),
     ('promo_3', 'From the world\nto your street', 'Continents, countries, states, cities and neighbourhood papers.',
-        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), [const Color(0xFF0E5E5A), const Color(0xFF1E9A8A)]),
+        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), [Brand.deep, Brand.purple, Brand.red]),
     ('promo_4', 'Break out of\nyour bubble', 'Blindspots reveal stories one side is ignoring.',
-        () => _feedShell(3, stories), [const Color(0xFF8C3B12), const Color(0xFFE07A2E)]),
+        () => _feedShell(3, stories), [Brand.deep, Brand.purple, Brand.red]),
   ];
 
   for (final p in promos) {

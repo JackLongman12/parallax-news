@@ -157,7 +157,74 @@ class NewsRepository {
     }
 
     final articles = await _run(tasks, errors);
+
+    // Guarantee breadth: keep widening the net until at least [minSources]
+    // distinct outlets cover this place (or we run out of strategies).
+    for (final batch in _widenings(p, ed, parent, outlets)) {
+      if (_distinct(articles) >= minSources) break;
+      articles.addAll(await _run(batch, errors));
+    }
     return _finish(articles, errors, outlets: outlets);
+  }
+
+  /// Minimum number of distinct outlets we try to show for any place.
+  static const minSources = 10;
+
+  static int _distinct(List<Article> a) => a.map((x) => x.domain).toSet().length;
+
+  /// Progressively broader fallbacks, cheapest first.
+  List<List<Future<List<Article>> Function()>> _widenings(
+      Place p, Edition ed, String parent, List<SourceInfo> outlets) {
+    final batches = <List<Future<List<Article>> Function()>>[];
+    final local = p.isLocalLevel;
+
+    // 1. Remaining discovered outlets for this place that weren't fetched yet.
+    final usedMax = p.level == PlaceLevel.country ? 6 : settings.maxLocalOutlets;
+    final rest = outlets.skip(usedMax).take(12).toList();
+    if (rest.isNotEmpty) {
+      batches.add([
+        for (final o in rest)
+          o.feedUrl != null
+              ? () => DirectFeed.fetch(o.feedUrl!, sourceName: o.name, domain: o.domain, isLocal: local)
+              : () => GoogleNews.site(o.domain, ed, isLocal: local)
+      ]);
+    }
+
+    // 2. Looser searches: longer time window, no parent qualifier, other engines.
+    batches.add([
+      () => GoogleNews.search('"${p.name}" when:30d', ed, isLocal: local),
+      if (parent.isNotEmpty) () => GoogleNews.search('${p.name} $parent news', ed, isLocal: local),
+      if (!ed.isEnglish) () => GoogleNews.search('"${p.name}"', Edition.us, isLocal: local),
+      () => BingNews.search('${p.name} news', isLocal: local),
+      if (!settings.useGdelt) () => Gdelt.search('"${p.name}"', countryCode: p.countryCode),
+    ]);
+
+    // 3. Curated outlets from the same country / continent, via site: search
+    //    for this place's name (country & continent levels use their latest news).
+    final catalog = bias.curated.where((s) => s.topics.isEmpty).where((s) {
+      if (p.level == PlaceLevel.continent) {
+        return countryByCode(s.country)?.continent == p.continentCode;
+      }
+      return p.countryCode != null && s.country == p.countryCode;
+    }).take(12).toList();
+    if (catalog.isNotEmpty) {
+      final broad = p.level == PlaceLevel.continent || p.level == PlaceLevel.country;
+      batches.add([
+        for (final s in catalog)
+          broad
+              ? () => GoogleNews.site(s.domain, ed, isLocal: false)
+              : () => GoogleNews.search('site:${s.domain} "${p.name}"', ed, isLocal: local),
+      ]);
+    }
+
+    // 4. Last resort for tiny places: news from the parent area.
+    if (parent.isNotEmpty && local) {
+      batches.add([
+        () => GoogleNews.search('"$parent" when:7d', ed, isLocal: true),
+        () => BingNews.search(parent, isLocal: true),
+      ]);
+    }
+    return batches;
   }
 
   Future<NewsBundle> _loadTopic(Category c) async {
