@@ -31,27 +31,35 @@ class ParallaxApp extends StatelessWidget {
 }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.initialTab = 0, this.pageOverride});
+
+  final int initialTab;
+
+  /// Used by the screenshot generator to inject sample content.
+  final Widget? Function(int tab)? pageOverride;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _tab = 0;
-  final _built = <int>{0};
+  late int _tab = widget.initialTab;
+  late final _built = <int>{widget.initialTab};
 
   static const _titles = ['For You', 'Topics', 'Explore', 'Blindspot', 'Sources'];
 
   @override
   void initState() {
     super.initState();
+    if (widget.pageOverride != null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.read<AppState>().autoUpdate) checkForUpdate(context);
     });
   }
 
   Widget _page(int i) {
+    final o = widget.pageOverride?.call(i);
+    if (o != null) return o;
     switch (i) {
       case 0:
         return const ForYouScreen();

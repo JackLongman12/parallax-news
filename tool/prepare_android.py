@@ -100,6 +100,27 @@ def main() -> None:
 
     MANIFEST.write_text(text, encoding="utf-8")
     print("AndroidManifest.xml patched")
+    patch_gradle()
+
+
+def patch_gradle() -> None:
+    """ota_update needs core library desugaring."""
+    kts = ROOT / "android/app/build.gradle.kts"
+    groovy = ROOT / "android/app/build.gradle"
+    gradle = kts if kts.exists() else groovy
+    text = gradle.read_text(encoding="utf-8")
+    if "CoreLibraryDesugaring" in text or "coreLibraryDesugaring" in text:
+        return
+    if gradle == kts:
+        text = text.replace("compileOptions {", "compileOptions {\n        isCoreLibraryDesugaringEnabled = true", 1)
+        text += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+    else:
+        text = text.replace("compileOptions {", "compileOptions {\n        coreLibraryDesugaringEnabled true", 1)
+        text += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n"
+    if "esugaringEnabled" not in text:
+        sys.exit("could not find compileOptions block in " + str(gradle))
+    gradle.write_text(text, encoding="utf-8")
+    print(f"{gradle.name} patched (desugaring)")
 
 
 if __name__ == "__main__":
