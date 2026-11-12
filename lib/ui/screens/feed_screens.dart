@@ -506,13 +506,25 @@ class _CollectionTile extends StatelessWidget {
             height: 132,
             decoration: BoxDecoration(gradient: LinearGradient(colors: c.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
             child: Stack(children: [
-              Positioned(right: 0, top: 0, bottom: 0, width: 150, child: CustomPaint(painter: c.art())),
+              Positioned(right: 0, top: 0, bottom: 0, width: 120, child: CustomPaint(painter: c.art())),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 150, 18),
+                padding: const EdgeInsets.fromLTRB(20, 16, 124, 16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(c.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  // One line, shrunk to fit on narrow phones.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(c.title,
+                        maxLines: 1,
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  ),
                   const SizedBox(height: 6),
-                  Text(c.blurb, maxLines: 2, style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.3)),
+                  Flexible(
+                    child: Text(c.blurb,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.3)),
+                  ),
                 ]),
               ),
             ]),
