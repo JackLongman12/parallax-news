@@ -22,6 +22,7 @@ import 'package:parallax_news/services/markets.dart';
 import 'package:parallax_news/services/repository.dart';
 import 'package:parallax_news/state/app_state.dart';
 import 'package:parallax_news/ui/screens/feed_screens.dart';
+import 'package:parallax_news/ui/screens/sources_screen.dart';
 import 'package:parallax_news/ui/screens/story_list.dart';
 import 'package:parallax_news/ui/theme.dart';
 import 'package:parallax_news/ui/screens/story_screen.dart';
@@ -293,7 +294,7 @@ void main() {
 
   testWidgets('sources', (tester) async {
     await setup(tester, phone);
-    await tester.pumpWidget(_app(state, const HomeShell(initialTab: 5, pageOverride: _noOverride)));
+    await tester.pumpWidget(_app(state, Scaffold(appBar: AppBar(title: const Text('Sources')), body: const SourcesScreen())));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/06_sources.png'));
   });
