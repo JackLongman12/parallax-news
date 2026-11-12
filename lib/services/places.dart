@@ -4,6 +4,7 @@ import '../models/place.dart';
 import '../models/source.dart';
 import 'feed_parser.dart';
 import 'net.dart';
+import 'provider_health.dart';
 
 /// Live geography + local-outlet discovery from open data:
 ///  * OpenStreetMap Nominatim for place search (any town, suburb, village)
@@ -119,7 +120,8 @@ class PlaceService {
 
   static Future<List<Map<String, dynamic>>> _query(String sparql) async {
     final url = '$_sparql?format=json&query=${Uri.encodeQueryComponent(sparql)}';
-    final json = await Net.getJson(url, headers: {'Accept': 'application/sparql-results+json'});
+    final json = await ProviderHealth.instance
+        .run('wikidata', () => Net.getJson(url, headers: {'Accept': 'application/sparql-results+json'}));
     if (json is! Map) return const [];
     final results = json['results'];
     final rows = (results is Map ? results['bindings'] : null) as List? ?? const [];

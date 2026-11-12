@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/geo.dart';
 import '../../models/category.dart';
 import '../../state/app_state.dart';
+import '../../services/provider_health.dart';
 import '../../services/updater.dart';
 import '../update_flow.dart';
 
@@ -54,18 +57,29 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (v) => app.updateSettings((x) => x.maxLocalOutlets = v.round()),
           ),
         ),
+        const Divider(),
         SwitchListTile(
-          title: const Text('Use Bing News'),
-          subtitle: const Text('Second index for wider local coverage'),
-          value: s.useBing,
-          onChanged: (v) => app.updateSettings((x) => x.useBing = v),
+          title: const Text('News sources: Auto (recommended)'),
+          subtitle: const Text('Uses Google + Bing, adds GDELT where it helps, and automatically '
+              'routes around any source that is slow or rate-limited'),
+          value: s.autoSources,
+          onChanged: (v) => app.updateSettings((x) => x.autoSources = v),
         ),
-        SwitchListTile(
-          title: const Text('Use GDELT'),
-          subtitle: const Text('Global multilingual index (slower, rate limited)'),
-          value: s.useGdelt,
-          onChanged: (v) => app.updateSettings((x) => x.useGdelt = v),
-        ),
+        if (!s.autoSources) ...[
+          SwitchListTile(
+            title: const Text('Use Bing News'),
+            subtitle: const Text('Second index for wider local coverage'),
+            value: s.useBing,
+            onChanged: (v) => app.updateSettings((x) => x.useBing = v),
+          ),
+          SwitchListTile(
+            title: const Text('Use GDELT'),
+            subtitle: const Text('Global multilingual index (slower, rate limited)'),
+            value: s.useGdelt,
+            onChanged: (v) => app.updateSettings((x) => x.useGdelt = v),
+          ),
+        ],
+        const _SourceHealth(),
         const Divider(),
         const ListTile(title: Text('Muted topics')),
         Padding(
@@ -101,6 +115,52 @@ class SettingsScreen extends StatelessWidget {
           applicationLegalese: 'Open source (MIT). Ratings are a community seed + Wikidata (CC0). '
               'Place search © OpenStreetMap contributors. Headlines link to their publishers.',
         ),
+      ]),
+    );
+  }
+}
+
+/// Live status of each news source (refreshes every few seconds).
+class _SourceHealth extends StatefulWidget {
+  const _SourceHealth();
+
+  @override
+  State<_SourceHealth> createState() => _SourceHealthState();
+}
+
+class _SourceHealthState extends State<_SourceHealth> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = ProviderHealth.instance.stats.values;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (final s in stats)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(children: [
+              Icon(Icons.circle, size: 10, color: s.coolingDown ? Colors.orange : (s.requests == 0 ? Colors.grey : Colors.green)),
+              const SizedBox(width: 8),
+              SizedBox(width: 100, child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+              Expanded(child: Text(s.status, style: Theme.of(context).textTheme.bodySmall)),
+            ]),
+          ),
       ]),
     );
   }

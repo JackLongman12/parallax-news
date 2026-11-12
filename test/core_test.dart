@@ -15,6 +15,7 @@ import 'package:parallax_news/services/curator.dart';
 import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
 import 'package:parallax_news/services/places.dart';
+import 'package:parallax_news/services/provider_health.dart';
 
 Article art(String title, String domain, {Bias bias = Bias.unrated, Category? hint}) {
   final a = Article(
@@ -181,6 +182,31 @@ void main() {
       expect(q.signals, 1);
       expect(q.hiddenSources, contains('spam.com'));
       expect(q.keywords.keys, contains('quantum'));
+    });
+  });
+
+  group('Auto source routing', () {
+    final h = ProviderHealth.instance;
+    setUp(h.reset);
+
+    test('rate limit pauses a provider immediately', () async {
+      await expectLater(h.run('bing', () async => throw NetException('HTTP 429', status: 429)), throwsA(isA<NetException>()));
+      expect(h.available('bing'), isFalse);
+      await expectLater(h.run('bing', () async => 1), throwsA(isA<ProviderUnavailable>()));
+      expect(h.stats['bing']!.status, contains('rate limited'));
+    });
+
+    test('three failures in a row pause; a success resets the streak', () async {
+      for (var i = 0; i < 2; i++) {
+        await expectLater(h.run('google', () async => throw NetException('boom')), throwsA(anything));
+      }
+      expect(h.available('google'), isTrue);
+      expect(await h.run('google', () async => 42), 42);
+      expect(h.stats['google']!.consecutiveFailures, 0);
+      for (var i = 0; i < 3; i++) {
+        await expectLater(h.run('google', () async => throw NetException('boom')), throwsA(anything));
+      }
+      expect(h.available('google'), isFalse);
     });
   });
 

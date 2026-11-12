@@ -66,6 +66,7 @@ class AppState extends ChangeNotifier {
     settings
       ..useBing = p.getBool('useBing') ?? true
       ..useGdelt = p.getBool('useGdelt') ?? false
+      ..autoSources = p.getBool('autoSources') ?? true
       ..discoverLocal = p.getBool('discoverLocal') ?? true
       ..lite = p.getBool('lite') ?? false
       ..maxLocalOutlets = (p.getBool('outletsMaxV2') ?? false) ? (p.getInt('maxLocalOutlets') ?? 25) : 25
@@ -227,6 +228,7 @@ class AppState extends ChangeNotifier {
     _prefs
       ..setBool('useBing', settings.useBing)
       ..setBool('useGdelt', settings.useGdelt)
+      ..setBool('autoSources', settings.autoSources)
       ..setBool('discoverLocal', settings.discoverLocal)
       ..setBool('lite', settings.lite)
       ..setInt('maxLocalOutlets', settings.maxLocalOutlets)

@@ -5,8 +5,11 @@ import 'dart:io' show InternetAddress;
 import 'package:http/http.dart' as http;
 
 class NetException implements Exception {
-  NetException(this.message);
+  NetException(this.message, {this.status});
   final String message;
+
+  /// HTTP status when the failure was an HTTP error (e.g. 429 rate limit).
+  final int? status;
   @override
   String toString() => message;
 }
@@ -75,7 +78,7 @@ class Net {
     if (res.statusCode != 200) {
       // Drain so the connection can be reused.
       unawaited(res.stream.drain<void>().catchError((_) {}));
-      throw NetException('HTTP ${res.statusCode} from ${uri.host}');
+      throw NetException('HTTP ${res.statusCode} from ${uri.host}', status: res.statusCode);
     }
     final declared = res.contentLength;
     if (headBytes == null && declared != null && declared > maxBytes) {

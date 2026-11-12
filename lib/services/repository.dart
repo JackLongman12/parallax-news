@@ -14,12 +14,16 @@ import 'clustering.dart';
 import 'curator.dart';
 import 'net.dart';
 import 'places.dart';
+import 'provider_health.dart';
 import 'providers.dart';
 import 'text.dart';
 
 class FetchSettings {
   bool useBing = true;
   bool useGdelt = false;
+
+  /// Auto mode: route around slow / rate-limited sources automatically.
+  bool autoSources = true;
   bool discoverLocal = true;
   int maxLocalOutlets = 25;
   /// Lower concurrency + fewer outlets for weak phones / metered data.
@@ -58,6 +62,52 @@ class NewsRepository {
   static const _ttl = Duration(minutes: 15);
 
   int get _concurrency => settings.lite ? 2 : 4;
+
+  bool get _useBing => settings.autoSources || settings.useBing;
+
+  /// GDELT is slow and rate limited, so Auto mode only adds it where it helps
+  /// most: places Google covers poorly (no edition / non-English). Thin
+  /// coverage also pulls it in via the widening fallbacks.
+  bool _useGdelt(Place p) {
+    if (!settings.autoSources) return settings.useGdelt;
+    if (!ProviderHealth.instance.available('gdelt')) return false;
+    if (p.level.index < PlaceLevel.country.index) return false;
+    final ed = editionFor(p.countryCode);
+    return ed == null || !ed.isEnglish;
+  }
+
+  static final _whenRe = RegExp(r'\s*when:\d+d');
+
+  /// Google first. In Auto mode, if Google fails, is paused or returns
+  /// nothing, the equivalent query runs on Bing instead.
+  Future<List<Article>> Function() _gn(Future<List<Article>> Function() google, String bingQuery,
+      {bool isLocal = false, Category? hint}) {
+    return () async {
+      final auto = settings.autoSources;
+      Object? err;
+      if (!auto || ProviderHealth.instance.available('google')) {
+        try {
+          final r = await google();
+          if (r.isNotEmpty || !auto) return r;
+        } catch (e) {
+          if (!auto) rethrow;
+          err = e;
+        }
+      }
+      if (!auto || !ProviderHealth.instance.available('bing')) {
+        if (err != null) throw err;
+        return const <Article>[];
+      }
+      final r = await BingNews.search(bingQuery.replaceAll(_whenRe, ''), isLocal: isLocal);
+      if (hint != null) {
+        for (final a in r) {
+          a.hintCategory ??= hint;
+        }
+      }
+      return r;
+    };
+  }
+
 
   NewsBundle? cached(String key) => _cache[key];
 
@@ -111,35 +161,35 @@ class NewsRepository {
     switch (p.level) {
       case PlaceLevel.world:
         final home = editionFor(settings.homeCountry) ?? Edition.us;
-        tasks.add(() => GoogleNews.topic('WORLD', home, Category.world));
-        tasks.add(() => GoogleNews.topHeadlines(home));
-        if (!home.isEnglish) tasks.add(() => GoogleNews.topic('WORLD', Edition.us, Category.world));
-        if (settings.useBing) tasks.add(() => BingNews.search('world news'));
+        tasks.add(_gn(() => GoogleNews.topic('WORLD', home, Category.world), 'world news', hint: Category.world));
+        tasks.add(_gn(() => GoogleNews.topHeadlines(home), 'top news'));
+        if (!home.isEnglish) tasks.add(_gn(() => GoogleNews.topic('WORLD', Edition.us, Category.world), 'international news', hint: Category.world));
+        if (_useBing) tasks.add(() => BingNews.search('world news'));
       case PlaceLevel.continent:
-        tasks.add(() => GoogleNews.search('${p.name} when:2d', Edition.us));
-        if (settings.useBing) tasks.add(() => BingNews.search(p.name));
+        tasks.add(_gn(() => GoogleNews.search('${p.name} when:2d', Edition.us), p.name));
+        if (_useBing) tasks.add(() => BingNews.search(p.name));
       case PlaceLevel.country:
         final native = editionFor(p.countryCode);
         if (native != null) {
-          tasks.add(() => GoogleNews.topHeadlines(native));
-          tasks.add(() => GoogleNews.topic('NATION', native, Category.politics));
+          tasks.add(_gn(() => GoogleNews.topHeadlines(native), '${p.name} news'));
+          tasks.add(_gn(() => GoogleNews.topic('NATION', native, Category.politics), '${p.name} politics', hint: Category.politics));
         }
         if (native == null || !native.isEnglish) {
-          tasks.add(() => GoogleNews.search('"${p.name}" when:2d', Edition.us));
+          tasks.add(_gn(() => GoogleNews.search('"${p.name}" when:2d', Edition.us), '"${p.name}"'));
         }
-        if (settings.useBing) tasks.add(() => BingNews.search(p.name));
-        if (settings.useGdelt) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
+        if (_useBing) tasks.add(() => BingNews.search(p.name));
+        if (_useGdelt(p)) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
       case PlaceLevel.region:
       case PlaceLevel.district:
       case PlaceLevel.city:
       case PlaceLevel.locality:
         final q = parent.isEmpty ? '"${p.name}"' : '"${p.name}" $parent';
-        tasks.add(() => GoogleNews.search(q, ed, isLocal: p.isLocalLevel));
+        tasks.add(_gn(() => GoogleNews.search(q, ed, isLocal: p.isLocalLevel), q, isLocal: p.isLocalLevel));
         if (p.level == PlaceLevel.city || p.level == PlaceLevel.locality) {
-          tasks.add(() => GoogleNews.geo(parent.isEmpty ? p.name : '${p.name}, $parent', ed));
+          tasks.add(_gn(() => GoogleNews.geo(parent.isEmpty ? p.name : '${p.name}, $parent', ed), '${p.name} $parent local news', isLocal: true));
         }
-        if (settings.useBing) tasks.add(() => BingNews.search(q, isLocal: p.isLocalLevel));
-        if (settings.useGdelt) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
+        if (_useBing) tasks.add(() => BingNews.search(q, isLocal: p.isLocalLevel));
+        if (_useGdelt(p)) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
     }
 
     // Local outlet discovery: real community papers, radio and TV stations.
@@ -155,7 +205,7 @@ class NewsRepository {
         if (o.feedUrl != null) {
           tasks.add(() => DirectFeed.fetch(o.feedUrl!, sourceName: o.name, domain: o.domain, isLocal: local));
         } else {
-          tasks.add(() => GoogleNews.site(o.domain, ed, isLocal: local));
+          tasks.add(_gn(() => GoogleNews.site(o.domain, ed, isLocal: local), 'site:${o.domain}', isLocal: local));
         }
       }
     }
@@ -190,17 +240,17 @@ class NewsRepository {
         for (final o in rest)
           o.feedUrl != null
               ? () => DirectFeed.fetch(o.feedUrl!, sourceName: o.name, domain: o.domain, isLocal: local)
-              : () => GoogleNews.site(o.domain, ed, isLocal: local)
+              : _gn(() => GoogleNews.site(o.domain, ed, isLocal: local), 'site:${o.domain}', isLocal: local)
       ]);
     }
 
     // 2. Looser searches: longer time window, no parent qualifier, other engines.
     batches.add([
-      () => GoogleNews.search('"${p.name}" when:30d', ed, isLocal: local),
-      if (parent.isNotEmpty) () => GoogleNews.search('${p.name} $parent news', ed, isLocal: local),
-      if (!ed.isEnglish) () => GoogleNews.search('"${p.name}"', Edition.us, isLocal: local),
+      _gn(() => GoogleNews.search('"${p.name}" when:30d', ed, isLocal: local), '"${p.name}"', isLocal: local),
+      if (parent.isNotEmpty) _gn(() => GoogleNews.search('${p.name} $parent news', ed, isLocal: local), '${p.name} $parent', isLocal: local),
+      if (!ed.isEnglish) _gn(() => GoogleNews.search('"${p.name}"', Edition.us, isLocal: local), '${p.name} news', isLocal: local),
       () => BingNews.search('${p.name} news', isLocal: local),
-      if (!settings.useGdelt) () => Gdelt.search('"${p.name}"', countryCode: p.countryCode),
+      if (!_useGdelt(p)) () => Gdelt.search('"${p.name}"', countryCode: p.countryCode),
     ]);
 
     // 3. Curated outlets from the same country / continent, via site: search
@@ -216,15 +266,15 @@ class NewsRepository {
       batches.add([
         for (final s in catalog)
           broad
-              ? () => GoogleNews.site(s.domain, ed, isLocal: false)
-              : () => GoogleNews.search('site:${s.domain} "${p.name}"', ed, isLocal: local),
+              ? _gn(() => GoogleNews.site(s.domain, ed, isLocal: false), 'site:${s.domain}')
+              : _gn(() => GoogleNews.search('site:${s.domain} "${p.name}"', ed, isLocal: local), 'site:${s.domain} ${p.name}', isLocal: local),
       ]);
     }
 
     // 4. Last resort for tiny places: news from the parent area.
     if (parent.isNotEmpty && local) {
       batches.add([
-        () => GoogleNews.search('"$parent" when:7d', ed, isLocal: true),
+        _gn(() => GoogleNews.search('"$parent" when:7d', ed, isLocal: true), '"$parent"', isLocal: true),
         () => BingNews.search(parent, isLocal: true),
       ]);
     }
@@ -235,14 +285,14 @@ class NewsRepository {
     final errors = <String>[];
     final ed = editionFor(settings.homeCountry) ?? Edition.us;
     final tasks = <Future<List<Article>> Function()>[];
-    if (c.gnTopic != null) tasks.add(() => GoogleNews.topic(c.gnTopic!, ed, c));
+    if (c.gnTopic != null) tasks.add(_gn(() => GoogleNews.topic(c.gnTopic!, ed, c), '${c.label} news', hint: c));
     final q = c.searchQuery;
-    if (q != null) tasks.add(() => GoogleNews.search('$q when:2d', ed, hint: c));
+    if (q != null) tasks.add(_gn(() => GoogleNews.search('$q when:2d', ed, hint: c), q, hint: c));
     final specialists = bias.curated.where((s) => s.feedUrl != null && s.topics.contains(c)).toList();
     for (final s in specialists.take(settings.lite ? 4 : 8)) {
       tasks.add(() => DirectFeed.fetch(s.feedUrl!, sourceName: s.name, domain: s.domain, hint: c));
     }
-    if (tasks.isEmpty) tasks.add(() => GoogleNews.search('${c.label} when:2d', ed, hint: c));
+    if (tasks.isEmpty) tasks.add(_gn(() => GoogleNews.search('${c.label} when:2d', ed, hint: c), c.label, hint: c));
     final articles = await _run(tasks, errors);
     return _finish(articles, errors);
   }

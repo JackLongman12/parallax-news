@@ -3,6 +3,7 @@ import '../models/article.dart';
 import '../models/category.dart';
 import 'feed_parser.dart';
 import 'net.dart';
+import 'provider_health.dart';
 
 /// Google News RSS: free, keyless, covers essentially every locality on earth
 /// and tells us the real publisher of each item.
@@ -31,7 +32,7 @@ class GoogleNews {
       search('site:$domain when:7d', ed, isLocal: isLocal);
 
   static Future<List<Article>> _fetch(String url, {Category? hint, bool isLocal = false}) async {
-    final body = await Net.getText(url);
+    final body = await ProviderHealth.instance.run('google', () => Net.getText(url));
     return FeedParser.parse(body, provider: 'google', hint: hint, isLocal: isLocal);
   }
 }
@@ -40,8 +41,8 @@ class GoogleNews {
 class BingNews {
   static Future<List<Article>> search(String query, {String? market, bool isLocal = false}) async {
     final mkt = market == null ? '' : '&mkt=${Uri.encodeQueryComponent(market)}';
-    final body = await Net.getText(
-        'https://www.bing.com/news/search?q=${Uri.encodeQueryComponent(query)}&format=rss$mkt');
+    final body = await ProviderHealth.instance.run('bing', () => Net.getText(
+        'https://www.bing.com/news/search?q=${Uri.encodeQueryComponent(query)}&format=rss$mkt'));
     return FeedParser.parse(body, provider: 'bing', isLocal: isLocal);
   }
 }
@@ -52,7 +53,7 @@ class Gdelt {
     final q = countryCode == null ? query : '$query sourcecountry:${_fips(countryCode)}';
     final url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=${Uri.encodeQueryComponent(q)}'
         '&mode=ArtList&maxrecords=75&format=json&sort=DateDesc&timespan=3d';
-    final json = await Net.getJson(url);
+    final json = await ProviderHealth.instance.run('gdelt', () => Net.getJson(url));
     final list = (json is Map ? json['articles'] : null) as List? ?? const [];
     final out = <Article>[];
     for (final raw in list) {
