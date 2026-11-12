@@ -103,8 +103,26 @@ def main() -> None:
     patch_gradle()
 
 
+def patch_root_gradle() -> None:
+    """Android Lint crashes analysing a plugin (url_launcher_android) - a lint bug,
+    not ours. Dart code is gated by `flutter analyze` + tests instead."""
+    kts = ROOT / "android/build.gradle.kts"
+    groovy = ROOT / "android/build.gradle"
+    gradle = kts if kts.exists() else groovy
+    text = gradle.read_text(encoding="utf-8")
+    if "lintVital" in text:
+        return
+    if gradle == kts:
+        text += '\nsubprojects {\n    tasks.matching { it.name.startsWith("lintVital") }.configureEach { enabled = false }\n}\n'
+    else:
+        text += "\nsubprojects {\n    tasks.matching { it.name.startsWith('lintVital') }.configureEach { enabled = false }\n}\n"
+    gradle.write_text(text, encoding="utf-8")
+    print(f"root {gradle.name} patched (lintVital off)")
+
+
 def patch_gradle() -> None:
     """ota_update needs core library desugaring."""
+    patch_root_gradle()
     kts = ROOT / "android/app/build.gradle.kts"
     groovy = ROOT / "android/app/build.gradle"
     gradle = kts if kts.exists() else groovy
