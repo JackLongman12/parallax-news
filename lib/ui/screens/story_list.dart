@@ -129,8 +129,7 @@ class _StoryListState extends State<StoryList> {
       onError: (Object e) {
         if (!mounted) return;
         setState(() {
-          if (_all.isEmpty) _error = 'Could not load news. Check your connection.
-($e)';
+          if (_all.isEmpty) _error = 'Could not load news. Check your connection.\n($e)';
           _loading = false;
         });
         if (!firstDone.isCompleted) firstDone.complete();

@@ -136,8 +136,9 @@ class CoverImages {
             '&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1200'
             '&gsrsearch=${Uri.encodeQueryComponent('filetype:bitmap $q')}';
         final json = await Net.getJson(url).timeout(const Duration(seconds: 8));
-        final pages = (json is Map ? (json['query'] as Map?)?['pages'] : null) as Map?;
-        if (pages == null) continue;
+        final query = json is Map ? json['query'] : null;
+        final pages = query is Map ? query['pages'] : null;
+        if (pages is! Map) continue;
         final infos = pages.values
             .whereType<Map>()
             .map((p) => ((p['imageinfo'] as List?)?.firstOrNull) as Map?)
