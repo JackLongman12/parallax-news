@@ -286,6 +286,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- One-time tips ----
+  bool tipSeen(String id) => (_prefs.getStringList('tipsSeen') ?? const []).contains(id);
+
+  void dismissTip(String id) {
+    _prefs.setStringList('tipsSeen', {...?_prefs.getStringList('tipsSeen'), id}.toList());
+    notifyListeners();
+  }
+
   // ---- First-run setup ----
   bool get onboarded => _prefs.getBool('onboardedV1') ?? false;
   void finishOnboarding() => _prefs.setBool('onboardedV1', true);

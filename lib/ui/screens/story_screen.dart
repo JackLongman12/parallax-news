@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../models/article.dart';
 import '../../models/bias.dart';
@@ -65,6 +67,8 @@ class _StoryScreenState extends State<StoryScreen> {
     return DefaultTabController(
       length: tabs.length,
       child: Scaffold(
+        // One-handed: the main actions sit at the bottom, within thumb reach.
+        bottomNavigationBar: _ActionBar(story: story, app: _app),
         body: NestedScrollView(
           headerSliverBuilder: (context, _) => [
             SliverAppBar(
@@ -72,17 +76,6 @@ class _StoryScreenState extends State<StoryScreen> {
               expandedHeight: 300,
               backgroundColor: Brand.black,
               foregroundColor: Colors.white,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.thumb_up_alt_outlined),
-                  tooltip: 'More like this',
-                  onPressed: () {
-                    _app.moreLikeThis(story);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(const SnackBar(content: Text('Got it — more stories like this')));
-                  },
-                ),
-              ],
               flexibleSpace: FlexibleSpaceBar(background: _hero()),
             ),
             SliverToBoxAdapter(
@@ -312,6 +305,70 @@ class SummaryCard extends StatelessWidget {
             'Read the full coverage below for every detail.',
             style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
       ]),
+    );
+  }
+}
+
+/// Bottom action bar for the story page (reachable with one thumb).
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({required this.story, required this.app});
+  final Story story;
+  final AppState app;
+
+  void _toast(BuildContext context, String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(Brand.purple.withValues(alpha: 0.10), surface),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(children: [
+          IconButton(
+            tooltip: 'More like this',
+            icon: const Icon(Icons.thumb_up_alt_outlined),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              app.moreLikeThis(story);
+              _toast(context, 'Got it: more stories like this');
+            },
+          ),
+          IconButton(
+            tooltip: 'Less like this',
+            icon: const Icon(Icons.thumb_down_alt_outlined),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              app.lessLikeThis(story);
+              _toast(context, 'Got it: fewer stories like this');
+            },
+          ),
+          IconButton(
+            tooltip: 'Share',
+            icon: const Icon(Icons.ios_share_rounded),
+            onPressed: () {
+              app.recordShare(story);
+              SharePlus.instance.share(ShareParams(text: '${story.title}\n${story.lead.url}\n\nCompare coverage on Parallax News'));
+            },
+          ),
+          const Spacer(),
+          FilledButton.icon(
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('Read original'),
+            onPressed: () {
+              app.recordClickThrough(story, story.lead);
+              openArticle(context, story.lead.url);
+            },
+          ),
+          const SizedBox(width: 4),
+        ]),
+      ),
     );
   }
 }

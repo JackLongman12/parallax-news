@@ -20,6 +20,10 @@ import 'ui/update_flow.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ship the Inter font licence with the app (SIL Open Font License).
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(['Inter typeface'], await rootBundle.loadString('assets/fonts/Inter-LICENSE.txt'));
+  });
   final state = await AppState.create();
   runApp(ChangeNotifierProvider.value(value: state, child: const ParallaxApp()));
 }
@@ -166,6 +170,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         index: _tab,
         children: [for (var i = 0; i < 6; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
       ),
+      // Thumb-reach shortcuts above the bottom bar.
+      floatingActionButton: _tab == 3
+          ? FloatingActionButton.extended(
+              heroTag: 'searchPlaces',
+              icon: const Icon(Icons.search_rounded),
+              label: const Text('Find a place'),
+              onPressed: () async {
+                final p = await showPlacePicker(context);
+                if (p != null && context.mounted) openPlace(context, p);
+              },
+            )
+          : (_tab == 2
+              ? FloatingActionButton.extended(
+                  heroTag: 'addStock',
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add stock'),
+                  onPressed: () => showSymbolSearch(context),
+                )
+              : null),
       // Floating, translucent bottom bar; content scrolls underneath it.
       extendBody: true,
       bottomNavigationBar: ParallaxBottomBar(

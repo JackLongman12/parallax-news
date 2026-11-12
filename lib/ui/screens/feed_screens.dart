@@ -176,6 +176,9 @@ class _TopicsScreenState extends State<TopicsScreen> {
         SliverToBoxAdapter(child: header('Picked for you')),
         SliverToBoxAdapter(child: SubPathChips(paths: forYou)),
       ],
+      const SliverToBoxAdapter(
+        child: OneTimeTip(id: 'topicsTip', text: 'Tap a topic to read it, long-press to follow it. Inside a topic, pick a subtopic, then a niche.'),
+      ),
       SliverToBoxAdapter(child: header('Outside your bubble')),
       SliverToBoxAdapter(child: SubPathChips(paths: breakOut, icon: Icons.explore_rounded)),
       if (mine.isNotEmpty) ...[
@@ -336,20 +339,6 @@ class _TopicPageState extends State<TopicPage> {
       appBar: AppBar(
         title: Text(path == null ? category.label : path.leaf.label, style: const TextStyle(fontWeight: FontWeight.w900)),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: following
-                ? OutlinedButton.icon(
-                    icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Following'),
-                    onPressed: () => app.toggleTopic(category),
-                  )
-                : FilledButton.icon(
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Follow'),
-                    onPressed: () => app.toggleTopic(category),
-                  ),
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz_rounded),
             onSelected: (_) => app.toggleMute(category),
@@ -358,6 +347,24 @@ class _TopicPageState extends State<TopicPage> {
             ],
           ),
         ],
+      ),
+      // One-handed: follow / unfollow from the bottom of the screen.
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: SizedBox(
+          height: 52,
+          child: following
+              ? OutlinedButton.icon(
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text('Following ${category.label}'),
+                  onPressed: () => app.toggleTopic(category),
+                )
+              : FilledButton.icon(
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text('Follow ${category.label}'),
+                  onPressed: () => app.toggleTopic(category),
+                ),
+        ),
       ),
       body: Column(children: [
         if (subs.isNotEmpty)
@@ -513,6 +520,12 @@ class BriefingHeader extends StatelessWidget {
           ),
         ]),
       ),
+      if (selected == null)
+        const OneTimeTip(
+          id: 'feedGestures',
+          text: 'Long-press any story for options: more or less like it, follow or mute its topic, or hide an outlet. '
+              'Tap the For You tab again to jump to the top; tap once more to refresh.',
+        ),
       if (selected == null) const DailyOverview(),
     ]);
   }

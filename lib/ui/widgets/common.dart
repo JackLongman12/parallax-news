@@ -593,3 +593,37 @@ class EmptyOrError extends StatelessWidget {
         ),
       );
 }
+
+
+/// A small tip shown until the user dismisses it (remembered on the phone).
+class OneTimeTip extends StatelessWidget {
+  const OneTimeTip({super.key, required this.id, required this.text});
+  final String id;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    if (app.tipSeen(id)) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+        decoration: BoxDecoration(
+          color: Brand.purple.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(children: [
+          const Icon(Icons.lightbulb_outline_rounded, color: Brand.purple, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+          IconButton(
+            tooltip: 'Got it',
+            icon: const Icon(Icons.close_rounded, size: 18),
+            onPressed: () => app.dismissTip(id),
+          ),
+        ]),
+      ),
+    );
+  }
+}
