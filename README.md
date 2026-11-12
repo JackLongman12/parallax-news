@@ -2,13 +2,7 @@
 
 ![Parallax News](docs/img/feature_graphic.png)
 
-**Every side of every story, from the world to your street.** Open-source, bias-aware news for Android. No account, no tracking, no server.
-
-<p align="center">
-  <img src="docs/img/promo_1.png" width="32%" />
-  <img src="docs/img/promo_2.png" width="32%" />
-  <img src="docs/img/promo_3.png" width="32%" />
-</p>
+**Every side of every story, from the world to your street.** Open-source, bias-aware news and markets for Android. No account, no tracking, no server.
 
 ## Features
 
