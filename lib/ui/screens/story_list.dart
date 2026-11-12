@@ -25,6 +25,7 @@ class StoryList extends StatefulWidget {
     this.filter,
     this.autoRefresh,
     this.scrollToTop,
+    this.jumpToTop,
   });
 
   final Future<List<Story>> Function(bool force)? loader;
@@ -44,6 +45,9 @@ class StoryList extends StatefulWidget {
 
   /// Fires when the user re-taps this tab: scroll to top (or refresh if already there).
   final Listenable? scrollToTop;
+
+  /// Fires when the user switches to this tab: jump to the top, no refresh.
+  final Listenable? jumpToTop;
 
   @override
   State<StoryList> createState() => _StoryListState();
@@ -89,6 +93,7 @@ class _StoryListState extends State<StoryList> {
     }
     _load(false);
     widget.scrollToTop?.addListener(_onReselect);
+    widget.jumpToTop?.addListener(_onJump);
     final every = widget.autoRefresh;
     if (every != null) _autoTimer = Timer.periodic(every, (_) => _backgroundRefresh());
   }
@@ -114,6 +119,10 @@ class _StoryListState extends State<StoryList> {
     }
   }
 
+  void _onJump() {
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
   void _onReselect() {
     if (!_scroll.hasClients) return;
     if (_pending.isNotEmpty) {
@@ -128,6 +137,7 @@ class _StoryListState extends State<StoryList> {
   @override
   void dispose() {
     widget.scrollToTop?.removeListener(_onReselect);
+    widget.jumpToTop?.removeListener(_onJump);
     _autoTimer?.cancel();
     _sub?.cancel();
     _scroll.dispose();

@@ -29,6 +29,14 @@ class InterestProfile {
   final Map<String, double> keywords = {};
   final Set<Category> muted = {};
   final Set<String> hiddenSources = {};
+
+  /// Interest by time of day: "category:bucket" (bucket = 6-hour window).
+  final Map<String, double> hourly = {};
+
+  /// Topic of the story read most recently (avoid serving more of the same right away).
+  Category? lastRead;
+
+  static int get _bucket => DateTime.now().hour ~/ 6;
   DateTime lastDecay = DateTime.now();
   int signals = 0;
 
@@ -62,7 +70,15 @@ class InterestProfile {
     }
   }
 
-  void recordOpen(Story s) => _bump(s, 1.0);
+  void recordOpen(Story s) {
+    _bump(s, 1.0);
+    lastRead = s.category;
+    final k = '${s.category.name}:$_bucket';
+    hourly[k] = (hourly[k] ?? 0) + 1.0;
+  }
+
+  /// 0..1: how much this topic is read at the current time of day.
+  double timeAffinity(Category c) => _squash(hourly['${c.name}:$_bucket'] ?? 0, 4);
 
   void recordDwell(Story s, Duration d) {
     final secs = d.inMilliseconds / 1000.0;
@@ -89,6 +105,7 @@ class InterestProfile {
     weights.updateAll((_, v) => v * f);
     sources.updateAll((_, v) => v * f);
     keywords.updateAll((_, v) => v * f);
+    hourly.updateAll((_, v) => v * f);
     lastDecay = DateTime.now();
   }
 
@@ -144,6 +161,7 @@ class InterestProfile {
         'h': hiddenSources.toList(),
         't': lastDecay.toIso8601String(),
         'n': signals,
+        'hr': hourly,
       });
 
   void loadJsonString(String s) {
@@ -162,6 +180,7 @@ class InterestProfile {
       hiddenSources.addAll((j['h'] as List? ?? const []).map((e) => e.toString()));
       lastDecay = DateTime.tryParse(j['t'] as String? ?? '') ?? DateTime.now();
       signals = (j['n'] as num?)?.toInt() ?? 0;
+      (j['hr'] as Map<String, dynamic>? ?? {}).forEach((k, v) => hourly[k] = (v as num).toDouble());
     } catch (_) {}
   }
 
@@ -191,6 +210,12 @@ class Curator {
       var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
       if (s.hasLocal) score += 1.0;
       if (s.imageUrl != null) score += 0.2;
+      // Time of day: e.g. markets in the morning, sports in the evening.
+      score += profile.timeAffinity(s.category) * 0.8 * trust;
+      // Developing stories: share of reports from the last 2 hours.
+      score += developing(s, now) * 1.2;
+      // Just read this topic? Lead with something else first.
+      if (profile.lastRead == s.category) score -= 0.5;
       // Session fatigue: topics you've already scrolled past a lot cool off.
       score -= 0.25 * math.min(8, profile.sessionSeen(s.category));
       // A little randomness so each refresh feels different.
@@ -242,6 +267,15 @@ class Curator {
   }
 
   static final math.Random rng = math.Random();
+
+  /// 0..1: how much of a story's coverage appeared in the last 2 hours
+  /// (only counts once 3+ outlets are on it).
+  static double developing(Story s, DateTime now) {
+    final dated = s.articles.map((a) => a.published).whereType<DateTime>().toList();
+    if (s.uniqueSources.length < 3 || dated.isEmpty) return 0;
+    final recent = dated.where((d) => now.difference(d).inMinutes <= 120).length;
+    return recent / dated.length;
+  }
 
   /// How spread out the reader's interests are: 0 = one topic, 1 = even.
   static double interestSpread(InterestProfile p) {

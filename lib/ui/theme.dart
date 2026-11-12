@@ -26,7 +26,7 @@ class Brand {
       case Category.technology:
         return Icons.memory_rounded;
       case Category.ai:
-        return Icons.auto_awesome_rounded;
+        return Icons.psychology_rounded;
       case Category.science:
         return Icons.science_rounded;
       case Category.space:

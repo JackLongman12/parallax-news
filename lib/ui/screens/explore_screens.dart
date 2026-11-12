@@ -232,14 +232,16 @@ class ExploreScreen extends StatelessWidget {
       const PlaceSearchPanel(shrinkWrap: true),
       if (app.followed.isNotEmpty) ...[
         section('Your places'),
-        SizedBox(
-          height: 96,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: app.followed.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, i) => _PlaceCard(place: app.followed[i], width: 150),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.4,
+            children: [for (final p in app.followed) _PlaceCard(place: p)],
           ),
         ),
       ],

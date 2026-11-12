@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,6 +38,7 @@ class NetImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CachedNetworkImage(
         imageUrl: url,
+        cacheManager: ImageCacheStore.instance,
         fit: fit,
         memCacheWidth: width,
         fadeInDuration: const Duration(milliseconds: 220),
@@ -46,9 +48,25 @@ class NetImage extends StatelessWidget {
       );
 }
 
+/// Disk cache for images, capped so it can't bloat the phone: at most 300
+/// images, each kept up to 7 days (roughly 30-40 MB worst case).
+class ImageCacheStore {
+  static final CacheManager instance = CacheManager(Config(
+    'parallaxImages',
+    stalePeriod: Duration(days: 7),
+    maxNrOfCacheObjects: 300,
+  ));
+
+  static Future<void> clear() async {
+    await instance.emptyCache();
+    PaintingBinding.instance.imageCache.clear();
+  }
+}
+
 /// Warm the disk + memory cache for an image before it's on screen.
 void prefetchImage(BuildContext context, String url) {
-  precacheImage(CachedNetworkImageProvider(url, maxWidth: decodeWidth(context)), context, onError: (_, __) {});
+  precacheImage(CachedNetworkImageProvider(url, maxWidth: decodeWidth(context), cacheManager: ImageCacheStore.instance), context,
+      onError: (_, __) {});
 }
 
 /// Decode images at the real on-screen pixel width (sharp on any phone,
@@ -317,7 +335,7 @@ class _StoryCardState extends State<StoryCard> {
             height: lite ? 250 : 340,
             child: FutureBuilder<String?>(
               future: _cover,
-              initialData: CoverImages.cached(story),
+              initialData: CoverImages.quick(story),
               builder: (context, snap) {
                 final img = snap.data;
                 return Stack(fit: StackFit.expand, children: [

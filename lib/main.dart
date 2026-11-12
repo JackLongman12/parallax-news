@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -169,46 +168,30 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ),
       // Floating, translucent bottom bar; content scrolls underneath it.
       extendBody: true,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-              ),
-              child: NavigationBar(
-                      selectedIndex: _tab,
-                      height: 62,
-                      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-                      onDestinationSelected: (i) {
-                        HapticFeedback.selectionClick();
-                        // Tapping the tab you're already on scrolls it back to the top.
-                        if (i == _tab) {
-                          TabReselect.fire(i);
-                          return;
-                        }
-                        setState(() {
-                          _tab = i;
-                          _built.add(i);
-                        });
-                      },
-                      destinations: const [
-                        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'For You'),
-                        NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view_rounded), label: 'Topics'),
-                        NavigationDestination(icon: Icon(Icons.show_chart_rounded), selectedIcon: Icon(Icons.insights_rounded), label: 'Markets'),
-                        NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore_rounded), label: 'Explore'),
-                        NavigationDestination(icon: Icon(Icons.visibility_off_outlined), selectedIcon: Icon(Icons.visibility_off_rounded), label: 'Blindspot'),
-                        NavigationDestination(icon: Icon(Icons.newspaper_outlined), selectedIcon: Icon(Icons.newspaper_rounded), label: 'Sources'),
-                      ],
-                    ),
-            ),
-          ),
-        ),
+      bottomNavigationBar: ParallaxBottomBar(
+        selected: _tab,
+        items: const [
+          BarItem(Icons.home_outlined, Icons.home_rounded, 'For You'),
+          BarItem(Icons.grid_view_outlined, Icons.grid_view_rounded, 'Topics'),
+          BarItem(Icons.show_chart_rounded, Icons.insights_rounded, 'Markets'),
+          BarItem(Icons.explore_outlined, Icons.explore_rounded, 'Explore'),
+          BarItem(Icons.visibility_off_outlined, Icons.visibility_off_rounded, 'Blindspot'),
+          BarItem(Icons.newspaper_outlined, Icons.newspaper_rounded, 'Sources'),
+        ],
+        onSelect: (i) {
+          HapticFeedback.selectionClick();
+          // Tapping the tab you are already on scrolls it back to the top.
+          if (i == _tab) {
+            TabReselect.fire(i);
+            return;
+          }
+          // Revisiting a tab always starts at the top.
+          TabReselect.jumpTop(i);
+          setState(() {
+            _tab = i;
+            _built.add(i);
+          });
+        },
       ),
     );
   }

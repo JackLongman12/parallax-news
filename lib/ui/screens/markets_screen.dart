@@ -100,15 +100,16 @@ class _MarketsScreenState extends State<MarketsScreen> {
             return const SizedBox(height: 86, child: Center(child: CircularProgressIndicator()));
           }
           if (q.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('Market data unavailable right now.'));
-          return SizedBox(
-            height: 86,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: q.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (_, i) => _QuoteCard(q: q[i]),
-            ),
+          // Grid: all indices visible at once, no sideways scrolling.
+          return GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.25,
+            children: [for (final x in q) _QuoteCard(q: x)],
           );
         },
       ),
@@ -148,6 +149,7 @@ class _MarketsScreenState extends State<MarketsScreen> {
     return StoryList(
       key: const ValueKey('markets-feed'),
       scrollToTop: TabReselect.tabs[2],
+      jumpToTop: TabReselect.tops[2],
       header: header,
       loader: (force) async {
         if (force) setState(() => _reload(app));
@@ -170,8 +172,7 @@ class _QuoteCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: () => openStock(context, q.symbol, q.label),
           child: Container(
-            width: 132,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(q.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
               Text(fmtPrice(q.price), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),

@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../../services/provider_health.dart';
 import '../../services/updater.dart';
 import '../update_flow.dart';
+import '../widgets/common.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -103,6 +104,17 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
         const _SourceHealth(),
+        ListTile(
+          title: const Text('Clear image cache'),
+          subtitle: const Text('Photos are cached on the phone (max 300, 7 days) so feeds load instantly'),
+          trailing: const Icon(Icons.delete_outline_rounded),
+          onTap: () async {
+            await ImageCacheStore.clear();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image cache cleared')));
+            }
+          },
+        ),
         const Divider(),
         const ListTile(title: Text('Muted topics')),
         Padding(

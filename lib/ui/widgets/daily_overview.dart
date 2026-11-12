@@ -42,7 +42,7 @@ class _DailyOverviewState extends State<DailyOverview> {
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Icon(Icons.wb_twilight_rounded, color: Brand.purple),
+              const Icon(Icons.today_rounded, color: Brand.purple),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('Today in brief', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),

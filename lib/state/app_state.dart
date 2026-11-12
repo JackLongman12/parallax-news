@@ -47,6 +47,9 @@ class AppState extends ChangeNotifier {
     repo.onRatingsUpdated = s._scheduleRatingsSave;
     unawaited(bias.refreshRemote());
     unawaited(s.detectHomeCountry());
+    if (!NewsRepository.offline) {
+      unawaited(CoverImages.init(prefs, [...Category.values.where((c) => c != Category.local)]));
+    }
     return s;
   }
 

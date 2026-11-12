@@ -56,6 +56,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
       final p = place;
       return StoryList(
         scrollToTop: TabReselect.tabs[0],
+        jumpToTop: TabReselect.tops[0],
         key: ValueKey('fy-place:${p.id}'),
         header: header,
         loader: (force) async => Curator.rank((await app.repo.place(p, force: force)).stories, app.profile, limit: 80),
@@ -65,6 +66,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
       final c = topic;
       return StoryList(
         scrollToTop: TabReselect.tabs[0],
+        jumpToTop: TabReselect.tops[0],
         key: ValueKey('fy-topic:${c.name}'),
         header: header,
         loader: (force) async => Curator.rank((await app.repo.topic(c, force: force)).stories, app.profile, limit: 80),
@@ -75,6 +77,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
     return StoryList(
       key: key,
       scrollToTop: TabReselect.tabs[0],
+        jumpToTop: TabReselect.tops[0],
       // Opens instantly with last session's feed, then streams fresh news in
       // stages (World + 3 topics first, then places, then other topics).
       initial: app.snapshot,
@@ -126,6 +129,11 @@ class _TopicsScreenState extends State<TopicsScreen> {
   void initState() {
     super.initState();
     TabReselect.tabs[1].addListener(_toTop);
+    TabReselect.tops[1].addListener(_jump);
+  }
+
+  void _jump() {
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
   void _toTop() {
@@ -135,6 +143,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
   @override
   void dispose() {
     TabReselect.tabs[1].removeListener(_toTop);
+    TabReselect.tops[1].removeListener(_jump);
     _scroll.dispose();
     super.dispose();
   }
@@ -301,11 +310,11 @@ class _TopicPageState extends State<TopicPage> {
     final chain = [if (_sub != null) _sub!, if (_niche != null) _niche!];
     final path = chain.isEmpty ? null : SubPath(category, chain);
 
-    Widget chips(List<Sub> items, Sub? selected, void Function(Sub?) onPick, {bool small = false}) => SizedBox(
-          height: small ? 40 : 46,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    Widget chips(List<Sub> items, Sub? selected, void Function(Sub?) onPick, {bool small = false}) => Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          child: Wrap(
+            spacing: 0,
+            runSpacing: 6,
             children: [
               for (final s in items)
                 Padding(
@@ -392,24 +401,18 @@ class SubPathChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (paths.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 46,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          for (final sp in paths)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ActionChip(
-                avatar: Icon(icon ?? Brand.categoryIcon(sp.category), size: 16),
-                label: Text(sp.chain.map((s) => s.label).join(' > '), style: const TextStyle(fontWeight: FontWeight.w700)),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => TopicPage(category: sp.category, initial: sp))),
-              ),
-            ),
-        ],
-      ),
+    // Wraps onto several lines: everything visible, no sideways scrolling.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final sp in paths)
+          ActionChip(
+            avatar: Icon(icon ?? Brand.categoryIcon(sp.category), size: 16),
+            label: Text(sp.chain.map((s) => s.label).join(' > '), style: const TextStyle(fontWeight: FontWeight.w700)),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => TopicPage(category: sp.category, initial: sp))),
+          ),
+      ]),
     );
   }
 }
@@ -422,6 +425,7 @@ class BlindspotScreen extends StatelessWidget {
     final app = context.watch<AppState>();
     return StoryList(
       scrollToTop: TabReselect.tabs[4],
+      jumpToTop: TabReselect.tops[4],
       key: ValueKey('blind:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
       loader: (force) => app.repo.blindspotPool(places: app.followed, topics: app.followedTopics, force: force),
       emptyMessage: 'No one-sided stories right now. More outlets get rated as you browse, '
@@ -489,37 +493,11 @@ class BriefingHeader extends StatelessWidget {
     for (final it in items) {
       if (selected != null && it.$3 == selected) title = it.$1;
     }
+    // The circular "stories" row was removed as redundant: places and topics
+    // live in Explore / Topics and the Customize sheet.
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(
-        height: 104,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) {
-            final it = items[i];
-            final active = it.$3 == selected;
-            return GestureDetector(
-              onTap: it.$4,
-              onLongPress: it.$5,
-              child: SizedBox(
-                width: 68,
-                child: Column(children: [
-                  GradientRing(active: active || it.$3 == '+', child: it.$2),
-                  const SizedBox(height: 5),
-                  Text(it.$1,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w600)),
-                ]),
-              ),
-            );
-          },
-        ),
-      ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
         child: Row(children: [
           Expanded(
             child: Text(title,

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/category.dart';
 import '../models/story.dart';
@@ -83,21 +86,98 @@ class CoverImages {
   static Future<String?> forStory(Story s) {
     final direct = s.imageUrl;
     if (!enabled) return Future.value(direct);
-    if (_cache.containsKey(s.id)) return Future.value(_cache[s.id]);
+    if (_cache.containsKey(s.id) && _cache[s.id] != null && !_isPool(_cache[s.id]!)) return Future.value(_cache[s.id]);
     if (direct != null && !isLowRes(direct) && _claim(direct, s.id)) {
-      _cache[s.id] = direct;
+      _remember(s.id, direct);
       return Future.value(direct);
     }
     return _inflight[s.id] ??= _limited(() => _find(s)).then((url) {
-      if (_cache.length > 600) _cache.clear();
-      _cache[s.id] = url;
       _inflight.remove(s.id);
-      return url;
+      if (url != null) _remember(s.id, url);
+      return url ?? _cache[s.id];
+    });
+  }
+
+  /// Instant image for a card: the remembered cover, or a distinct photo
+  /// from the topic's pool (no network). The real news photo replaces it.
+  static String? quick(Story s) {
+    final known = cached(s);
+    if (known != null || !enabled) return known;
+    final pool = _pools[s.category] ?? _pools[Category.general];
+    if (pool == null || pool.isEmpty) return null;
+    final start = s.id.hashCode.abs() % pool.length;
+    for (var i = 0; i < pool.length; i++) {
+      final url = pool[(start + i) % pool.length];
+      if (_claim(url, s.id)) {
+        _cache[s.id] = url;
+        return url;
+      }
+    }
+    return null;
+  }
+
+  // ---- Topic photo pools (one request per topic, remembered for a week) ----
+  static final Map<Category, List<String>> _pools = {};
+  static final Set<String> _poolUrls = {};
+  static bool _isPool(String url) => _poolUrls.contains(url);
+  static SharedPreferences? _store;
+
+  /// Restores pools + remembered covers from the last session, then refreshes
+  /// stale pools in the background.
+  static Future<void> init(SharedPreferences prefs, Iterable<Category> warm) async {
+    _store = prefs;
+    try {
+      final raw = jsonDecode(prefs.getString('imgPools') ?? '{}') as Map<String, dynamic>;
+      final at = DateTime.tryParse(prefs.getString('imgPoolsAt') ?? '');
+      raw.forEach((k, v) {
+        final c = Category.byName(k);
+        if (c == null || v is! List) return;
+        final urls = v.whereType<String>().where((u) => Uri.tryParse(u)?.host == 'upload.wikimedia.org').toList();
+        _pools[c] = urls;
+        _poolUrls.addAll(urls);
+      });
+      final covers = jsonDecode(prefs.getString('coverMap') ?? '{}') as Map<String, dynamic>;
+      covers.forEach((id, url) {
+        if (url is String) seed(id, url);
+      });
+      if (at != null && DateTime.now().difference(at) < const Duration(days: 7) && _pools.length >= warm.length) return;
+    } catch (_) {}
+    if (!enabled) return;
+    await runPooled<void>([for (final c in {Category.general, ...warm}) () => _fillPool(c)], concurrency: 2);
+    _savePools();
+  }
+
+  static Future<void> _fillPool(Category c) async {
+    final qs = concepts[c] ?? const <String>[];
+    final urls = <String>[];
+    for (final q in qs.take(2)) {
+      urls.addAll(await _commonsList(q, limit: 15));
+    }
+    if (urls.isNotEmpty) {
+      _pools[c] = urls;
+      _poolUrls.addAll(urls);
+    }
+  }
+
+  static void _savePools() {
+    _store?.setString('imgPools', jsonEncode(_pools.map((k, v) => MapEntry(k.name, v))));
+    _store?.setString('imgPoolsAt', DateTime.now().toIso8601String());
+  }
+
+  static Timer? _saveTimer;
+  static void _remember(String id, String url) {
+    if (_cache.length > 600) _cache.clear();
+    _cache[id] = url;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(seconds: 5), () {
+      final entries = _cache.entries.where((e) => e.value != null).toList();
+      final keep = Map.fromEntries(entries.skip(entries.length > 400 ? entries.length - 400 : 0));
+      _store?.setString('coverMap', jsonEncode(keep));
     });
   }
 
   static Future<T> _limited<T>(Future<T> Function() task) async {
-    while (_active >= 5) {
+    while (_active >= 6) {
       final c = Completer<void>();
       _waiters.add(c);
       await c.future;
@@ -120,6 +200,21 @@ class CoverImages {
     }
   }
 
+  /// First non-null result among [futures] that can be claimed for [id].
+  static Future<String?> _firstClaimed(List<Future<String?>> futures, String id) {
+    if (futures.isEmpty) return Future.value(null);
+    final done = Completer<String?>();
+    var left = futures.length;
+    for (final f in futures) {
+      f.then((v) {
+        if (!done.isCompleted && v != null && _claim(v, id)) done.complete(v);
+      }).catchError((_) {}).whenComplete(() {
+        if (--left == 0 && !done.isCompleted) done.complete(null);
+      });
+    }
+    return done.future;
+  }
+
   static Future<String?> _find(Story s) async {
     final id = s.id;
     // 1. Full-size images already present in the story's feeds.
@@ -127,21 +222,25 @@ class CoverImages {
       final img = a.imageUrl;
       if (img != null && !isLowRes(img) && _claim(img, id)) return img;
     }
-    // 2. Publisher pages' og:image (Google links are redirect wrappers; skip).
-    for (final a in s.articles.where((a) => a.provider != 'google' && isSafeWebUrl(a.url)).take(3)) {
-      final img = await _ogImage(a.url);
-      if (_claim(img, id)) return img;
-    }
-    // 3. Find the same story on Bing, then use those publishers' og:image.
+    // 2+3 in PARALLEL: publishers' og:image, and the same story found on Bing.
     final thumbs = <String>[];
-    try {
-      final results = await BingNews.search(s.title).timeout(const Duration(seconds: 8));
-      for (final r in results.take(3)) {
-        final img = await _ogImage(r.url);
-        if (_claim(img, id)) return img;
-        if (r.imageUrl != null) thumbs.add(r.imageUrl!);
+    Future<String?> viaBing() async {
+      try {
+        final results = await BingNews.search(s.title).timeout(const Duration(seconds: 6));
+        for (final r in results) {
+          if (r.imageUrl != null) thumbs.add(r.imageUrl!);
+        }
+        return _firstClaimed([for (final r in results.take(3)) _ogImage(r.url)], id);
+      } catch (_) {
+        return null;
       }
-    } catch (_) {}
+    }
+
+    final best = await _firstClaimed([
+      for (final a in s.articles.where((a) => a.provider != 'google' && isSafeWebUrl(a.url)).take(3)) _ogImage(a.url),
+      viaBing(),
+    ], id);
+    if (best != null) return best;
     // 4. Any lower-res image we have (already upscaled where possible).
     thumbs.addAll(s.articles.map((a) => a.imageUrl).whereType<String>());
     for (final t in thumbs) {
@@ -150,8 +249,8 @@ class CoverImages {
     // 5. A relevant photo by the story's key words from Wikimedia Commons.
     final kw = await commonsImage(s);
     if (kw != null) return kw;
-    // 6. Last resort: a fitting photo for the topic (never the same twice).
-    return topicImage(s.category, claimFor: id);
+    // 6. Last resort: a distinct photo from the topic's pool.
+    return quick(s) ?? topicImage(s.category, claimFor: id);
   }
 
   static final _caps = RegExp(r"\b[A-Z][a-zA-Z'’-]{2,}(?:\s+[A-Z][a-zA-Z'’-]{2,})*");
@@ -222,6 +321,34 @@ class CoverImages {
   };
 
   static final Map<String, String?> _keyed = {};
+
+  /// Several good images for a query (for topic pools).
+  static Future<List<String>> _commonsList(String q, {int limit = 15}) async {
+    try {
+      final url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
+          '&gsrnamespace=6&gsrlimit=30&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1080'
+          '&gsrsearch=${Uri.encodeQueryComponent('filetype:bitmap $q')}';
+      final json = await Net.getJson(url).timeout(const Duration(seconds: 8));
+      final query = json is Map ? json['query'] : null;
+      final pages = query is Map ? query['pages'] : null;
+      if (pages is! Map) return const [];
+      final out = <String>[];
+      for (final p in pages.values.whereType<Map>()) {
+        final title = '${p['title'] ?? ''}';
+        if (RegExp(r'(map|logo|flag|coat of arms|diagram|chart|seal|signature|icon)', caseSensitive: false).hasMatch(title)) continue;
+        final info = (p['imageinfo'] as List?)?.firstOrNull;
+        if (info is! Map) continue;
+        if ((info['width'] as num? ?? 0) < 800 || !'${info['mime']}'.startsWith('image/')) continue;
+        final thumb = Uri.tryParse('${info['thumburl'] ?? info['url']}');
+        if (thumb == null || thumb.scheme != 'https' || thumb.host != 'upload.wikimedia.org') continue;
+        out.add(thumb.toString());
+        if (out.length >= limit) break;
+      }
+      return out;
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// One Commons search; returns the first unused image whose file title
   /// passes [accept] (used to make sure the photo is actually relevant).
