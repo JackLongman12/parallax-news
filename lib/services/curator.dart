@@ -210,6 +210,11 @@ class Curator {
       var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
       if (s.hasLocal) score += 1.0;
       if (s.imageUrl != null) score += 0.2;
+      // Prefer stories several outlets cover: they show real left/center/right
+      // contrast. Single-outlet items sink unless they are local news.
+      if (sources == 1 && !s.hasLocal) score -= 1.8;
+      if (sources >= 3) score += 0.8;
+      if (dist.isReliable) score += 0.6;
       // Time of day: e.g. markets in the morning, sports in the evening.
       score += profile.timeAffinity(s.category) * 0.8 * trust;
       // Developing stories: share of reports from the last 2 hours.

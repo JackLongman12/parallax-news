@@ -51,7 +51,7 @@ class StoryClusterer {
           best = ci;
         }
       });
-      if (best >= 0 && bestSim >= 0.42) {
+      if (best >= 0 && bestSim >= 0.38) {
         final c = clusters[best];
         c.articles.add(a);
         // Keep the cluster signature focused: only the first few headlines.

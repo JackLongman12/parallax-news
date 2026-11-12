@@ -21,7 +21,8 @@ class TopicClassifier {
   final Set<String> _vocab = {};
   int _allDocs = 0;
 
-  static const maxVocab = 30000;
+  /// Caps the model at roughly 0.5 MB of stored counts.
+  static const maxVocab = 12000;
 
   static final Map<Category, List<String>> _lexicon = {
     Category.ai: ['artificial intelligence', ' ai ', 'openai', 'chatgpt', 'anthropic', 'claude', 'gemini', 'llm', 'machine learning', 'neural', 'deepmind', 'copilot', 'generative', 'deepfake', 'chatbot', 'nvidia'],

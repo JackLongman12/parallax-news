@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/article.dart';
 import '../../models/bias.dart';
+import '../../models/category.dart';
 import '../../models/source.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
@@ -61,6 +62,27 @@ class ImageCacheStore {
     await instance.emptyCache();
     PaintingBinding.instance.imageCache.clear();
   }
+}
+
+/// Bundled default photo for a topic (always available, even offline).
+/// Falls back to the plain brand colour if a topic has no bundled photo.
+class TopicPhoto extends StatelessWidget {
+  const TopicPhoto(this.category, {super.key, this.width});
+  final Category category;
+  final int? width;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+        'assets/topics/${category.name}.jpg',
+        fit: BoxFit.cover,
+        cacheWidth: width,
+        errorBuilder: (_, __, ___) => Image.asset(
+          'assets/topics/general.jpg',
+          fit: BoxFit.cover,
+          cacheWidth: width,
+          errorBuilder: (_, __, ___) => const ColoredBox(color: Brand.purple),
+        ),
+      );
 }
 
 /// Warm the disk + memory cache for an image before it's on screen.
@@ -339,12 +361,7 @@ class _StoryCardState extends State<StoryCard> {
               builder: (context, snap) {
                 final img = snap.data;
                 return Stack(fit: StackFit.expand, children: [
-                  if (img == null)
-                    Positioned(
-                      right: -24,
-                      top: 20,
-                      child: Icon(Brand.categoryIcon(story.category), size: 200, color: Colors.white.withValues(alpha: 0.10)),
-                    ),
+                  if (img == null) TopicPhoto(story.category, width: decodeWidth(context)),
                   if (img != null)
                     NetImage(img, width: decodeWidth(context)),
                   // Scrim: light at the top for the labels, heavy at the bottom for the text.

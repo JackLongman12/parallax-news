@@ -252,6 +252,17 @@ class ExploreScreen extends StatelessWidget {
           child: _PlaceCard(place: home.place, big: true),
         ),
       ],
+      section('Sources & ratings'),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: _Tile(
+          icon: Icons.newspaper_rounded,
+          title: 'Source directory',
+          subtitle: 'Every outlet, its lean, owner and factuality',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => Scaffold(appBar: AppBar(title: const Text('Sources')), body: const SourcesScreen()))),
+        ),
+      ),
       section('Browse the world'),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),

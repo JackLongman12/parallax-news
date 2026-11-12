@@ -32,6 +32,7 @@ flutter:
   assets:
     - assets/sources.json
     - assets/fonts/Inter-LICENSE.txt
+    - assets/topics/
   fonts:
     - family: Inter
       fonts:

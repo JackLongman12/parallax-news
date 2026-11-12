@@ -206,7 +206,7 @@ class NewsRepository {
       final maxOutlets = p.level == PlaceLevel.country
           ? 6
           : (settings.lite ? (settings.maxLocalOutlets ~/ 2) : settings.maxLocalOutlets);
-      final ranked = [...outlets]..sort((a, b) => (b.feedUrl != null ? 1 : 0) - (a.feedUrl != null ? 1 : 0));
+      final ranked = outlets.where((o) => !_quietOutlets.contains(o.domain)).toList()..sort((a, b) => (b.feedUrl != null ? 1 : 0) - (a.feedUrl != null ? 1 : 0));
       for (final o in ranked.take(maxOutlets)) {
         final local = p.level != PlaceLevel.country;
         if (o.feedUrl != null) {
@@ -300,6 +300,7 @@ class NewsRepository {
       tasks.add(() => DirectFeed.fetch(s.feedUrl!, sourceName: s.name, domain: s.domain, hint: c));
     }
     if (tasks.isEmpty) tasks.add(_gn(() => GoogleNews.search('${c.label} when:2d', ed, hint: c), c.label, hint: c));
+    if (_useBing) tasks.add(() => BingNews.search(c.searchQuery ?? '${c.label} news'));
     final articles = await _run(tasks, errors);
     return _finish(articles, errors);
   }
@@ -541,7 +542,43 @@ class NewsRepository {
     onRatingsUpdated?.call();
   }
 
+  // ---- Garbage filter -------------------------------------------------
+  /// Auto-generated filler that adds nothing (stock-holding notices, etc.).
+  static final _spam = RegExp(
+      r'(acquires? (new )?(stake|position|[\d,]+ shares)|(sells|buys|purchases) [\d,]+ shares|'
+      r'(increases|decreases|raises|trims|lifts|cuts) (its )?(stake|position|holdings) in|position in .+ \(|'
+      r'price target (raised|lowered|cut|increased)|(stock|shares) (price )?(down|up) [\d.]+%|'
+      r'short interest (update|in)|sees (unusually )?(large|high) options volume|'
+      r'^(sponsored|advertisement|press release)\b|horoscope|lottery results|crossword)',
+      caseSensitive: false);
+
+  /// Known content farms that mass-produce templated "news".
+  static const _farms = {
+    'marketbeat.com', 'americanbankingnews.com', 'tickerreport.com', 'etfdailynews.com', 'defenseworld.net',
+    'thelincolnianonline.com', 'themarketsdaily.com', 'thecerbatgem.com', 'theenterpriseleader.com',
+    'modernreaders.com', 'wkrb13.com', 'zolmax.com', 'dailypolitical.com', 'thestockobserver.com',
+  };
+
+  static bool isJunk(Article a, {DateTime? now}) {
+    now ??= DateTime.now().toUtc();
+    final p = a.published;
+    final maxAge = a.isLocal ? const Duration(days: 10) : const Duration(days: 4);
+    if (p != null && now.difference(p) > maxAge) return true;
+    if (_farms.contains(a.domain)) return true;
+    if (a.title.length < 12) return true;
+    return _spam.hasMatch(a.title);
+  }
+
+  /// Local outlets that returned nothing this session (skipped next time so
+  /// slots go to outlets that actually publish).
+  final Set<String> _quietOutlets = {};
+
   Future<NewsBundle> _finish(List<Article> articles, List<String> errors, {List<SourceInfo> outlets = const []}) async {
+    articles.removeWhere((a) => isJunk(a));
+    if (outlets.isNotEmpty) {
+      final active = articles.map((a) => a.domain).toSet();
+      _quietOutlets.addAll(outlets.map((o) => o.domain).where((d) => !active.contains(d)));
+    }
     bias.annotate(articles);
     // Rate never-seen outlets in the background; the shared Article objects
     // are re-annotated in place, so cards pick it up on their next build.

@@ -236,8 +236,27 @@ class CoverImages {
       }
     }
 
+    // The covering outlets' own article pages: find the article on that
+    // outlet's site (Google links are wrappers), then read its preview image.
+    Future<String?> onOutletSite(String domain) async {
+      if (!_domainRe.hasMatch(domain) || !isPublicHost(domain)) return null;
+      try {
+        final hits = await BingNews.search('site:$domain ${s.title}').timeout(const Duration(seconds: 6));
+        final own = hits.where((h) {
+          final d = domainOf(h.url);
+          return d == domain || d.endsWith('.$domain'); // exact or real subdomain only
+        }).take(1).toList();
+        if (own.isEmpty) return null;
+        return _ogImage(own.first.url);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final googleOnly = s.articles.where((a) => a.provider == 'google').map((a) => a.domain).toSet().take(2);
     final best = await _firstClaimed([
       for (final a in s.articles.where((a) => a.provider != 'google' && isSafeWebUrl(a.url)).take(3)) _ogImage(a.url),
+      for (final d in googleOnly) onOutletSite(d),
       viaBing(),
     ], id);
     if (best != null) return best;
@@ -252,6 +271,8 @@ class CoverImages {
     // 6. Last resort: a distinct photo from the topic's pool.
     return quick(s) ?? topicImage(s.category, claimFor: id);
   }
+
+  static final _domainRe = RegExp(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$');
 
   static final _caps = RegExp(r"\b[A-Z][a-zA-Z'’-]{2,}(?:\s+[A-Z][a-zA-Z'’-]{2,})*");
 

@@ -19,6 +19,7 @@ import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
 import 'package:parallax_news/services/places.dart';
 import 'package:parallax_news/services/provider_health.dart';
+import 'package:parallax_news/services/repository.dart';
 import 'package:parallax_news/services/summarizer.dart';
 import 'package:parallax_news/services/text.dart';
 
@@ -311,6 +312,23 @@ void main() {
       }
       expect(Curator.exploreEvery(narrow), lessThan(Curator.exploreEvery(wide)));
       expect(Curator.exploreEvery(InterestProfile()), 4); // new users
+    });
+  });
+
+  group('Garbage filter', () {
+    test('drops filler, farms and stale items; keeps real news', () {
+      expect(NewsRepository.isJunk(art('Vanguard Group Inc acquires 12,345 shares of Acme Corp', 'x.com')), isTrue);
+      expect(NewsRepository.isJunk(art('Acme stock price down 3.4% - Here is why', 'x.com')), isTrue);
+      expect(NewsRepository.isJunk(art('Senate passes infrastructure budget after long debate', 'marketbeat.com')), isTrue);
+      final old = Article(
+          title: 'Old but real story about the election results',
+          url: 'https://x.com/o',
+          sourceName: 'x',
+          domain: 'x.com',
+          provider: 'rss',
+          published: DateTime.now().toUtc().subtract(const Duration(days: 6)));
+      expect(NewsRepository.isJunk(old), isTrue);
+      expect(NewsRepository.isJunk(art('Senate passes infrastructure budget after long debate', 'x.com')), isFalse);
     });
   });
 

@@ -1,0 +1,12 @@
+Default topic images (Wikimedia Commons, public domain / CC0):
+travel.jpg: File:Clouds disappearing into a darkening blue sky over an airplane wing.jpg (CC0) https://commons.wikimedia.org/wiki/File%3AClouds_disappearing_into_a_darkening_blue_sky_over_an_airplane_wing.jpg
+lifestyle.jpg: File:Cup of coffee in Café Butter - Prenzlauer Berg, Berlin.jpg (CC0) https://commons.wikimedia.org/wiki/File%3ACup_of_coffee_in_Caf%C3%A9_Butter_-_Prenzlauer_Berg%2C_Berlin.jpg
+local.jpg: File:Main Street, Old Town, Maine (74576).jpg (Public domain) https://commons.wikimedia.org/wiki/File%3AMain_Street%2C_Old_Town%2C_Maine_%2874576%29.jpg
+energy.jpg: File:Solar panels in Paysandú Department.jpg (CC0) https://commons.wikimedia.org/wiki/File%3ASolar_panels_in_Paysand%C3%BA_Department.jpg
+weather.jpg: File:Thunder cloud over Gåseberg.jpg (CC0) https://commons.wikimedia.org/wiki/File%3AThunder_cloud_over_G%C3%A5seberg.jpg
+education.jpg: File:Tokai University Isehara Campus Building No. 2.jpg (CC0) https://commons.wikimedia.org/wiki/File%3ATokai_University_Isehara_Campus_Building_No._2.jpg
+autos.jpg: File:Lidl Charging Station for electric cars in Tomaszów Mazowiecki, Poland.jpg (Public domain) https://commons.wikimedia.org/wiki/File%3ALidl_Charging_Station_for_electric_cars_in_Tomasz%C3%B3w_Mazowiecki%2C_Poland.jpg
+realEstate.jpg: File:Modern apartment building with greenery.jpg (CC0) https://commons.wikimedia.org/wiki/File%3AModern_apartment_building_with_greenery.jpg
+defense.jpg: File:Photograph of Marine Jet Fighter Planes Flying in Formation Over the Air Station at Cherry Point, North Carolina - DPLA - 9056495b0eef900c2d22b3ada35c953e.jpg (Public domain) https://commons.wikimedia.org/wiki/File%3APhotograph_of_Marine_Jet_Fighter_Planes_Flying_in_Formation_Over_the_Air_Station_at_Cherry_Point%2C_North_Carolina_-_DPLA_-_9056495b0eef900c2d22b3ada35c953e.jpg
+labor.jpg: File:Worker putting notice on construction site wall in Sakuragaokachō.jpg (CC0) https://commons.wikimedia.org/wiki/File%3AWorker_putting_notice_on_construction_site_wall_in_Sakuragaokach%C5%8D.jpg
+finance.jpg: File:Sign of the New York Stock Exchange, Broad Street.jpg (CC0) https://commons.wikimedia.org/wiki/File%3ASign_of_the_New_York_Stock_Exchange%2C_Broad_Street.jpg

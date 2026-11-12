@@ -150,12 +150,7 @@ class _StoryScreenState extends State<StoryScreen> {
           final img = snap.data;
           return Stack(fit: StackFit.expand, children: [
             const ColoredBox(color: Brand.purple),
-            if (img == null)
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(Brand.categoryIcon(story.category), size: 190, color: Colors.white.withValues(alpha: 0.10)),
-              ),
+            if (img == null) TopicPhoto(story.category, width: decodeWidth(context)),
             if (img != null)
               NetImage(img, width: decodeWidth(context)),
             if (img != null && CoverImages.needsCredit(img))

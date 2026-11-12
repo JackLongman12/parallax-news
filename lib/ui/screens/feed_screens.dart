@@ -8,6 +8,7 @@ import '../../models/category.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
 import '../../services/curator.dart';
+import '../../services/repository.dart';
 import '../../models/place.dart';
 import '../../services/home_widgets.dart';
 import '../../state/app_state.dart';
@@ -40,6 +41,13 @@ class _ForYouScreenState extends State<ForYouScreen> {
     final extra = Category.values
         .where((c) => c != Category.general && c != Category.local && !app.followedTopics.contains(c))
         .toList();
+    // Load-as-you-scroll (like IG / TikTok): the first batch is World + your
+    // first 3 topics; each further page brings one more place or topic.
+    final later = <Future<NewsBundle> Function()>[
+      for (final p in app.followed) () => app.repo.place(p),
+      for (final c in app.followedTopics.skip(3)) () => app.repo.topic(c),
+      for (final c in extra) () => app.repo.topic(c),
+    ];
     final header = BriefingHeader(selected: _sel, onSelect: (id) => setState(() => _sel = id));
 
     Place? place;
@@ -85,8 +93,8 @@ class _ForYouScreenState extends State<ForYouScreen> {
       streamLoader: (force) async* {
         List<Story>? last;
         await for (final stories in app.repo.briefingStream(
-          places: app.followed,
-          topics: app.followedTopics,
+          places: const [],
+          topics: app.followedTopics.take(3).toList(),
           profile: app.profile,
           force: force,
         )) {
@@ -99,14 +107,9 @@ class _ForYouScreenState extends State<ForYouScreen> {
         }
       },
       onLoadMore: (page) async {
-        final picks = extra.skip(page * 2).take(2).toList();
-        if (picks.isEmpty) return <Story>[];
-        final stories = <Story>[];
-        for (final c in picks) {
-          final b = await app.repo.topic(c);
-          stories.addAll(b.stories);
-        }
-        return Curator.rank(stories, app.profile, limit: 30);
+        if (page >= later.length) return <Story>[];
+        final b = await later[page]();
+        return Curator.rank(b.stories, app.profile, limit: 30);
       },
       header: header,
     );
@@ -223,15 +226,8 @@ class _TopicTileState extends State<TopicTile> {
         child: Stack(fit: StackFit.expand, children: [
           FutureBuilder<String?>(
             future: _img,
-            builder: (context, snap) => snap.data == null
-                ? Align(
-                    alignment: Alignment.bottomRight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(Brand.categoryIcon(c), size: 64, color: Colors.white.withValues(alpha: 0.15)),
-                    ),
-                  )
-                : NetImage(snap.data!, width: 600),
+            // Bundled photo shows instantly; a fresh one replaces it if found.
+            builder: (context, snap) => snap.data == null ? TopicPhoto(c, width: 600) : NetImage(snap.data!, width: 600),
           ),
           const DecoratedBox(
             decoration: BoxDecoration(

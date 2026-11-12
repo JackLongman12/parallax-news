@@ -81,7 +81,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _tab = widget.initialTab;
   late final _built = <int>{widget.initialTab};
 
-  static const _titles = ['For You', 'Topics', 'Markets', 'Explore', 'Blindspot', 'Sources'];
+  static const _titles = ['For You', 'Topics', 'Markets', 'Explore', 'Blindspot'];
 
   @override
   void initState() {
@@ -146,10 +146,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         return const MarketsScreen();
       case 3:
         return const ExploreScreen();
-      case 4:
-        return const BlindspotScreen();
       default:
-        return const SourcesScreen();
+        return const BlindspotScreen();
     }
   }
 
@@ -169,7 +167,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       // Tabs are built lazily on first visit, then kept alive.
       body: IndexedStack(
         index: _tab,
-        children: [for (var i = 0; i < 6; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+        children: [for (var i = 0; i < 5; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
       ),
       // Thumb-reach shortcuts above the bottom bar.
       floatingActionButton: _tab == 3
@@ -200,7 +198,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           BarItem(Icons.show_chart_rounded, Icons.insights_rounded, 'Markets'),
           BarItem(Icons.explore_outlined, Icons.explore_rounded, 'Explore'),
           BarItem(Icons.visibility_off_outlined, Icons.visibility_off_rounded, 'Blindspot'),
-          BarItem(Icons.newspaper_outlined, Icons.newspaper_rounded, 'Sources'),
         ],
         onSelect: (i) {
           HapticFeedback.selectionClick();

@@ -54,7 +54,7 @@ class StoryList extends StatefulWidget {
 }
 
 class _StoryListState extends State<StoryList> {
-  static const _pageSize = 15;
+  static const _pageSize = 10;
   List<Story> _all = [];
   int _visible = _pageSize;
   bool _loading = true;
@@ -63,6 +63,7 @@ class _StoryListState extends State<StoryList> {
   int _extraPage = 0;
   String? _error;
   final _scroll = ScrollController();
+  final _refreshKey = GlobalKey<RefreshIndicatorState>();
   StreamSubscription<List<Story>>? _sub;
   bool _refreshing = false;
   Timer? _autoTimer;
@@ -72,7 +73,7 @@ class _StoryListState extends State<StoryList> {
   /// Start loading covers for the cards just below the fold.
   void _prefetch() {
     if (!mounted || context.read<AppState>().settings.lite) return;
-    final end = (_visible + 6).clamp(0, _all.length);
+    final end = (_visible + 3).clamp(0, _all.length);
     for (var i = 0; i < end; i++) {
       final st = _all[i];
       if (!_prefetched.add(st.id)) continue;
@@ -130,7 +131,8 @@ class _StoryListState extends State<StoryList> {
     } else if (_scroll.offset > 8) {
       _scroll.animateTo(0, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
     } else {
-      _load(true); // already at the top: refresh
+      // Already at the top: refresh, with the spinner so it's visible.
+      _refreshKey.currentState?.show() ?? _load(true);
     }
   }
 
@@ -290,6 +292,7 @@ class _StoryListState extends State<StoryList> {
     final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == _all.length);
     if (_all.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _prefetch());
     final list = RefreshIndicator(
+      key: _refreshKey,
       onRefresh: () => _load(true),
       child: _all.isEmpty
           ? ListView(children: [

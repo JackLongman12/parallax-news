@@ -286,6 +286,27 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- Today in brief: what has been read ----
+  String _today() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month}-${n.day}';
+  }
+
+  /// How many brief stories are new since it was last opened. A new day
+  /// always counts as new (returns the full count).
+  int briefUnseen(List<Story> picks) {
+    if (_prefs.getString('briefDay') != _today()) return picks.length >= 1 ? picks.length : 0;
+    final seen = (_prefs.getStringList('briefSeen') ?? const []).toSet();
+    final fresh = picks.where((s) => !seen.contains(s.title)).length;
+    return fresh >= 5 ? fresh : 0;
+  }
+
+  void markBriefSeen(List<Story> picks) {
+    _prefs.setString('briefDay', _today());
+    final seen = {...?_prefs.getStringList('briefSeen'), ...picks.map((s) => s.title)}.toList();
+    _prefs.setStringList('briefSeen', seen.length > 200 ? seen.sublist(seen.length - 200) : seen);
+  }
+
   // ---- One-time tips ----
   bool tipSeen(String id) => (_prefs.getStringList('tipsSeen') ?? const []).contains(id);
 
