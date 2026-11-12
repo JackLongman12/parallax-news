@@ -32,7 +32,7 @@ class UpdateProgress {
 class Updater {
   static const manifestUrl = String.fromEnvironment(
     'UPDATE_MANIFEST_URL',
-    defaultValue: 'https://github.com/JackLongman12/parallax-news-releases/releases/latest/download/latest.json',
+    defaultValue: 'https://github.com/JackLongman12/parallax-news/releases/latest/download/latest.json',
   );
 
   static const _allowedHosts = {

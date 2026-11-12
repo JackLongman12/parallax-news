@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # publish releases (auto-update source)
 
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  RELEASES_REPO: ${{ github.repository_owner }}/parallax-news-releases
+  RELEASES_REPO: ${{ github.repository }}
 
 jobs:
   build:
@@ -107,15 +107,10 @@ jobs:
           path: dist/
           retention-days: 14
 
-      - name: Publish to releases repo (enables auto-update)
+      - name: Publish release (auto-update source)
+        if: github.ref == 'refs/heads/main'
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::RELEASES_TOKEN not set - skipping publish; auto-update will not see this build."
-            exit 0
-          fi
           TAG="v0.1.${{ github.run_number }}"
-          gh release create "$TAG" dist/*.apk dist/latest.json dist/sources.json \
-            --repo "$RELEASES_REPO" --title "Parallax News $TAG" \
-            --notes "Automated test build from ${GITHUB_SHA::7}" --latest
+          gh release create "$TAG" dist/*.apk dist/latest.json dist/sources.json             --repo "$RELEASES_REPO" --title "Parallax News $TAG"             --notes "Automated test build from ${GITHUB_SHA::7}" --latest

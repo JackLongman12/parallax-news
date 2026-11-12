@@ -26,7 +26,9 @@ CI (`.github/workflows/android.yml`) generates the Android project, runs analysi
 One-time setup:
 1. Run `python tool/make_keystore.py` and back up `secrets/signing.keystore`.
 2. Store it with `gh secret set ANDROID_KEYSTORE_B64 < secrets/signing.keystore.b64`.
-3. To enable auto-update, create a public `parallax-news-releases` repo and add a `RELEASES_TOKEN` secret (a fine-grained token with *Contents: write* on that repo).
+3. Each push to `main` publishes a GitHub Release (APK + `latest.json`). Installed apps update from there automatically.
+
+**Install:** download the APK from [Releases](https://github.com/JackLongman12/parallax-news/releases/latest) and allow "Install unknown apps" once.
 
 ## Contributing ratings
 
