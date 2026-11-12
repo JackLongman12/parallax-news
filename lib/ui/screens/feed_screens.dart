@@ -150,14 +150,13 @@ class BriefingHeader extends StatelessWidget {
       for (final p in [Place.world, ...app.followed])
         (
           p.name,
-          _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag),
-              const [Brand.deep, Brand.blue]),
+          _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag)),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p))),
         ),
       for (final c in app.followedTopics)
         (
           c.label,
-          _bubble(Brand.categoryIcon(c), Brand.categoryColors(c)),
+          _bubble(Brand.categoryIcon(c)),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),
         ),
     ];
@@ -188,11 +187,9 @@ class BriefingHeader extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
         child: Row(children: [
-          ShaderMask(
-            shaderCallback: (r) => Brand.spectrum.createShader(r),
-            child: const Text("Today's briefing",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-          ),
+          Text("Today's briefing",
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface)),
           const Spacer(),
           Text('${app.followed.length} places · ${app.followedTopics.length} topics',
               style: Theme.of(context).textTheme.bodySmall),
@@ -201,8 +198,8 @@ class BriefingHeader extends StatelessWidget {
     ]);
   }
 
-  static Widget _bubble(IconData icon, List<Color> colors) => DecoratedBox(
-        decoration: BoxDecoration(gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+  static Widget _bubble(IconData icon) => ColoredBox(
+        color: Brand.black,
         child: Center(child: Icon(icon, color: Colors.white, size: 26)),
       );
 }

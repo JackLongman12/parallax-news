@@ -133,16 +133,12 @@ class StoryCard extends StatelessWidget {
     final lite = context.select<AppState, bool>((s) => s.settings.lite);
     final img = lite ? null : story.imageUrl;
     final blind = dist.blindspotFor;
-    final colors = Brand.categoryColors(story.category);
 
     // Hero: photo with a dark scrim, or a category gradient "post".
     final hero = SizedBox(
       height: lite ? 150 : 190,
       child: Stack(fit: StackFit.expand, children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-              gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-        ),
+        ColoredBox(color: theme.brightness == Brightness.dark ? Brand.deep : Brand.purple),
         if (img == null)
           Positioned(
             right: -18,
@@ -151,7 +147,8 @@ class StoryCard extends StatelessWidget {
           ),
         if (img != null)
           Image.network(img, fit: BoxFit.cover, cacheWidth: 720, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-        const DecoratedBox(
+        if (img != null)
+          const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -323,7 +320,7 @@ class ArticleTile extends StatelessWidget {
         child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
           Text(article.sourceName, style: const TextStyle(fontWeight: FontWeight.w600)),
           if (s != null) BiasChip(source: s),
-          if (article.isLocal) const Tag('Local', color: Colors.teal),
+          if (article.isLocal) const Tag('Local', color: Brand.purple),
           if (s?.stateAffiliated ?? false) const Tag('State-affiliated', color: Colors.deepOrange),
           Text(timeAgo(article.published)),
         ]),

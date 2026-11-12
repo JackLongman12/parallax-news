@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <corners android:radius="24dp" />
-    <!-- Purple, fading to blue -->
-    <gradient
-        android:angle="315"
-        android:startColor="#4A1FA8"
-        android:centerColor="#6E35D9"
-        android:endColor="#3F5BEA"
-        android:type="linear" />
+    <solid android:color="#7C3AED" />
 </shape>

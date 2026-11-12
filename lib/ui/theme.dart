@@ -2,28 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../models/category.dart';
 
-/// Brand palette: purple-led, fading into blue (left) or red (right) at the edges.
+/// Brand palette: solid purple, white and black. No gradients.
+/// (Blue/red are used only to encode political lean in bias bars.)
 class Brand {
-  static const deep = Color(0xFF3A1786);
-  static const purple = Color(0xFF6E35D9);
-  static const violet = Color(0xFF9B6BFF);
-  static const blue = Color(0xFF3F5BEA);
+  static const purple = Color(0xFF7C3AED);
+  static const deep = Color(0xFF5B21B6);
+  static const violet = Color(0xFFC4B5FD);
+  static const black = Color(0xFF0A0A0C);
+  static const white = Color(0xFFFFFFFF);
   static const red = Color(0xFFE0406A);
-
-  static const gradient = LinearGradient(
-    colors: [deep, purple, violet],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  /// The signature "spectrum" fade used for rings, bars and highlights.
-  static const spectrum = LinearGradient(colors: [blue, purple, red]);
-
-  /// Each category gets purple with an occasional fade to blue or red.
-  static List<Color> categoryColors(Category c) {
-    final fade = c.index % 3 == 0 ? red : (c.index % 3 == 1 ? blue : violet);
-    return [deep, purple, fade];
-  }
+  static const blue = Color(0xFF3F5BEA);
 
   static IconData categoryIcon(Category c) {
     switch (c) {
@@ -73,9 +61,9 @@ class Brand {
   static ThemeData theme(Brightness b) {
     final dark = b == Brightness.dark;
     final scheme = ColorScheme.fromSeed(seedColor: purple, brightness: b).copyWith(
-      primary: dark ? violet : purple,
-      secondary: dark ? const Color(0xFFC6A8FF) : deep,
-      surface: dark ? const Color(0xFF120B22) : const Color(0xFFF8F5FF),
+      primary: dark ? const Color(0xFFA78BFA) : purple,
+      secondary: dark ? violet : deep,
+      surface: dark ? black : white,
     );
     return ThemeData(
       useMaterial3: true,
@@ -83,7 +71,7 @@ class Brand {
       scaffoldBackgroundColor: scheme.surface,
       cardTheme: CardThemeData(
         elevation: 0,
-        color: dark ? const Color(0xFF1C1233) : Colors.white,
+        color: dark ? const Color(0xFF16141C) : white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         margin: EdgeInsets.zero,
       ),
@@ -94,45 +82,42 @@ class Brand {
         centerTitle: false,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: dark ? const Color(0xFF170E2B) : Colors.white,
+        backgroundColor: dark ? black : white,
         indicatorColor: purple.withValues(alpha: dark ? 0.45 : 0.16),
         labelTextStyle: WidgetStatePropertyAll(
-            TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: dark ? Colors.white : deep)),
+            TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: dark ? white : black)),
       ),
       chipTheme: ChipThemeData(shape: StadiumBorder(side: BorderSide(color: purple.withValues(alpha: 0.25)))),
     );
   }
 }
 
-/// Gradient "Parallax" wordmark for the app bar.
+/// "parallax" wordmark for the app bar.
 class Wordmark extends StatelessWidget {
   const Wordmark({super.key, this.size = 24});
   final double size;
 
   @override
-  Widget build(BuildContext context) => ShaderMask(
-        shaderCallback: (r) => Brand.spectrum.createShader(r),
-        child: Text('parallax',
-            style: TextStyle(fontSize: size, fontWeight: FontWeight.w900, letterSpacing: -0.8, color: Colors.white)),
-      );
+  Widget build(BuildContext context) => Text('parallax',
+      style: TextStyle(
+          fontSize: size,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.8,
+          color: Theme.of(context).colorScheme.primary));
 }
 
-/// Instagram-style gradient ring around an avatar.
+/// Instagram-style ring around an avatar (solid purple).
 class GradientRing extends StatelessWidget {
-  const GradientRing({super.key, required this.child, this.size = 66, this.colors});
+  const GradientRing({super.key, required this.child, this.size = 66});
   final Widget child;
   final double size;
-  final List<Color>? colors;
 
   @override
   Widget build(BuildContext context) => Container(
         width: size,
         height: size,
         padding: const EdgeInsets.all(2.5),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: SweepGradient(colors: colors ?? const [Brand.blue, Brand.purple, Brand.red, Brand.violet, Brand.blue]),
-        ),
+        decoration: const BoxDecoration(shape: BoxShape.circle, color: Brand.purple),
         child: Container(
           padding: const EdgeInsets.all(2.5),
           decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).scaffoldBackgroundColor),

@@ -141,27 +141,37 @@ Widget _feedShell(int tab, List<Story> stories, {bool blind = false}) => HomeShe
       },
     );
 
-/// Promo frame: headline + phone mockup containing a live screen.
-Widget _promo(String headline, String sub, Widget screen, List<Color> gradient) => Directionality(
+/// Promo frame: fixed-height caption area + fixed-size phone, so every
+/// promo image shows the phone at exactly the same size and position.
+Widget _promo(String headline, String sub, Widget screen, Color bg) => Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
-        decoration: BoxDecoration(gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-        padding: const EdgeInsets.fromLTRB(36, 56, 36, 0),
+        color: bg,
         child: Column(children: [
-          Text(headline,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Roboto', fontSize: 40, height: 1.1, fontWeight: FontWeight.w800, color: Colors.white)),
-          const SizedBox(height: 14),
-          Text(sub,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Roboto', fontSize: 19, height: 1.3, color: Color(0xE6FFFFFF))),
-          const SizedBox(height: 36),
-          Expanded(
+          SizedBox(
+            height: 250,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(36, 56, 36, 0),
+              child: Column(children: [
+                Text(headline,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: const TextStyle(fontFamily: 'Roboto', fontSize: 40, height: 1.1, fontWeight: FontWeight.w800, color: Colors.white)),
+                const SizedBox(height: 14),
+                Text(sub,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: const TextStyle(fontFamily: 'Roboto', fontSize: 18, height: 1.3, color: Color(0xE6FFFFFF))),
+              ]),
+            ),
+          ),
+          SizedBox(
+            width: 440,
+            height: 830,
             child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(44)),
-                boxShadow: const [BoxShadow(blurRadius: 40, color: Color(0x66000000))],
+              decoration: const BoxDecoration(
+                color: Brand.black,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(44)),
               ),
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
               child: ClipRRect(
@@ -169,7 +179,7 @@ Widget _promo(String headline, String sub, Widget screen, List<Color> gradient) 
                 child: FittedBox(
                   fit: BoxFit.fitWidth,
                   alignment: Alignment.topCenter,
-                  child: SizedBox(width: 412, height: 820, child: screen),
+                  child: SizedBox(width: 412, height: 830, child: screen),
                 ),
               ),
             ),
@@ -181,30 +191,18 @@ Widget _promo(String headline, String sub, Widget screen, List<Color> gradient) 
 Widget _feature() => Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
-        decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Brand.blue, Brand.deep, Brand.purple, Brand.deep, Brand.red], stops: [0, 0.25, 0.55, 0.8, 1])),
+        color: Brand.black,
         padding: const EdgeInsets.all(48),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
               const Text('Parallax News',
-                  style: TextStyle(fontFamily: 'Roboto', fontSize: 64, fontWeight: FontWeight.w800, color: Colors.white)),
+                  style: TextStyle(fontFamily: 'Roboto', fontSize: 64, fontWeight: FontWeight.w900, color: Brand.purple)),
               const SizedBox(height: 10),
               const Text('Every side of every story —\nfrom the world to your street.',
                   style: TextStyle(fontFamily: 'Roboto', fontSize: 28, height: 1.25, color: Color(0xE6FFFFFF))),
               const SizedBox(height: 28),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  height: 20,
-                  width: 460,
-                  child: Row(children: [
-                    Expanded(flex: 35, child: Container(color: Side.left.color)),
-                    Expanded(flex: 30, child: Container(color: Side.center.color)),
-                    Expanded(flex: 35, child: Container(color: Side.right.color)),
-                  ]),
-                ),
-              ),
+              Container(width: 120, height: 8, decoration: BoxDecoration(color: Brand.purple, borderRadius: BorderRadius.circular(4))),
               const SizedBox(height: 10),
               const Text('Open source · No account · No tracking · Free',
                   style: TextStyle(fontFamily: 'Roboto', fontSize: 20, color: Color(0xCCFFFFFF))),
@@ -287,15 +285,15 @@ void main() {
   });
 
   const promoSize = Size(540, 1080);
-  final promos = <(String, String, String, Widget Function(), List<Color>)>[
+  final promos = <(String, String, String, Widget Function(), Color)>[
     ('promo_1', 'See every side\nof every story', 'Coverage from left, center and right — side by side.',
-        () => _feedShell(0, stories), [Brand.deep, Brand.purple, Brand.blue]),
+        () => _feedShell(0, stories), Brand.purple),
     ('promo_2', 'Know who is\ntelling it', 'Bias, factuality, ownership and state affiliation for every outlet.',
-        () => StoryScreen(story: stories.first), [Brand.deep, Brand.purple, Brand.violet]),
+        () => StoryScreen(story: stories.first), Brand.black),
     ('promo_3', 'From the world\nto your street', 'Continents, countries, states, cities and neighbourhood papers.',
-        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), [Brand.deep, Brand.purple, Brand.red]),
+        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), Brand.purple),
     ('promo_4', 'Break out of\nyour bubble', 'Blindspots reveal stories one side is ignoring.',
-        () => _feedShell(3, stories), [Brand.deep, Brand.purple, Brand.red]),
+        () => _feedShell(3, stories), Brand.black),
   ];
 
   for (final p in promos) {
