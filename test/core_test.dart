@@ -16,6 +16,7 @@ import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
 import 'package:parallax_news/services/places.dart';
 import 'package:parallax_news/services/provider_health.dart';
+import 'package:parallax_news/services/summarizer.dart';
 
 Article art(String title, String domain, {Bias bias = Bias.unrated, Category? hint}) {
   final a = Article(
@@ -210,7 +211,62 @@ void main() {
     });
   });
 
+  group('TL;DR', () {
+    Article withSnippet(String title, String domain, String snippet, Bias bias) {
+      final a = Article(
+          title: title, url: 'https://$domain/x', sourceName: domain, domain: domain, provider: 'rss', snippet: snippet);
+      a.source = SourceInfo(domain: domain, name: domain, bias: bias);
+      return a;
+    }
+
+    test('picks corroborated sentences, attributed, never invented', () {
+      final s = Story(id: 's', category: Category.politics, articles: [
+        withSnippet('Senate passes budget', 'a.com',
+            'The Senate passed the budget bill by 52 votes to 48 on Tuesday. Critics called it reckless spending.', Bias.left),
+        withSnippet('Budget clears Senate', 'b.com',
+            'The budget bill passed the Senate 52 to 48 on Tuesday night. It now goes to the House for a vote.', Bias.right),
+        withSnippet('Budget vote', 'c.com',
+            'Lawmakers in the Senate passed the budget bill on Tuesday, 52-48. Markets barely reacted to the news today.', Bias.center),
+      ]);
+      final sum = Summarizer.summarize(s);
+      expect(sum.points, isNotEmpty);
+      // The corroborated fact (52-48 vote) ranks first.
+      expect(sum.points.first.text, contains('52'));
+      // Every point is verbatim text from one outlet.
+      for (final p in sum.points) {
+        expect(p.article.snippet, contains(p.text));
+      }
+      expect(sum.framing.keys, containsAll([Side.left, Side.center, Side.right]));
+    });
+  });
+
+  group('Snapshot', () {
+    test('stories round-trip through JSON', () {
+      final s = Story(id: 'x1', category: Category.ai, articles: [art('Chip news', 'a.com', hint: Category.ai)]);
+      final back = Story.fromJson(s.toJson())!;
+      expect(back.id, 'x1');
+      expect(back.category, Category.ai);
+      expect(back.articles.single.title, 'Chip news');
+      expect(Story.fromJson({'id': 1}), isNull); // malformed data is ignored
+    });
+  });
+
   group('Cover images', () {
+    test('Bing thumbnails are upscaled and flagged low-res', () {
+      final up = FeedParser.upscaleImage('https://www.bing.com/th?id=OVFT.abc&pid=News');
+      expect(up, contains('w=1200'));
+      expect(up, isNot(contains('pid=')));
+      expect(CoverImages.isLowRes('https://www.bing.com/th?id=OVFT.abc'), isTrue);
+      expect(CoverImages.isLowRes('https://cdn.site.com/big.jpg'), isFalse);
+    });
+
+    test('image keywords prefer proper nouns', () {
+      final s = Story(id: 'k', category: Category.space, articles: [art('NASA delays Artemis launch over heat shield worries', 'x.com')]);
+      final k = CoverImages.keywordsFor(s);
+      expect(k, contains('NASA'));
+      expect(k, contains('Artemis'));
+    });
+
     test('extracts og:image and rejects private/http hosts', () {
       final base = Uri.parse('https://news.example.com/a/b');
       expect(

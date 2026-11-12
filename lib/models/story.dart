@@ -104,4 +104,20 @@ class Story {
     }
     return BiasDistribution(l, c, r, u);
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'c': category.name,
+        'a': articles.take(12).map((a) => a.toJson()).toList(),
+      };
+
+  static Story? fromJson(Map<String, dynamic> j) {
+    try {
+      final arts = (j['a'] as List).whereType<Map<String, dynamic>>().map(Article.fromJson).whereType<Article>().toList();
+      if (arts.isEmpty) return null;
+      return Story(id: j['id'] as String, articles: arts, category: Category.byName(j['c'] as String?) ?? Category.general);
+    } catch (_) {
+      return null;
+    }
+  }
 }

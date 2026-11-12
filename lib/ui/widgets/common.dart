@@ -24,6 +24,13 @@ String timeAgo(DateTime? t) {
   return '${d.inDays}d ago';
 }
 
+/// Decode images at the real on-screen pixel width (sharp on any phone,
+/// without wasting memory on huge originals).
+int decodeWidth(BuildContext context) {
+  final px = MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context);
+  return px.round().clamp(480, 1440);
+}
+
 Future<void> openArticle(BuildContext context, String url) async {
   if (!isSafeWebUrl(url)) return;
   final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
@@ -256,7 +263,7 @@ class _StoryCardState extends State<StoryCard> {
               Image.network(
                 img,
                 fit: BoxFit.cover,
-                cacheWidth: 720,
+                cacheWidth: decodeWidth(context),
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 frameBuilder: (context, child, frame, sync) => AnimatedOpacity(
                   opacity: frame == null ? 0 : 1,
@@ -286,6 +293,12 @@ class _StoryCardState extends State<StoryCard> {
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
               ]),
             ),
+            if (img != null && CoverImages.needsCredit(img))
+              const Positioned(
+                right: 10,
+                top: 40,
+                child: Text('Photo: Wikimedia Commons', style: TextStyle(color: Colors.white70, fontSize: 9)),
+              ),
             Positioned(
               left: 16,
               right: 16,

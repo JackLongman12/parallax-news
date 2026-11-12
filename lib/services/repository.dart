@@ -56,6 +56,9 @@ class NewsRepository {
   void Function()? onModelUpdated;
   void Function()? onRatingsUpdated;
 
+  /// Set by widget tests (no network available there).
+  static bool offline = false;
+
   final Map<String, NewsBundle> _cache = {};
   final Map<String, Future<NewsBundle>> _inflight = {};
   final Map<String, List<SourceInfo>> _outletCache = {};
@@ -299,6 +302,44 @@ class NewsRepository {
 
   /// The daily briefing: everything the reader follows, merged, re-clustered
   /// across sources and ranked by the [Curator].
+  /// Progressive briefing for a fast start. Emits a ranked feed after each
+  /// stage instead of waiting for everything:
+  ///   1. World + your first 3 topics (in parallel)
+  ///   2. each followed place, one at a time
+  ///   3. the remaining topics, one at a time
+  Stream<List<Story>> briefingStream({
+    required List<Place> places,
+    required List<Category> topics,
+    required InterestProfile profile,
+    bool force = false,
+  }) async* {
+    final collected = <Article>[];
+    final seen = <String>{};
+    Future<void> add(Future<NewsBundle> f) async {
+      try {
+        for (final a in (await f).articles) {
+          if (seen.add(a.url)) collected.add(a);
+        }
+      } catch (_) {}
+    }
+
+    List<Story> ranked() => Curator.rank(_clusterAndLabel(collected), profile);
+
+    await Future.wait([
+      add(place(Place.world, force: force)),
+      for (final t in topics.take(3)) add(topic(t, force: force)),
+    ]);
+    yield ranked();
+    for (final p in places) {
+      await add(place(p, force: force));
+      yield ranked();
+    }
+    for (final t in topics.skip(3)) {
+      await add(topic(t, force: force));
+      yield ranked();
+    }
+  }
+
   Future<List<Story>> briefing({
     required List<Place> places,
     required List<Category> topics,
@@ -322,7 +363,7 @@ class NewsRepository {
   /// topic, nudged by the reader's own interests. Uses already-loaded news
   /// plus the story's topic feed, so it's instant most of the time.
   Future<List<Story>> related(Story s, InterestProfile profile, {int limit = 12}) async {
-    if (s.category != Category.general && s.category != Category.local) {
+    if (!offline && s.category != Category.general && s.category != Category.local) {
       try {
         await topic(s.category).timeout(const Duration(seconds: 12));
       } catch (_) {}

@@ -4,6 +4,7 @@ import '../models/story.dart';
 import 'feed_parser.dart';
 import 'net.dart';
 import 'providers.dart';
+import 'text.dart';
 
 /// Finds a real news photo for a story. Google News RSS carries no images, so
 /// we try, cheapest first:
@@ -21,11 +22,30 @@ class CoverImages {
   /// Disabled by the screenshot generator (no network in widget tests).
   static bool enabled = true;
 
-  static String? cached(Story s) => s.imageUrl ?? _cache[s.id];
+  static String? cached(Story s) => _cache[s.id] ?? s.imageUrl;
+
+  /// Restores a cover remembered from the last session (validated again).
+  static void seed(String id, String url) {
+    final u = Uri.tryParse(url);
+    if (u != null && u.scheme == 'https' && isPublicHost(u.host)) _cache[id] = url;
+  }
+
+  /// Bing /th thumbnails and similar are small; try for something better first.
+  static bool isLowRes(String url) {
+    final u = Uri.tryParse(url);
+    if (u == null) return true;
+    if (u.host.endsWith('bing.com') && u.path.startsWith('/th')) return true;
+    final w = int.tryParse(u.queryParameters['w'] ?? u.queryParameters['width'] ?? '');
+    return w != null && w < 500;
+  }
+
+  /// Images from Wikimedia Commons need a credit line.
+  static bool needsCredit(String url) => Uri.tryParse(url)?.host == 'upload.wikimedia.org';
 
   static Future<String?> forStory(Story s) {
     final direct = s.imageUrl;
-    if (direct != null || !enabled) return Future.value(direct);
+    if (!enabled) return Future.value(direct);
+    if (direct != null && !isLowRes(direct)) return Future.value(direct);
     if (_cache.containsKey(s.id)) return Future.value(_cache[s.id]);
     return _inflight[s.id] ??= _limited(() => _find(s)).then((url) {
       if (_cache.length > 600) _cache.clear();
@@ -50,24 +70,88 @@ class CoverImages {
     }
   }
 
-  static Future<String?> _find(Story s) async {
-    // 2. Publisher pages (Google links are redirect wrappers, so skip them).
-    final pages = s.articles.where((a) => a.provider != 'google' && isSafeWebUrl(a.url)).take(2);
-    for (final a in pages) {
-      try {
-        final html = await Net.getText(a.url,
-            useCache: false, headBytes: 200 * 1024, timeout: const Duration(seconds: 8));
-        final img = extractMetaImage(html, Uri.parse(a.url));
-        if (img != null) return img;
-      } catch (_) {}
+  static Future<String?> _ogImage(String url) async {
+    try {
+      final html = await Net.getText(url, useCache: false, headBytes: 200 * 1024, timeout: const Duration(seconds: 8));
+      return extractMetaImage(html, Uri.parse(url));
+    } catch (_) {
+      return null;
     }
-    // 3. Search the headline on Bing News, which returns thumbnails.
+  }
+
+  static Future<String?> _find(Story s) async {
+    // 1. Full-size images already present in the story's feeds.
+    for (final a in s.articles) {
+      final img = a.imageUrl;
+      if (img != null && !isLowRes(img)) return img;
+    }
+    // 2. Publisher pages' og:image (Google links are redirect wrappers; skip).
+    for (final a in s.articles.where((a) => a.provider != 'google' && isSafeWebUrl(a.url)).take(2)) {
+      final img = await _ogImage(a.url);
+      if (img != null) return img;
+    }
+    // 3. Find the same story on Bing, then use that publisher's og:image.
+    String? thumb;
     try {
       final results = await BingNews.search(s.title).timeout(const Duration(seconds: 8));
-      for (final r in results) {
-        if (r.imageUrl != null) return r.imageUrl;
+      for (final r in results.take(2)) {
+        final img = await _ogImage(r.url);
+        if (img != null) return img;
+        thumb ??= r.imageUrl;
       }
     } catch (_) {}
+    // 4. Any lower-res image we have (already upscaled where possible).
+    thumb ??= s.articles.map((a) => a.imageUrl).whereType<String>().firstOrNull;
+    if (thumb != null) return thumb;
+    // 5. Generic but relevant photo by keywords from Wikimedia Commons.
+    return commonsImage(s);
+  }
+
+  static final _caps = RegExp(r"\b[A-Z][a-zA-Z'’-]{2,}(?:\s+[A-Z][a-zA-Z'’-]{2,})*");
+
+  /// Keywords for an image search: proper nouns first (places, people,
+  /// organisations), then the most specific other words.
+  static String keywordsFor(Story s) {
+    final title = s.title;
+    final proper = _caps
+        .allMatches(title)
+        .map((m) => m.group(0)!)
+        .where((w) => !TextTokens.isStopWord(w.toLowerCase()))
+        .toList();
+    final words = TextTokens.tokens(title)..sort((a, b) => b.length.compareTo(a.length));
+    final parts = <String>[...proper.take(2)];
+    for (final w in words) {
+      if (parts.length >= 3) break;
+      if (!parts.any((p) => p.toLowerCase().contains(w))) parts.add(w);
+    }
+    return parts.join(' ');
+  }
+
+  static Future<String?> commonsImage(Story s) async {
+    final queries = [keywordsFor(s), s.category.label];
+    for (final q in queries) {
+      if (q.trim().isEmpty) continue;
+      try {
+        final url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
+            '&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1200'
+            '&gsrsearch=${Uri.encodeQueryComponent('filetype:bitmap $q')}';
+        final json = await Net.getJson(url).timeout(const Duration(seconds: 8));
+        final pages = (json is Map ? (json['query'] as Map?)?['pages'] : null) as Map?;
+        if (pages == null) continue;
+        final infos = pages.values
+            .whereType<Map>()
+            .map((p) => ((p['imageinfo'] as List?)?.firstOrNull) as Map?)
+            .whereType<Map>()
+            .where((i) => (i['width'] as num? ?? 0) >= 800 && '${i['mime']}'.startsWith('image/'))
+            .toList();
+        for (final i in infos) {
+          final thumb = Uri.tryParse('${i['thumburl'] ?? i['url']}');
+          if (thumb != null && thumb.scheme == 'https' && thumb.host == 'upload.wikimedia.org') {
+            return thumb.toString();
+          }
+        }
+      } catch (_) {}
+    }
     return null;
   }
 
@@ -92,6 +176,6 @@ class CoverImages {
     final resolved = base.resolve(FeedParser.decodeEntities(raw.trim()));
     final u = resolved.scheme == 'http' ? resolved.replace(scheme: 'https') : resolved;
     if (u.scheme != 'https' || !isPublicHost(u.host)) return null;
-    return u.toString();
+    return FeedParser.upscaleImage(u.toString());
   }
 }

@@ -11,6 +11,7 @@ import '../models/place.dart';
 import '../models/source.dart';
 import '../models/story.dart';
 import '../services/bias_service.dart';
+import '../services/cover_images.dart';
 import '../services/classifier.dart';
 import '../services/curator.dart';
 import '../services/repository.dart';
@@ -95,6 +96,7 @@ class AppState extends ChangeNotifier {
           .map((e) => Place.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (_) {}
+    _loadSnapshot();
     final prof = p.getString('profile');
     if (prof != null) profile.loadJsonString(prof);
   }
@@ -202,6 +204,35 @@ class AppState extends ChangeNotifier {
     if (!profile.hiddenSources.remove(domain)) profile.hiddenSources.add(domain);
     _saveProfileSoon();
     notifyListeners();
+  }
+
+  // ---- Instant-start snapshot of the last feed ----
+  List<Story> snapshot = [];
+
+  void _loadSnapshot() {
+    try {
+      final list = jsonDecode(_prefs.getString('snapshot') ?? '[]') as List;
+      final out = <Story>[];
+      for (final e in list.whereType<Map<String, dynamic>>()) {
+        final s = Story.fromJson(e);
+        if (s == null) continue;
+        final cover = e['cv'];
+        if (cover is String) CoverImages.seed(s.id, cover);
+        out.add(s);
+      }
+      bias.annotate([for (final s in out) ...s.articles]);
+      snapshot = out;
+    } catch (_) {
+      snapshot = [];
+    }
+  }
+
+  void saveSnapshot(List<Story> stories) {
+    snapshot = stories;
+    final data = [
+      for (final s in stories.take(40)) {...s.toJson(), 'cv': CoverImages.cached(s)}
+    ];
+    _prefs.setString('snapshot', jsonEncode(data));
   }
 
   // ---- Recent places ----

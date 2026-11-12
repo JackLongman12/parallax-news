@@ -5,6 +5,7 @@ import '../../models/article.dart';
 import '../../models/bias.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
+import '../../services/summarizer.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -22,6 +23,7 @@ class _StoryScreenState extends State<StoryScreen> {
   late final AppState _app;
   late final Future<List<Story>> _related = _app.repo.related(widget.story, _app.profile);
   late final Future<String?> _cover = CoverImages.forStory(widget.story);
+  late final StorySummary _summary = Summarizer.summarize(widget.story);
 
   Story get story => widget.story;
 
@@ -44,13 +46,14 @@ class _StoryScreenState extends State<StoryScreen> {
     final dist = story.distribution;
     final all = story.uniqueSources;
     List<Article> bySide(Side? side) => all.where((a) => a.source?.bias.side == side).toList();
+    // Short labels so every tab fits on screen without swiping.
     final tabs = <(String, List<Article>?)>[
-      ('All (${all.length})', all),
-      ('Left (${dist.left})', bySide(Side.left)),
-      ('Center (${dist.center})', bySide(Side.center)),
-      ('Right (${dist.right})', bySide(Side.right)),
-      if (dist.unrated > 0) ('Unrated (${dist.unrated})', bySide(null)),
-      ('Related', null),
+      ('All ${all.length}', all),
+      ('Left ${dist.left}', bySide(Side.left)),
+      ('Ctr ${dist.center}', bySide(Side.center)),
+      ('Right ${dist.right}', bySide(Side.right)),
+      if (dist.unrated > 0) ('N/R ${dist.unrated}', bySide(null)),
+      ('More', null),
     ];
     final blind = dist.blindspotFor;
 
@@ -98,16 +101,20 @@ class _StoryScreenState extends State<StoryScreen> {
                       ),
                     ),
                   ],
-                  if (story.lead.snippet.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(story.lead.snippet),
-                  ],
+                  const SizedBox(height: 14),
+                  SummaryCard(summary: _summary),
                 ]),
               ),
             ),
             SliverPersistentHeader(
               pinned: true,
-              delegate: _TabHeader(TabBar(isScrollable: true, tabs: [for (final t in tabs) Tab(text: t.$1)])),
+              delegate: _TabHeader(TabBar(
+                isScrollable: false,
+                labelPadding: EdgeInsets.zero,
+                labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                tabs: [for (final t in tabs) Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text(t.$1)))],
+              )),
             ),
           ],
           body: TabBarView(children: [
@@ -146,7 +153,13 @@ class _StoryScreenState extends State<StoryScreen> {
                 child: Icon(Brand.categoryIcon(story.category), size: 190, color: Colors.white.withValues(alpha: 0.10)),
               ),
             if (img != null)
-              Image.network(img, fit: BoxFit.cover, cacheWidth: 1080, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              Image.network(img, fit: BoxFit.cover, cacheWidth: decodeWidth(context), errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            if (img != null && CoverImages.needsCredit(img))
+              const Positioned(
+                right: 10,
+                bottom: 4,
+                child: Text('Photo: Wikimedia Commons', style: TextStyle(color: Colors.white70, fontSize: 9)),
+              ),
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -217,4 +230,77 @@ class _TabHeader extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _TabHeader old) => old.bar != bar;
+}
+
+/// TL;DR: extracted (never generated) key points, each attributed to its
+/// outlet, plus how each side of the spectrum headlined the story.
+class SummaryCard extends StatelessWidget {
+  const SummaryCard({super.key, required this.summary});
+  final StorySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    Widget sourceTag(Article a) {
+      final b = a.source?.bias ?? Bias.unrated;
+      return Text(' — ${a.sourceName}${b == Bias.unrated ? '' : ' (${b.label})'}',
+          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700, color: b == Bias.unrated ? null : b.color));
+    }
+
+    const sides = [Side.left, Side.center, Side.right, null];
+    final framing = [for (final s in sides) if (summary.framing[s] != null) (s, summary.framing[s]!)];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Brand.purple.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Brand.purple.withValues(alpha: 0.25)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.bolt, size: 18, color: Brand.purple),
+          const SizedBox(width: 6),
+          Text('TL;DR', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 8),
+        for (final p in summary.points)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('•  ', style: TextStyle(fontWeight: FontWeight.w900)),
+              Expanded(child: Text.rich(TextSpan(children: [TextSpan(text: p.text), WidgetSpan(child: sourceTag(p.article))]))),
+            ]),
+          ),
+        if (framing.length >= 2) ...[
+          if (summary.points.isNotEmpty) const Divider(),
+          Text('How each side headlined it', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          for (final f in framing)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 52,
+                  margin: const EdgeInsets.only(right: 8, top: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: (f.$1?.color ?? Bias.unrated.color).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(f.$1?.label ?? 'N/R',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: f.$1?.color)),
+                ),
+                Expanded(child: Text.rich(TextSpan(children: [TextSpan(text: f.$2.title), WidgetSpan(child: sourceTag(f.$2))]))),
+              ]),
+            ),
+        ],
+        const SizedBox(height: 4),
+        Text('Auto-extracted from ${summary.outlets} outlets — quotes their own words, never rewritten. '
+            'Read the full coverage below for every detail.',
+            style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
+      ]),
+    );
+  }
 }

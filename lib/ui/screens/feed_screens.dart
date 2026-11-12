@@ -65,15 +65,24 @@ class _ForYouScreenState extends State<ForYouScreen> {
     final key = ValueKey('${app.followed.map((p) => p.id).join(',')}|${app.followedTopics.map((c) => c.name).join(',')}|${app.settings.homeCountry}');
     return StoryList(
       key: key,
-      loader: (force) async {
-        final stories = await app.repo.briefing(
+      // Opens instantly with last session's feed, then streams fresh news in
+      // stages (World + 3 topics first, then places, then other topics).
+      initial: app.snapshot,
+      streamLoader: (force) async* {
+        List<Story>? last;
+        await for (final stories in app.repo.briefingStream(
           places: app.followed,
           topics: app.followedTopics,
           profile: app.profile,
           force: force,
-        );
-        unawaited(HomeWidgets.publish(stories));
-        return stories;
+        )) {
+          last = stories;
+          yield stories;
+        }
+        if (last != null && last.isNotEmpty) {
+          app.saveSnapshot(last);
+          unawaited(HomeWidgets.publish(last));
+        }
       },
       onLoadMore: (page) async {
         final picks = extra.skip(page * 2).take(2).toList();

@@ -18,6 +18,7 @@ import 'package:parallax_news/models/place.dart';
 import 'package:parallax_news/models/source.dart';
 import 'package:parallax_news/models/story.dart';
 import 'package:parallax_news/services/cover_images.dart';
+import 'package:parallax_news/services/repository.dart';
 import 'package:parallax_news/state/app_state.dart';
 import 'package:parallax_news/ui/screens/feed_screens.dart';
 import 'package:parallax_news/ui/screens/story_list.dart';
@@ -220,6 +221,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     CoverImages.enabled = false;
     AppState.debounceSaves = false;
+    NewsRepository.offline = true;
     await _loadFonts();
   });
 

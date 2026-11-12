@@ -94,28 +94,37 @@ class FeedParser {
     // Google's description is just the headline + publisher again.
     if (provider == 'google') snippet = '';
 
+    // Pick the LARGEST image offered (feeds often list a tiny thumbnail first).
     String? image;
-    for (final e in item.childElements) {
+    var bestWidth = -1;
+    void consider(String? u, int width) {
+      // Images load outside our Net guard, so only allow public HTTPS hosts.
+      final iu = u == null ? null : Uri.tryParse(u.trim());
+      if (iu == null || iu.scheme != 'https' || !isPublicHost(iu.host)) return;
+      if (width > bestWidth) {
+        bestWidth = width;
+        image = iu.toString();
+      }
+    }
+
+    final mediaEls = [
+      ...item.childElements,
+      for (final g in item.childElements.where((e) => e.name.local == 'group')) ...g.childElements,
+    ];
+    for (final e in mediaEls) {
       final n = e.name.local;
       // Bing: <News:Image>https://www.bing.com/th?id=...</News:Image>
       if (n == 'Image' && e.getAttribute('url') == null) {
-        final iu = Uri.tryParse(e.innerText.trim());
-        if (iu != null && iu.scheme == 'https' && isPublicHost(iu.host)) {
-          image = iu.toString();
-          break;
-        }
-      }
-      if (n == 'thumbnail' || n == 'content' || n == 'enclosure') {
-        final u = e.getAttribute('url');
-        final type = e.getAttribute('type') ?? 'image';
-        // Images load outside our Net guard, so only allow public HTTPS hosts.
-        final iu = u == null ? null : Uri.tryParse(u);
-        if (iu != null && iu.scheme == 'https' && isPublicHost(iu.host) && type.startsWith('image')) {
-          image = u;
-          break;
-        }
+        consider(upscaleImage(e.innerText.trim()), 1000);
+      } else if (n == 'thumbnail' || n == 'content' || n == 'enclosure') {
+        final type = e.getAttribute('type') ?? e.getAttribute('medium') ?? 'image';
+        if (!type.startsWith('image')) continue;
+        // Unknown size: assume medium. Known tiny thumbnails rank lowest.
+        final w = int.tryParse(e.getAttribute('width') ?? '') ?? (n == 'thumbnail' ? 300 : 700);
+        consider(e.getAttribute('url'), w);
       }
     }
+    if (bestWidth > 0 && bestWidth < 250) image = null; // too small to look good
 
     return Article(
       title: title,
@@ -129,6 +138,20 @@ class FeedParser {
       isLocal: isLocal,
       hintCategory: hint,
     );
+  }
+
+  /// Bing serves thumbnails from /th; ask for a large rendition instead.
+  static String upscaleImage(String url) {
+    final u = Uri.tryParse(url);
+    if (u == null || !u.host.endsWith('bing.com') || !u.path.startsWith('/th')) return url;
+    final q = Map<String, String>.from(u.queryParameters)
+      ..['w'] = '1200'
+      ..['h'] = '675'
+      ..['c'] = '7'
+      ..['rs'] = '1'
+      ..['qlt'] = '90'
+      ..remove('pid');
+    return u.replace(queryParameters: q).toString();
   }
 
   static XmlElement? _child(XmlElement e, String local) {

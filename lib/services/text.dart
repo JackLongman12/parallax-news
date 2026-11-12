@@ -13,6 +13,8 @@ class TextTokens {
     'una', 'und', 'der', 'die', 'das', 'mit', 'von', 'den', 'ist', 'dei', 'della', 'che',
   };
 
+  static bool isStopWord(String w) => _stop.contains(w);
+
   static final _split = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
   static final _cjk = RegExp(r'[぀-ヿ㐀-鿿가-힯฀-๿]');
 
