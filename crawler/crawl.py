@@ -454,6 +454,16 @@ def main():
             if a.get("i"):
                 return a["i"]
         cands = [a["u"] for a in c["a"] if a["v"] != "google"][:3]
+        if not cands:
+            # Google links are wrappers: find the same article on Bing to get
+            # a real page URL (and Bing's own thumbnail as a backup).
+            lead = c["a"][0]
+            data = fetch("https://www.bing.com/news/search?q=" + urllib.parse.quote_plus(lead["t"]) + "&format=rss")
+            for b in (parse_feed(data, "bing", None, None) if data else [])[:4]:
+                if sim(tokens(b["t"]), c["tk"]) >= 0.45:
+                    cands.append(b["u"])
+                    if b.get("i"):
+                        c.setdefault("_thumb", b["i"])
         for u in cands:
             if u in og_cache:
                 if og_cache[u]:
@@ -463,7 +473,7 @@ def main():
             og_cache[u] = img
             if img:
                 return img
-        return None
+        return c.get("_thumb")
 
     t0 = time.time()
     with ThreadPoolExecutor(32) as ex:

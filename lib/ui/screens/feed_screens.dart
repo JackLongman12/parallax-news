@@ -426,82 +426,235 @@ class SubPathChips extends StatelessWidget {
   }
 }
 
-/// Blindspot tab, now with collections of under-covered and contrasting stories.
-class BlindspotScreen extends StatefulWidget {
+/// One collection of stories (blindspots, underreported, ...).
+class _Collection {
+  const _Collection(this.id, this.title, this.blurb, this.colors, this.art);
+  final String id;
+  final String title;
+  final String blurb;
+  final List<Color> colors;
+  final CustomPainter Function() art;
+}
+
+final _collections = <_Collection>[
+  _Collection('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers',
+      [const Color(0xFF3B1E8C), Brand.purple], () => _BlindspotArt()),
+  _Collection('underreported', 'Underreported', 'Few outlets, reliable sources',
+      [const Color(0xFF1D1B26), const Color(0xFF3A3550)], () => _UnderreportedArt()),
+  _Collection('divergent', 'Divergent takes', 'Left and right both cover it: compare the framing',
+      [const Color(0xFF2B2F7A), const Color(0xFF7A2B4F)], () => _DivergentArt()),
+  _Collection('left', 'Popular with the left', 'Mostly covered by left-leaning outlets',
+      [const Color(0xFF1E2F9E), const Color(0xFF3F5BEA)], () => _SideArt(Side.left)),
+  _Collection('right', 'Popular with the right', 'Mostly covered by right-leaning outlets',
+      [const Color(0xFF8C1430), const Color(0xFFE0406A)], () => _SideArt(Side.right)),
+];
+
+bool _inCollection(String id, Story s) {
+  final d = s.distribution;
+  switch (id) {
+    case 'blindspot':
+      return d.blindspotFor != null;
+    case 'underreported':
+      final n = s.uniqueSources.length;
+      final good = s.uniqueSources
+          .where((a) => a.source?.factuality == Factuality.high || a.source?.factuality == Factuality.veryHigh)
+          .length;
+      return n >= 2 && n <= 5 && good >= 1;
+    case 'divergent':
+      return d.divergent;
+    case 'left':
+      return d.rated >= 3 && d.share(Side.left) >= 0.6;
+    case 'right':
+      return d.rated >= 3 && d.share(Side.right) >= 0.6;
+  }
+  return false;
+}
+
+/// Blindspot tab: big illustrated tiles, one per collection.
+class BlindspotScreen extends StatelessWidget {
   const BlindspotScreen({super.key});
 
   @override
-  State<BlindspotScreen> createState() => _BlindspotScreenState();
-}
-
-class _BlindspotScreenState extends State<BlindspotScreen> {
-  String _view = 'blindspot';
-
-  static const _views = [
-    ('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers.'),
-    ('underreported', 'Underreported', 'Stories few outlets cover, from reliable sources.'),
-    ('divergent', 'Divergent takes', 'Covered heavily by both left and right: compare how each frames it.'),
-    ('left', 'Popular with the left', 'Stories mostly covered by left-leaning outlets.'),
-    ('right', 'Popular with the right', 'Stories mostly covered by right-leaning outlets.'),
-  ];
-
-  bool _keep(Story s) {
-    final d = s.distribution;
-    switch (_view) {
-      case 'blindspot':
-        return d.blindspotFor != null;
-      case 'underreported':
-        final n = s.uniqueSources.length;
-        final good = s.uniqueSources
-            .where((a) => a.source?.factuality == Factuality.high || a.source?.factuality == Factuality.veryHigh)
-            .length;
-        return n >= 2 && n <= 5 && good >= 1;
-      case 'divergent':
-        return d.divergent;
-      case 'left':
-        return d.rated >= 3 && d.share(Side.left) >= 0.6;
-      case 'right':
-        return d.rated >= 3 && d.share(Side.right) >= 0.6;
-    }
-    return false;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final info = _views.firstWhere((v) => v.$1 == _view);
-    return StoryList(
-      scrollToTop: TabReselect.tabs[4],
-      jumpToTop: TabReselect.tops[4],
-      key: ValueKey('coll:$_view:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
-      loader: (force) async {
-        final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
-        final kept = all.where(_keep).toList()..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
-        return kept;
-      },
-      emptyMessage: 'Nothing in this collection right now. More outlets get rated as you browse, so check back later.',
-      header: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final v in _views)
-              ChoiceChip(
-                label: Text(v.$2),
-                selected: _view == v.$1,
-                showCheckmark: false,
-                selectedColor: Brand.purple,
-                labelStyle: TextStyle(color: _view == v.$1 ? Colors.white : null, fontWeight: FontWeight.w700),
-                onSelected: (_) => setState(() => _view = v.$1),
-              ),
-          ]),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-            child: Text(info.$3, style: Theme.of(context).textTheme.bodySmall),
-          ),
-        ]),
+    return ReselectScroll(
+      tab: 4,
+      builder: (ctrl) => ListView(
+        controller: ctrl,
+        padding: EdgeInsets.fromLTRB(14, 8, 14, 24 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          for (final c in _collections) ...[
+            _CollectionTile(c: c),
+            const SizedBox(height: 12),
+          ],
+        ],
       ),
     );
   }
+}
+
+class _CollectionTile extends StatelessWidget {
+  const _CollectionTile({required this.c});
+  final _Collection c;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        borderRadius: BorderRadius.circular(26),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CollectionPage(c: c))),
+          child: Ink(
+            height: 132,
+            decoration: BoxDecoration(gradient: LinearGradient(colors: c.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
+            child: Stack(children: [
+              Positioned(right: 0, top: 0, bottom: 0, width: 150, child: CustomPaint(painter: c.art())),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 150, 18),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(c.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  const SizedBox(height: 6),
+                  Text(c.blurb, maxLines: 2, style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.3)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+class CollectionPage extends StatelessWidget {
+  const CollectionPage({super.key, required this.c});
+  final _Collection c;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    return Scaffold(
+      appBar: AppBar(title: Text(c.title)),
+      body: StoryList(
+        loader: (force) async {
+          final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
+          return all.where((s) => _inCollection(c.id, s)).toList()
+            ..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
+        },
+        emptyMessage: 'Nothing here right now. More outlets get rated as you browse, so check back later.',
+        header: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(c.blurb, style: Theme.of(context).textTheme.bodySmall),
+        ),
+      ),
+    );
+  }
+}
+
+// ---- Illustrations (drawn in code: crisp, tiny, no image files) ----
+
+/// An eye with a slash over a lopsided left/right bar.
+class _BlindspotArt extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final w = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    final cx = s.width * 0.5, cy = s.height * 0.42;
+    final eye = Path()
+      ..moveTo(cx - 44, cy)
+      ..quadraticBezierTo(cx, cy - 34, cx + 44, cy)
+      ..quadraticBezierTo(cx, cy + 34, cx - 44, cy);
+    canvas.drawPath(eye, w);
+    canvas.drawCircle(Offset(cx, cy), 11, Paint()..color = Colors.white.withValues(alpha: 0.9));
+    canvas.drawLine(Offset(cx - 40, cy + 32), Offset(cx + 40, cy - 32), w..strokeWidth = 6);
+    final bar = RRect.fromLTRBR(cx - 50, s.height * 0.78, cx + 50, s.height * 0.78 + 10, const Radius.circular(5));
+    canvas.save();
+    canvas.clipRRect(bar);
+    canvas.drawRect(Rect.fromLTWH(cx - 50, bar.top, 10, 10), Paint()..color = Side.left.color);
+    canvas.drawRect(Rect.fromLTWH(cx - 40, bar.top, 90, 10), Paint()..color = Side.right.color);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+/// A tiny spotlight on a single small bar among tall empty ones.
+class _UnderreportedArt extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final faint = Paint()..color = Colors.white.withValues(alpha: 0.12);
+    final bright = Paint()..color = const Color(0xFFFFD166);
+    final base = s.height * 0.82;
+    final xs = [s.width * 0.18, s.width * 0.38, s.width * 0.58, s.width * 0.78];
+    final hs = [70.0, 55.0, 16.0, 62.0];
+    for (var i = 0; i < 4; i++) {
+      final rect = RRect.fromLTRBR(xs[i] - 10, base - hs[i], xs[i] + 10, base, const Radius.circular(6));
+      canvas.drawRRect(rect, i == 2 ? bright : faint);
+    }
+    final beam = Path()
+      ..moveTo(xs[2] - 6, s.height * 0.08)
+      ..lineTo(xs[2] - 26, base - 18)
+      ..lineTo(xs[2] + 26, base - 18)
+      ..lineTo(xs[2] + 6, s.height * 0.08)
+      ..close();
+    canvas.drawPath(beam, Paint()..color = const Color(0xFFFFD166).withValues(alpha: 0.18));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+/// Two arrows leaving one point in opposite directions (blue / red).
+class _DivergentArt extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final o = Offset(s.width * 0.5, s.height * 0.78);
+    void arrow(Offset to, Color c) {
+      final p = Paint()
+        ..color = c
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(o, to, p);
+      final dir = (to - o) / (to - o).distance;
+      final n = Offset(-dir.dy, dir.dx);
+      final head = Path()
+        ..moveTo(to.dx + dir.dx * 10, to.dy + dir.dy * 10)
+        ..lineTo(to.dx - dir.dx * 8 + n.dx * 11, to.dy - dir.dy * 8 + n.dy * 11)
+        ..lineTo(to.dx - dir.dx * 8 - n.dx * 11, to.dy - dir.dy * 8 - n.dy * 11)
+        ..close();
+      canvas.drawPath(head, Paint()..color = c);
+    }
+
+    arrow(Offset(s.width * 0.2, s.height * 0.22), const Color(0xFF7D93FF));
+    arrow(Offset(s.width * 0.8, s.height * 0.22), const Color(0xFFFF8FA8));
+    canvas.drawCircle(o, 8, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+/// Stacked "outlet" bubbles tilted to one side.
+class _SideArt extends CustomPainter {
+  _SideArt(this.side);
+  final Side side;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final light = Paint()..color = Colors.white.withValues(alpha: 0.85);
+    final faint = Paint()..color = Colors.white.withValues(alpha: 0.18);
+    final left = side == Side.left;
+    for (var row = 0; row < 3; row++) {
+      for (var i = 0; i < 4; i++) {
+        final x = s.width * (0.2 + i * 0.2);
+        final y = s.height * (0.28 + row * 0.24);
+        final onSide = left ? i < 3 : i > 0;
+        canvas.drawCircle(Offset(x, y), 11, onSide ? light : faint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SideArt old) => old.side != side;
 }
 
 /// Instagram-style rings: For You, +Add, then your places and topics.

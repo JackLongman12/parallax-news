@@ -26,6 +26,7 @@ import 'package:parallax_news/ui/screens/feed_screens.dart';
 import 'package:parallax_news/ui/screens/sources_screen.dart';
 import 'package:parallax_news/ui/screens/story_list.dart';
 import 'package:parallax_news/ui/theme.dart';
+import 'package:parallax_news/ui/widgets/common.dart';
 import 'package:parallax_news/ui/screens/story_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,7 +140,7 @@ Widget _feedShell(int tab, List<Story> stories, {bool blind = false}) => HomeShe
             header: const BriefingHeader(),
           );
         }
-        if (i == 4) {
+        if (i == 99) { // Blindspot now renders its real tile screen
           return StoryList(
             loader: (_) async => stories,
             filter: (s) => s.distribution.blindspotFor != null,
@@ -234,6 +235,7 @@ void main() {
     NewsRepository.offline = true;
     Markets.enabled = false;
     CrawlerFeed.enabled = false;
+    NetImage.enabled = false;
     await _loadFonts();
   });
 

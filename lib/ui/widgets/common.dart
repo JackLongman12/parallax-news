@@ -43,8 +43,13 @@ class NetImage extends StatelessWidget {
   final int? width;
   final BoxFit fit;
 
+  /// Off in widget tests (no disk cache there): shows [fallback] instead.
+  static bool enabled = true;
+
   @override
-  Widget build(BuildContext context) => CachedNetworkImage(
+  Widget build(BuildContext context) => !enabled
+      ? (fallback ?? const SizedBox.shrink())
+      : CachedNetworkImage(
         imageUrl: url,
         cacheManager: ImageCacheStore.instance,
         fit: fit,
