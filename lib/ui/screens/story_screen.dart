@@ -38,7 +38,7 @@ class _StoryScreenState extends State<StoryScreen> {
     // Find more outlets covering this event, so left/center/right coverage
     // is as complete as possible.
     _app.repo.expandCoverage(widget.story).then((more) {
-      if (more.isNotEmpty && mounted) setState(() => widget.story.articles.addAll(more));
+      if (more.isNotEmpty && mounted) setState(() {});
     });
   }
 

@@ -287,6 +287,7 @@ class StoryCard extends StatefulWidget {
 
 class _StoryCardState extends State<StoryCard> {
   Timer? _impression;
+  Timer? _lean;
   Future<String?>? _cover;
 
   Story get story => widget.story;
@@ -298,6 +299,18 @@ class _StoryCardState extends State<StoryCard> {
     _impression = Timer(const Duration(milliseconds: 1200), () {
       if (mounted) context.read<AppState>().recordImpression(story);
     });
+    // Lean unknown? Look for more outlets once the card has settled on screen
+    // (skipped while scrolling past, and in lite mode).
+    if (!story.distribution.isReliable) {
+      _lean = Timer(const Duration(milliseconds: 700), () {
+        if (!mounted) return;
+        final app = context.read<AppState>();
+        if (app.settings.lite) return;
+        app.repo.fillLean(story).then((changed) {
+          if (changed && mounted) setState(() {});
+        });
+      });
+    }
   }
 
   @override
@@ -310,6 +323,7 @@ class _StoryCardState extends State<StoryCard> {
   @override
   void dispose() {
     _impression?.cancel();
+    _lean?.cancel();
     super.dispose();
   }
 

@@ -41,6 +41,7 @@ class Updater {
     'objects.githubusercontent.com',
     'release-assets.githubusercontent.com',
     'raw.githubusercontent.com',
+    'api.github.com',
   };
 
   static bool _allowed(String url) {
@@ -69,7 +70,7 @@ class Updater {
 
   static Future<UpdateInfo?> check() async {
     try {
-      final info = await _check();
+      final info = await _check().timeout(const Duration(seconds: 25));
       lastResult = info == null ? 'Up to date (checked ${_stamp()})' : 'Update ${info.version} found (${_stamp()})';
       return info;
     } catch (e) {
@@ -78,16 +79,55 @@ class Updater {
     }
   }
 
+  static int _build(Map j) => (j['build'] as num?)?.toInt() ?? 0;
+
+  static Future<Map?> _manifest(String url) async {
+    try {
+      final j = await Net.getJson(url, useCache: false);
+      return j is Map ? j : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// latest.json of the newest non-prerelease, read via the GitHub API.
+  static Future<Map?> _manifestFromApi() async {
+    final m = RegExp(r'^https://github\.com/([\w.-]+)/([\w.-]+)/releases/').firstMatch(manifestUrl);
+    if (m == null) return null;
+    try {
+      final list = await Net.getJson('https://api.github.com/repos/${m[1]}/${m[2]}/releases?per_page=5',
+          headers: {'Accept': 'application/vnd.github+json'}, useCache: false);
+      if (list is! List) return null;
+      for (final r in list.whereType<Map>()) {
+        if (r['prerelease'] == true || r['draft'] == true) continue;
+        for (final a in (r['assets'] as List? ?? const []).whereType<Map>()) {
+          final u = a['browser_download_url'];
+          if (a['name'] == 'latest.json' && u is String && _allowed(u)) return _manifest(u);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static Future<UpdateInfo?> _check() async {
     if (!Platform.isAndroid) return null;
     if (manifestUrl.isEmpty || !_allowed(manifestUrl)) {
       throw StateError('update source not allowed');
     }
-    // Cache-buster so no proxy/CDN can serve a stale manifest.
-    final manifest = '$manifestUrl?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
-    final json = await Net.getJson(manifest, useCache: false);
-    if (json is! Map) return null;
-    final build = (json['build'] as num?)?.toInt() ?? 0;
+    // Two independent sources, newest wins: GitHub's "latest" redirect can lag
+    // for a while after a release, so the newest release is also read from
+    // the API. Either one failing alone is fine.
+    final results = await Future.wait([
+      _manifest('$manifestUrl?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}'),
+      _manifestFromApi(),
+    ]);
+    Map? json;
+    for (final j in results) {
+      if (j == null) continue;
+      if (json == null || _build(j) > _build(json)) json = j;
+    }
+    if (json == null) throw StateError('could not reach GitHub');
+    final build = _build(json);
     final android = json['android'];
     if (android is! Map) return null;
     // Pick the APK built for this phone's CPU (64-bit vs 32-bit ARM).

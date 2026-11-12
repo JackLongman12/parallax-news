@@ -454,7 +454,41 @@ class NewsRepository {
   /// Finds MORE outlets covering the same event as [s] (searches Google News
   /// and Bing for the headline's key words, keeps only same-story matches).
   /// Returns the new articles; the caller merges them into the story.
-  Future<List<Article>> expandCoverage(Story s) async {
+  static final _expanded = Expando<Future<List<Article>>>('expanded');
+  int _expandActive = 0;
+  final _expandWaiters = <Completer<void>>[];
+
+  /// Finds more outlets for [s] and adds them to it (once per story, at most
+  /// two searches at a time). Returns the outlets that were added.
+  Future<List<Article>> expandCoverage(Story s) => _expanded[s] ??= _expandOnce(s);
+
+  /// For cards: fill in left/right coverage when the story's lean is still
+  /// unknown, so the card shows the same lean as the story page.
+  Future<bool> fillLean(Story s) async {
+    if (offline || s.distribution.isReliable) return false;
+    return (await expandCoverage(s)).isNotEmpty;
+  }
+
+  Future<List<Article>> _expandOnce(Story s) async {
+    while (_expandActive >= 2) {
+      final w = Completer<void>();
+      _expandWaiters.add(w);
+      await w.future;
+    }
+    _expandActive++;
+    try {
+      final more = await _searchMore(s);
+      s.articles.addAll(more);
+      return more;
+    } catch (_) {
+      return const [];
+    } finally {
+      _expandActive--;
+      if (_expandWaiters.isNotEmpty) _expandWaiters.removeAt(0).complete();
+    }
+  }
+
+  Future<List<Article>> _searchMore(Story s) async {
     if (offline) return const [];
     final words = TextTokens.tokens(s.title).where((w) => w.length >= 4).take(7).toList();
     if (words.length < 3) return const [];

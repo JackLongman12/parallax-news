@@ -9,7 +9,10 @@ bool _running = false;
 /// Startup (and manual) update flow: check manifest, then download right away
 /// with a progress dialog; Android then shows its one-tap install prompt.
 Future<void> checkForUpdate(BuildContext context, {bool manual = false}) async {
-  if (_running) return;
+  if (_running) {
+    if (manual) _snack(context, 'Already checking for updates…');
+    return;
+  }
   if (!Platform.isAndroid) {
     if (manual) _snack(context, 'Auto-update is Android-only for now.');
     return;
