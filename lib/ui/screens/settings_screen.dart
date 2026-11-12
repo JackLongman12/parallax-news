@@ -84,10 +84,11 @@ class SettingsScreen extends StatelessWidget {
         const ReadingBalanceTile(),
         ListTile(
           title: const Text('Clear image cache'),
-          subtitle: const Text('Photos are cached on the phone (max 300, 7 days) so feeds load instantly'),
+          subtitle: const Text('Photos are cached on the phone (max 150, 5 days) so feeds load instantly. Also removes old update files.'),
           trailing: const Icon(Icons.delete_outline_rounded),
           onTap: () async {
             await ImageCacheStore.clear();
+            await Updater.cleanOldApks();
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image cache cleared')));
             }

@@ -53,13 +53,13 @@ class NetImage extends StatelessWidget {
       );
 }
 
-/// Disk cache for images, capped so it can't bloat the phone: at most 300
-/// images, each kept up to 7 days (roughly 30-40 MB worst case).
+/// Disk cache for images, capped so it can't bloat the phone: at most 150
+/// images, each kept up to 5 days.
 class ImageCacheStore {
   static final CacheManager instance = CacheManager(Config(
     'parallaxImages',
-    stalePeriod: Duration(days: 7),
-    maxNrOfCacheObjects: 300,
+    stalePeriod: Duration(days: 5),
+    maxNrOfCacheObjects: 150,
   ));
 
   static Future<void> clear() async {

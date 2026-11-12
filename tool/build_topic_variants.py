@@ -87,7 +87,7 @@ def candidates(query: str):
         url = info.get("thumburl", "")
         artist = re.sub(r"<[^>]+>", "", info.get("extmetadata", {}).get("Artist", {}).get("value", "")).strip()
         artist = re.sub(r"\s+", " ", artist)[:60] or "Wikimedia Commons"
-        if url.startswith("https://upload.wikimedia.org/"):
+        if url.startswith(("https://upload.wikimedia.org/", "https://thumb.wikimedia.org/")):
             yield url, f"{artist} / {lic}", lic
 
 

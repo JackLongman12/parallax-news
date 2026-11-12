@@ -51,7 +51,7 @@ class CoverImages {
     // Wikimedia thumbs: /.../thumb/a/ab/File.jpg/1200px-File.jpg -> File.jpg
     final segs = u.pathSegments;
     final ti = segs.indexOf('thumb');
-    if (u.host == 'upload.wikimedia.org' && ti >= 0 && segs.length > ti + 3) return 'wm:${segs[ti + 3]}';
+    if (isWikimediaHost(u.host) && ti >= 0 && segs.length > ti + 3) return 'wm:${segs[ti + 3]}';
     return '${u.host}${u.path}';
   }
 
@@ -83,7 +83,10 @@ class CoverImages {
   }
 
   /// Images from Wikimedia Commons need a credit line.
-  static bool needsCredit(String url) => Uri.tryParse(url)?.host == 'upload.wikimedia.org';
+  /// Wikimedia serves files from upload.* and resized copies from thumb.*.
+  static bool isWikimediaHost(String? host) => host == 'upload.wikimedia.org' || host == 'thumb.wikimedia.org';
+
+  static bool needsCredit(String url) => isWikimediaHost(Uri.tryParse(url)?.host);
 
   static final Map<String, String> _credits = {};
 
@@ -145,7 +148,7 @@ class CoverImages {
         final urls = <String>[];
         for (final e in (v as List)) {
           final u = e is Map ? e['u'] : e;
-          if (u is! String || !u.startsWith('https://upload.wikimedia.org/')) continue;
+          if (u is! String || !u.startsWith('https://') || !isWikimediaHost(Uri.tryParse(u)?.host)) continue;
           urls.add(u);
           if (e is Map && e['c'] is String) _credits[u] = (e['c'] as String).replaceAll(RegExp(r'[\u0000-\u001F]'), '');
         }
@@ -171,7 +174,7 @@ class CoverImages {
       raw.forEach((k, v) {
         final c = Category.byName(k);
         if (c == null || v is! List) return;
-        final urls = v.whereType<String>().where((u) => Uri.tryParse(u)?.host == 'upload.wikimedia.org').toList();
+        final urls = v.whereType<String>().where((u) => isWikimediaHost(Uri.tryParse(u)?.host)).toList();
         _pools[c] = urls;
         _poolUrls.addAll(urls);
       });
@@ -401,7 +404,7 @@ class CoverImages {
         if (info is! Map) continue;
         if ((info['width'] as num? ?? 0) < 800 || !'${info['mime']}'.startsWith('image/')) continue;
         final thumb = Uri.tryParse('${info['thumburl'] ?? info['url']}');
-        if (thumb == null || thumb.scheme != 'https' || thumb.host != 'upload.wikimedia.org') continue;
+        if (thumb == null || thumb.scheme != 'https' || !isWikimediaHost(thumb.host)) continue;
         out.add(thumb.toString());
         if (out.length >= limit) break;
       }
@@ -435,7 +438,7 @@ class CoverImages {
         if (info is! Map) continue;
         if ((info['width'] as num? ?? 0) < 800 || !'${info['mime']}'.startsWith('image/')) continue;
         final thumb = Uri.tryParse('${info['thumburl'] ?? info['url']}');
-        if (thumb == null || thumb.scheme != 'https' || thumb.host != 'upload.wikimedia.org') continue;
+        if (thumb == null || thumb.scheme != 'https' || !isWikimediaHost(thumb.host)) continue;
         if (_claim(thumb.toString(), claimId)) return thumb.toString();
       }
     } catch (_) {}

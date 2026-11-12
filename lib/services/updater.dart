@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:ota_update/ota_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'net.dart';
 
@@ -116,7 +117,43 @@ class Updater {
     );
   }
 
+  /// Deletes update APKs left behind by earlier updates (each is ~20-60 MB).
+  /// Only touches files this app created (parallax_news_*.apk) inside its own
+  /// private folders; never follows links.
+  static Future<int> cleanOldApks({String? keep}) async {
+    if (!Platform.isAndroid) return 0;
+    final dirs = <Directory>[];
+    Future<void> add(Future<Directory?> Function() f) async {
+      try {
+        final d = await f();
+        if (d != null) dirs.add(d);
+      } catch (_) {}
+    }
+
+    await add(getApplicationSupportDirectory);
+    await add(() async => (await getApplicationDocumentsDirectory()).parent);
+    await add(getExternalStorageDirectory);
+    await add(getTemporaryDirectory);
+    var freed = 0;
+    final seen = <String>{};
+    for (final d in dirs) {
+      try {
+        await for (final e in d.list(recursive: true, followLinks: false)) {
+          if (e is! File || !seen.add(e.path)) continue;
+          final name = e.uri.pathSegments.isEmpty ? '' : e.uri.pathSegments.last;
+          if (!name.startsWith('parallax_news_') || !name.endsWith('.apk') || name == keep) continue;
+          try {
+            freed += await e.length();
+            await e.delete();
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    return freed;
+  }
+
   static Stream<UpdateProgress> install(UpdateInfo info) {
+    unawaited(cleanOldApks(keep: 'parallax_news_${info.build}.apk'));
     final controller = StreamController<UpdateProgress>();
     try {
       final stream = OtaUpdate().execute(

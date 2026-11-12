@@ -289,8 +289,8 @@ class _StoryListState extends State<StoryList> {
     }
     // Thumbs-down hides a story right away (undo brings it back).
     context.select<AppState, int>((a) => a.hiddenVersion);
-    final hidden = context.read<AppState>().hiddenStories;
-    final shown = hidden.isEmpty ? _all : _all.where((s) => !hidden.contains(s.id)).toList();
+    final appState = context.read<AppState>();
+    final shown = appState.hiddenStories.isEmpty ? _all : _all.where((s) => !appState.isHidden(s)).toList();
     final count = _visible.clamp(0, shown.length);
     final hasHeader = widget.header != null;
     final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == shown.length);

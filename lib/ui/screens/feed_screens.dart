@@ -100,7 +100,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
           force: force,
         )) {
           // "How should we keep you informed?": drop stories below the chosen depth.
-          final kept = stories.where((s) => s.hasLocal || s.uniqueSources.length >= app.minSources).toList();
+          final kept = app.applyInformLevel(stories);
           last = kept;
           yield kept;
         }
@@ -112,7 +112,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
       onLoadMore: (page) async {
         if (page >= later.length) return <Story>[];
         final b = await later[page]();
-        return Curator.rank(b.stories, app.profile, limit: 30);
+        return app.applyInformLevel(Curator.rank(b.stories, app.profile, limit: 30));
       },
       header: header,
     );

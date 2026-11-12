@@ -17,6 +17,7 @@ import '../services/markets.dart';
 import '../services/classifier.dart';
 import '../services/curator.dart';
 import '../services/repository.dart';
+import '../services/updater.dart';
 
 /// App-wide state. Everything is stored locally on the device.
 class AppState extends ChangeNotifier {
@@ -49,6 +50,8 @@ class AppState extends ChangeNotifier {
     repo.onRatingsUpdated = s._scheduleRatingsSave;
     unawaited(bias.refreshRemote());
     unawaited(s.detectHomeCountry());
+    // Remove APKs left over from previous updates.
+    if (!NewsRepository.offline) unawaited(Updater.cleanOldApks());
     if (!NewsRepository.offline) {
       unawaited(CoverImages.init(prefs, [...Category.values.where((c) => c != Category.local)]));
     }
@@ -360,9 +363,14 @@ class AppState extends ChangeNotifier {
     _saveProfileSoon();
   }
 
+  /// True if [s] (or any of its articles) was hidden with thumbs down.
+  bool isHidden(Story s) => hiddenStories.contains(s.id) || s.articles.any((a) => hiddenStories.contains(a.url));
+
   void thumbsDown(Story s) {
     profile.lessLikeThis(s);
-    hiddenStories.add(s.id);
+    hiddenStories
+      ..add(s.id)
+      ..addAll(s.articles.map((a) => a.url));
     hiddenVersion++;
     _saveProfileSoon();
     notifyListeners();
@@ -370,7 +378,9 @@ class AppState extends ChangeNotifier {
 
   void undoThumbsDown(Story s) {
     profile.moreLikeThis(s);
-    hiddenStories.remove(s.id);
+    hiddenStories
+      ..remove(s.id)
+      ..removeAll(s.articles.map((a) => a.url));
     hiddenVersion++;
     _saveProfileSoon();
     notifyListeners();
@@ -387,6 +397,16 @@ class AppState extends ChangeNotifier {
   }
 
   int get minSources => switch (informLevel) { 'detailed' => 1, 'key' => 5, _ => 2 };
+
+  /// Applies the informed level, but never empties the feed: if too few
+  /// stories qualify, the most widely covered ones are kept instead.
+  List<Story> applyInformLevel(List<Story> stories) {
+    final kept = stories.where((s) => s.hasLocal || s.uniqueSources.length >= minSources).toList();
+    if (kept.length >= 8 || kept.length == stories.length) return kept;
+    final byCoverage = [...stories]..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
+    final extra = byCoverage.where((s) => !kept.contains(s)).take(8 - kept.length);
+    return [...kept, ...extra];
+  }
 
   // ---- One-time tips ----
   bool tipSeen(String id) => (_prefs.getStringList('tipsSeen') ?? const []).contains(id);
