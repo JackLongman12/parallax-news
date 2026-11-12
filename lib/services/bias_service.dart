@@ -36,11 +36,27 @@ class BiasService {
     final json = jsonDecode(raw);
     final list = (json is Map ? json['sources'] : null) as List? ?? const [];
     for (final e in list) {
-      if (e is Map<String, dynamic> && e['d'] is String && e['n'] is String) {
+      if (e is Map<String, dynamic> && isValidCatalogEntry(e)) {
         final s = SourceInfo.fromCatalog(e);
         _curated[s.domain] = s;
       }
     }
+  }
+
+  static final _domainRe = RegExp(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$');
+
+  /// Rejects malformed or hostile entries (the catalog can be updated remotely).
+  static bool isValidCatalogEntry(Map<String, dynamic> e) {
+    final d = e['d'], n = e['n'], rss = e['rss'];
+    if (d is! String || n is! String) return false;
+    if (d.length > 100 || n.isEmpty || n.length > 120) return false;
+    if (!_domainRe.hasMatch(d.toLowerCase()) || !isPublicHost(d)) return false;
+    if (rss != null) {
+      if (rss is! String) return false;
+      final u = Uri.tryParse(rss);
+      if (u == null || u.scheme != 'https' || !isPublicHost(u.host)) return false;
+    }
+    return true;
   }
 
   Iterable<SourceInfo> get curated => _curated.values;

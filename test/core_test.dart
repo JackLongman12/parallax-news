@@ -7,6 +7,7 @@ import 'package:parallax_news/models/bias.dart';
 import 'package:parallax_news/models/category.dart';
 import 'package:parallax_news/models/source.dart';
 import 'package:parallax_news/models/story.dart';
+import 'package:parallax_news/services/bias_service.dart';
 import 'package:parallax_news/services/classifier.dart';
 import 'package:parallax_news/services/clustering.dart';
 import 'package:parallax_news/services/curator.dart';
@@ -103,6 +104,7 @@ void main() {
       final list = (json['sources'] as List).cast<Map<String, dynamic>>();
       final domains = <String>{};
       for (final e in list) {
+        expect(BiasService.isValidCatalogEntry(e), isTrue, reason: 'invalid entry ${e['d']}');
         final s = SourceInfo.fromCatalog(e);
         expect(domains.add(s.domain), isTrue, reason: 'duplicate ${s.domain}');
         if (s.feedUrl != null) expect(s.feedUrl!.startsWith('https://'), isTrue, reason: s.domain);
@@ -150,6 +152,34 @@ void main() {
       for (final h in ['localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', '172.20.0.1', '169.254.169.254', '[::1]', 'printer.local']) {
         expect(isPublicHost(h), isFalse, reason: h);
       }
+    });
+
+    test('IPv4-mapped IPv6 private addresses are blocked', () {
+      expect(isPublicHost('::ffff:192.168.1.1'), isFalse);
+      expect(isPublicHost('fd12::1'), isFalse);
+    });
+
+    test('bidi overrides and invisible chars are stripped from text', () {
+      expect(FeedParser.cleanText('Safe‮txt.exe​ title'), 'Safetxt.exe title');
+    });
+
+    test('feed images must be public https', () {
+      const xml = '''<rss><channel>
+<item><title>A</title><link>https://ex.com/a</link><enclosure url="https://192.168.0.1/x.jpg" type="image/jpeg"/></item>
+<item><title>B</title><link>https://ex.com/b</link><enclosure url="http://cdn.ex.com/x.jpg" type="image/jpeg"/></item>
+<item><title>C</title><link>https://ex.com/c</link><enclosure url="https://cdn.ex.com/x.jpg" type="image/jpeg"/></item>
+</channel></rss>''';
+      final items = FeedParser.parse(xml, provider: 'rss', sourceName: 'Ex', sourceDomain: 'ex.com');
+      expect(items.map((a) => a.imageUrl).toList(), [null, null, 'https://cdn.ex.com/x.jpg']);
+    });
+
+    test('catalog entries are validated', () {
+      expect(BiasService.isValidCatalogEntry({'d': 'bbc.co.uk', 'n': 'BBC'}), isTrue);
+      expect(BiasService.isValidCatalogEntry({'d': 'evil.com/@x', 'n': 'X'}), isFalse);
+      expect(BiasService.isValidCatalogEntry({'d': 'localhost', 'n': 'X'}), isFalse);
+      expect(BiasService.isValidCatalogEntry({'d': '10.0.0.1', 'n': 'X'}), isFalse);
+      expect(BiasService.isValidCatalogEntry({'d': 'ok.com', 'n': 'X', 'rss': 'http://ok.com/feed'}), isFalse);
+      expect(BiasService.isValidCatalogEntry({'d': 'ok.com', 'n': 'X', 'rss': 'https://ok.com/feed'}), isTrue);
     });
 
     test('domainOf strips www', () {

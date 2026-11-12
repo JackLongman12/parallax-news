@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show InternetAddress;
 
 import 'package:http/http.dart' as http;
 
@@ -31,11 +32,13 @@ class Net {
     Duration timeout = const Duration(seconds: 15),
     bool useCache = true,
   }) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !(uri.scheme == 'https' || uri.scheme == 'http')) {
+    final parsed = Uri.tryParse(url);
+    if (parsed == null || !(parsed.scheme == 'https' || parsed.scheme == 'http')) {
       throw NetException('Refusing non-http URL');
     }
-    if (!isPublicHost(uri.host)) {
+    // Cleartext is disabled app-wide; upgrade instead of failing.
+    final uri = parsed.scheme == 'http' ? parsed.replace(scheme: 'https') : parsed;
+    if (!isPublicHost(uri.host) || !await _resolvesPublic(uri.host)) {
       throw NetException('Refusing private/local address');
     }
     if (useCache) {
@@ -56,8 +59,9 @@ class Net {
       if (res.statusCode >= 300 && res.statusCode < 400 && loc != null) {
         unawaited(res.stream.drain<void>().catchError((_) {}));
         if (hop >= 5) throw NetException('Too many redirects from ${uri.host}');
-        final next = current.resolve(loc);
-        if (!(next.scheme == 'https' || next.scheme == 'http') || !isPublicHost(next.host)) {
+        var next = current.resolve(loc);
+        if (next.scheme == 'http') next = next.replace(scheme: 'https');
+        if (next.scheme != 'https' || !isPublicHost(next.host) || !await _resolvesPublic(next.host)) {
           throw NetException('Blocked redirect from ${uri.host}');
         }
         current = next;
@@ -94,6 +98,25 @@ class Net {
   }
 
   static void clearCache() => _cache.clear();
+
+  static final Map<String, bool> _dnsOk = {};
+
+  /// Blocks DNS tricks where a public-looking name resolves to a LAN/loopback IP.
+  static Future<bool> _resolvesPublic(String host) async {
+    final cached = _dnsOk[host];
+    if (cached != null) return cached;
+    bool ok;
+    try {
+      final addrs = await InternetAddress.lookup(host).timeout(const Duration(seconds: 5));
+      ok = addrs.isNotEmpty && addrs.every((a) => isPublicHost(a.address));
+    } catch (_) {
+      // Lookup failed: the request itself will fail too; don't cache.
+      return true;
+    }
+    if (_dnsOk.length > 500) _dnsOk.clear();
+    _dnsOk[host] = ok;
+    return ok;
+  }
 }
 
 class _CacheEntry {
@@ -143,6 +166,7 @@ bool isPublicHost(String host) {
   if (h.contains(':')) {
     // IPv6 literal: block loopback, link-local, unique-local.
     final v6 = h.replaceAll('[', '').replaceAll(']', '');
+    if (v6.startsWith('::ffff:')) return isPublicHost(v6.substring(7)); // IPv4-mapped
     return !(v6 == '::1' || v6 == '::' || v6.startsWith('fe80') || v6.startsWith('fc') || v6.startsWith('fd'));
   }
   final parts = h.split('.');

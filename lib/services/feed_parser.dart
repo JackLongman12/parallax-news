@@ -100,7 +100,9 @@ class FeedParser {
       if (n == 'thumbnail' || n == 'content' || n == 'enclosure') {
         final u = e.getAttribute('url');
         final type = e.getAttribute('type') ?? 'image';
-        if (u != null && type.startsWith('image') && isSafeWebUrl(u)) {
+        // Images load outside our Net guard, so only allow public HTTPS hosts.
+        final iu = u == null ? null : Uri.tryParse(u);
+        if (iu != null && iu.scheme == 'https' && isPublicHost(iu.host) && type.startsWith('image')) {
           image = u;
           break;
         }
@@ -137,6 +139,7 @@ class FeedParser {
 
   static final _tag = RegExp(r'<[^>]*>');
   static final _ws = RegExp(r'\s+');
+  static final _spoof = RegExp('[\u0000-\u0008\u000B\u000C\u000E-\u001F​-‏‪-‮⁦-⁩﻿]');
 
   /// Strips HTML tags and decodes common entities. Output is plain text only.
   static String cleanText(String s) {
@@ -144,6 +147,8 @@ class FeedParser {
     t = decodeEntities(t);
     // Entity-decoding can reveal escaped tags (&lt;b&gt;) — strip again.
     t = t.replaceAll(_tag, ' ');
+    // Remove bidi overrides / invisible controls used to spoof headlines & names.
+    t = t.replaceAll(_spoof, '');
     return t.replaceAll(_ws, ' ').trim();
   }
 

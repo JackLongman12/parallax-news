@@ -2,6 +2,7 @@ import '../data/geo.dart';
 import '../models/bias.dart';
 import '../models/place.dart';
 import '../models/source.dart';
+import 'feed_parser.dart';
 import 'net.dart';
 
 /// Live geography + local-outlet discovery from open data:
@@ -43,9 +44,9 @@ class PlaceService {
     final level = _levelFor(type);
     if (level == null) return null;
     final cc = addr['country_code']?.toString().toUpperCase();
-    final name = (r['name']?.toString().isNotEmpty ?? false)
+    final name = FeedParser.cleanText((r['name']?.toString().isNotEmpty ?? false)
         ? r['name'].toString()
-        : (r['display_name']?.toString().split(',').first ?? '');
+        : (r['display_name']?.toString().split(',').first ?? ''));
     if (name.isEmpty) return null;
 
     if (level == PlaceLevel.country && cc != null) {
@@ -55,7 +56,8 @@ class PlaceService {
 
     final parents = <String>[];
     for (final k in const ['city', 'town', 'municipality', 'county', 'state_district', 'state', 'province', 'region', 'country']) {
-      final v = addr[k]?.toString();
+      final raw = addr[k]?.toString();
+      final v = raw == null ? null : FeedParser.cleanText(raw);
       if (v != null && v != name && !parents.contains(v)) parents.add(v);
     }
     final qid = (r['extratags'] as Map?)?['wikidata']?.toString();
@@ -137,7 +139,8 @@ SELECT DISTINCT ?item ?itemLabel ?pop WHERE {
     final parents = [parent.name, ...parent.parents];
     for (final r in rows) {
       final qid = _qidFromUri(_v(r, 'item'));
-      final label = _v(r, 'itemLabel');
+      final rawLabel = _v(r, 'itemLabel');
+      final label = rawLabel == null ? null : FeedParser.cleanText(rawLabel);
       if (!isQid(qid) || label == null || label == qid) continue;
       final pop = double.tryParse(_v(r, 'pop') ?? '') ?? 0;
       byId[qid!] = (
@@ -191,7 +194,8 @@ SELECT ?o ?oLabel ?site ?feed ?alignLabel ?ideoLabel ?ownerLabel WHERE {
     for (final r in rows) {
       final qid = _qidFromUri(_v(r, 'o'));
       final site = _v(r, 'site');
-      final name = _v(r, 'oLabel');
+      final rawName = _v(r, 'oLabel');
+      final name = rawName == null ? null : FeedParser.cleanText(rawName);
       if (qid == null || site == null || name == null || !isSafeWebUrl(site)) continue;
       if (byQid.containsKey(qid) && byQid[qid]!.feedUrl != null) continue;
       final feed = _v(r, 'feed');
