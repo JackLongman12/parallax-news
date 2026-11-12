@@ -110,6 +110,13 @@ Future<void> _loadFonts() async {
     }
   }
   await roboto.load();
+  // The app's own typeface, bundled in assets/fonts.
+  final inter = FontLoader('Inter');
+  for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold', 'Black', 'Italic']) {
+    final f = File('assets/fonts/Inter-$w.ttf');
+    if (f.existsSync()) inter.addFont(Future.value(ByteData.view(f.readAsBytesSync().buffer)));
+  }
+  await inter.load();
 }
 
 Widget _app(AppState state, Widget home, {Brightness b = Brightness.light}) => ChangeNotifierProvider.value(
@@ -159,12 +166,12 @@ Widget _promo(String headline, String sub, Widget screen, Color bg) => Direction
                 Text(headline,
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    style: const TextStyle(fontFamily: 'Roboto', fontSize: 40, height: 1.1, fontWeight: FontWeight.w800, color: Colors.white)),
+                    style: const TextStyle(fontFamily: 'Inter', fontSize: 40, height: 1.1, fontWeight: FontWeight.w800, color: Colors.white)),
                 const SizedBox(height: 14),
                 Text(sub,
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    style: const TextStyle(fontFamily: 'Roboto', fontSize: 18, height: 1.3, color: Color(0xE6FFFFFF))),
+                    style: const TextStyle(fontFamily: 'Inter', fontSize: 18, height: 1.3, color: Color(0xE6FFFFFF))),
               ]),
             ),
           ),
@@ -200,15 +207,15 @@ Widget _feature() => Directionality(
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
               const Text('Parallax News',
-                  style: TextStyle(fontFamily: 'Roboto', fontSize: 64, fontWeight: FontWeight.w900, color: Brand.purple)),
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 64, fontWeight: FontWeight.w900, color: Brand.purple)),
               const SizedBox(height: 10),
               const Text('Every side of every story —\nfrom the world to your street.',
-                  style: TextStyle(fontFamily: 'Roboto', fontSize: 28, height: 1.25, color: Color(0xE6FFFFFF))),
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 28, height: 1.25, color: Color(0xE6FFFFFF))),
               const SizedBox(height: 28),
               Container(width: 120, height: 8, decoration: BoxDecoration(color: Brand.purple, borderRadius: BorderRadius.circular(4))),
               const SizedBox(height: 10),
               const Text('Open source · No account · No tracking · Free',
-                  style: TextStyle(fontFamily: 'Roboto', fontSize: 20, color: Color(0xCCFFFFFF))),
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 20, color: Color(0xCCFFFFFF))),
             ]),
           ),
         ]),

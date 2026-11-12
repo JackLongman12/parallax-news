@@ -21,13 +21,15 @@ class DailyOverview extends StatefulWidget {
 class _DailyOverviewState extends State<DailyOverview> {
   bool _open = true;
   late final Future<List<Quote>> _markets = Markets.load();
+  late final Future<List<Story>> _brief = context.read<AppState>().repo.dailyBrief();
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
+    return FutureBuilder<List<Story>>(future: _brief, builder: (context, snap) => _card(context, snap.data ?? const []));
+  }
+
+  Widget _card(BuildContext context, List<Story> picks) {
     final theme = Theme.of(context);
-    final top = [...app.snapshot]..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
-    final picks = top.take(5).toList();
     if (picks.isEmpty) return const SizedBox.shrink();
     final outlets = {for (final s in picks) ...s.uniqueSources.map((a) => a.domain)}.length;
 
@@ -72,7 +74,7 @@ class _DailyOverviewState extends State<DailyOverview> {
                 },
               ),
               const SizedBox(height: 8),
-              Text('Auto-extracted from $outlets outlets. Quotes their own reporting; tap a line for full coverage.',
+              Text('One top story from each area of the news, across $outlets outlets. Auto-extracted from their own reporting; tap a line for full coverage.',
                   style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
             ],
           ]),

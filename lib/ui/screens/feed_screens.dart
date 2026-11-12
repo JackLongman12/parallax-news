@@ -13,6 +13,7 @@ import '../../services/home_widgets.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
 import '../nav.dart';
+import '../widgets/common.dart';
 import '../widgets/daily_overview.dart';
 import '../widgets/markets_strip.dart';
 import 'explore_screens.dart';
@@ -177,7 +178,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
       ],
       SliverToBoxAdapter(child: header(mine.isEmpty ? 'Pick topics you like' : 'Discover more')),
       grid(rest),
-      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      SliverToBoxAdapter(child: SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom)),
     ]);
   }
 }
@@ -218,7 +219,7 @@ class _TopicTileState extends State<TopicTile> {
                       child: Icon(Brand.categoryIcon(c), size: 64, color: Colors.white.withValues(alpha: 0.15)),
                     ),
                   )
-                : Image.network(snap.data!, fit: BoxFit.cover, cacheWidth: 600, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                : NetImage(snap.data!, width: 600),
           ),
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -568,7 +569,7 @@ class _RingPhotoState extends State<_RingPhoto> {
     );
     Widget photo(String url) => Stack(fit: StackFit.expand, children: [
           fallback,
-          Image.network(url, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          NetImage(url, width: 200),
         ]);
     if (widget.image != null) return photo(widget.image!);
     if (_future == null) return fallback;

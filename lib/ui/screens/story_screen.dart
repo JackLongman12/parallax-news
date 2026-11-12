@@ -164,7 +164,7 @@ class _StoryScreenState extends State<StoryScreen> {
                 child: Icon(Brand.categoryIcon(story.category), size: 190, color: Colors.white.withValues(alpha: 0.10)),
               ),
             if (img != null)
-              Image.network(img, fit: BoxFit.cover, cacheWidth: decodeWidth(context), errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              NetImage(img, width: decodeWidth(context)),
             if (img != null && CoverImages.needsCredit(img))
               const Positioned(
                 right: 10,

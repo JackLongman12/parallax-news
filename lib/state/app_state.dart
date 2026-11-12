@@ -262,6 +262,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ---- Appearance: dark (default), light or follow the system ----
+  String get themeMode => _prefs.getString('themeMode') ?? 'dark';
+
+  void setThemeMode(String m) {
+    _prefs.setString('themeMode', m);
+    notifyListeners();
+  }
+
   // ---- Markets watchlist ----
   List<String> get watchlist => _prefs.getStringList('watchlist') ?? Markets.defaultWatchlist;
 

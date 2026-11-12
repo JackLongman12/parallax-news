@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -22,6 +24,31 @@ String timeAgo(DateTime? t) {
   if (d.inMinutes < 60) return '${d.inMinutes}m ago';
   if (d.inHours < 24) return '${d.inHours}h ago';
   return '${d.inDays}d ago';
+}
+
+/// Network image with a persistent disk cache (instant on later launches),
+/// a quick fade-in and silent failure.
+class NetImage extends StatelessWidget {
+  const NetImage(this.url, {super.key, this.width, this.fit = BoxFit.cover});
+  final String url;
+  final int? width;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) => CachedNetworkImage(
+        imageUrl: url,
+        fit: fit,
+        memCacheWidth: width,
+        fadeInDuration: const Duration(milliseconds: 220),
+        fadeOutDuration: Duration.zero,
+        placeholder: (_, __) => const SizedBox.shrink(),
+        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+      );
+}
+
+/// Warm the disk + memory cache for an image before it's on screen.
+void prefetchImage(BuildContext context, String url) {
+  precacheImage(CachedNetworkImageProvider(url, maxWidth: decodeWidth(context)), context, onError: (_, __) {});
 }
 
 /// Decode images at the real on-screen pixel width (sharp on any phone,
@@ -257,153 +284,122 @@ class _StoryCardState extends State<StoryCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final dist = story.distribution;
     final sources = story.uniqueSources;
     final lite = context.select<AppState, bool>((s) => s.settings.lite);
     final blind = dist.blindspotFor;
+    final skew = dist.skewedTo;
+    const white70 = Color(0xB3FFFFFF);
 
-    final hero = SizedBox(
-      height: lite ? 150 : 200,
-      child: FutureBuilder<String?>(
-        future: _cover,
-        initialData: CoverImages.cached(story),
-        builder: (context, snap) {
-          final img = snap.data;
-          return Stack(fit: StackFit.expand, children: [
-            ColoredBox(color: theme.brightness == Brightness.dark ? Brand.deep : Brand.purple),
-            if (img == null)
-              Positioned(
-                right: -18,
-                bottom: -24,
-                child: Icon(Brand.categoryIcon(story.category), size: 150, color: Colors.white.withValues(alpha: 0.10)),
-              ),
-            if (img != null)
-              Image.network(
-                img,
-                fit: BoxFit.cover,
-                cacheWidth: decodeWidth(context),
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                frameBuilder: (context, child, frame, sync) => AnimatedOpacity(
-                  opacity: frame == null ? 0 : 1,
-                  duration: const Duration(milliseconds: 250),
-                  child: child,
-                ),
-              ),
-            if (img != null)
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x55000000), Color(0x11000000), Color(0xC0000000)],
-                  ),
-                ),
-              ),
-            Positioned(
-              left: 16,
-              right: 16,
-              top: 14,
-              child: Row(children: [
-                _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
-                if (_isBreaking(story)) const _Pill(icon: Icons.flash_on_rounded, text: 'Breaking')
-                else if (_isTrending(story)) const _Pill(icon: Icons.local_fire_department_rounded, text: 'Trending'),
-                if (story.hasLocal) const _Pill(icon: Icons.place_rounded, text: 'Local'),
-                const Spacer(),
-                Text(timeAgo(story.latest),
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-              ]),
-            ),
-            if (img != null && CoverImages.needsCredit(img))
-              const Positioned(
-                right: 10,
-                top: 40,
-                child: Text('Photo: Wikimedia Commons', style: TextStyle(color: Colors.white70, fontSize: 9)),
-              ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 14,
-              child: Text(
-                story.title,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 19, height: 1.2, fontWeight: FontWeight.w800),
-              ),
-            ),
-          ]);
-        },
-      ),
-    );
+    Widget signal() {
+      if (blind != null) {
+        return _Pill(icon: Icons.visibility_off_rounded, text: 'Blindspot · few ${blind.label.toLowerCase()} outlets', color: Brand.red);
+      }
+      if (skew != null) {
+        return _Pill(icon: Icons.balance_rounded, text: 'Mostly ${skew.label.toLowerCase()}-leaning coverage', color: skew.color);
+      }
+      return const SizedBox.shrink();
+    }
 
     final card = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       child: Material(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(24),
+        color: Brand.purple,
+        borderRadius: BorderRadius.circular(28),
         clipBehavior: Clip.antiAlias,
-        elevation: 3,
-        shadowColor: Brand.purple.withValues(alpha: 0.25),
         child: InkWell(
           onTap: _open,
-          onLongPress: _menu,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            hero,
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 4, 6),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                if (blind != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      const Icon(Icons.visibility_off_rounded, size: 15, color: Brand.red),
-                      const SizedBox(width: 6),
-                      Text('Blindspot · barely covered by the ${blind.label.toLowerCase()}',
-                          style: const TextStyle(color: Brand.red, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ]),
-                  )
-                else if (dist.skewedTo != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      Icon(Icons.balance_rounded, size: 15, color: dist.skewedTo!.color),
-                      const SizedBox(width: 6),
-                      Text('Mostly ${dist.skewedTo!.label.toLowerCase()}-leaning coverage',
-                          style: TextStyle(color: dist.skewedTo!.color, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: BiasBar(dist: dist, height: 8),
-                ),
-                const SizedBox(height: 8),
-                Row(children: [
-                  SourceAvatars(articles: sources),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${sources.length} source${sources.length == 1 ? '' : 's'} · ${_split(dist)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _menu();
+          },
+          child: SizedBox(
+            height: lite ? 250 : 340,
+            child: FutureBuilder<String?>(
+              future: _cover,
+              initialData: CoverImages.cached(story),
+              builder: (context, snap) {
+                final img = snap.data;
+                return Stack(fit: StackFit.expand, children: [
+                  if (img == null)
+                    Positioned(
+                      right: -24,
+                      top: 20,
+                      child: Icon(Brand.categoryIcon(story.category), size: 200, color: Colors.white.withValues(alpha: 0.10)),
+                    ),
+                  if (img != null)
+                    NetImage(img, width: decodeWidth(context)),
+                  // Scrim: light at the top for the labels, heavy at the bottom for the text.
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0, 0.3, 0.55, 1],
+                        colors: [Color(0x66000000), Color(0x00000000), Color(0x55000000), Color(0xEE000000)],
+                      ),
                     ),
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: 'Share',
-                    icon: const Icon(Icons.ios_share_rounded, size: 20),
-                    onPressed: _share,
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    top: 14,
+                    child: Row(children: [
+                      _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
+                      if (_isBreaking(story))
+                        const _Pill(icon: Icons.flash_on_rounded, text: 'Breaking', color: Brand.red)
+                      else if (_isTrending(story))
+                        const _Pill(icon: Icons.local_fire_department_rounded, text: 'Trending'),
+                      if (story.hasLocal) const _Pill(icon: Icons.place_rounded, text: 'Local'),
+                      const Spacer(),
+                      Text(timeAgo(story.latest),
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ]),
                   ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: 'More options',
-                    icon: const Icon(Icons.more_horiz_rounded, size: 20),
-                    onPressed: _menu,
+                  if (img != null && CoverImages.needsCredit(img))
+                    const Positioned(
+                      right: 14,
+                      top: 44,
+                      child: Text('Photo: Wikimedia Commons', style: TextStyle(color: white70, fontSize: 9)),
+                    ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 12,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      signal(),
+                      if (blind != null || skew != null) const SizedBox(height: 8),
+                      Text(
+                        story.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 21, height: 1.18, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 12),
+                      BiasBar(dist: dist, height: 5),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        SourceAvatars(articles: sources, ring: Colors.black),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${sources.length} source${sources.length == 1 ? '' : 's'} · ${_split(dist)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: white70, fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        _RoundAction(icon: Icons.ios_share_rounded, tooltip: 'Share', onTap: _share),
+                        const SizedBox(width: 6),
+                        _RoundAction(icon: Icons.more_horiz_rounded, tooltip: 'More options', onTap: _menu),
+                      ]),
+                    ]),
                   ),
-                ]),
-              ]),
+                ]);
+              },
             ),
-          ]),
+          ),
         ),
       ),
     );
@@ -442,32 +438,64 @@ class _StoryCardState extends State<StoryCard> {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.text});
+  const _Pill({required this.icon, required this.text, this.color});
   final IconData icon;
   final String text;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.only(right: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.20),
+          // Translucent "glass" without a per-card blur (cheap on weak phones).
+          color: (color ?? Colors.black).withValues(alpha: color == null ? 0.38 : 0.85),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 13, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
         ]),
+      );
+}
+
+/// Small round translucent button used over photos.
+class _RoundAction extends StatelessWidget {
+  const _RoundAction({required this.icon, required this.tooltip, required this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.16),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
+            child: Padding(padding: const EdgeInsets.all(7), child: Icon(icon, size: 18, color: Colors.white)),
+          ),
+        ),
       );
 }
 
 /// Overlapping outlet "avatars", ringed in each outlet's bias colour.
 class SourceAvatars extends StatelessWidget {
-  const SourceAvatars({super.key, required this.articles, this.max = 5});
+  const SourceAvatars({super.key, required this.articles, this.max = 5, this.ring});
   final List<Article> articles;
   final int max;
+  final Color? ring;
 
   @override
   Widget build(BuildContext context) {
@@ -487,7 +515,7 @@ class SourceAvatars extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: (shown[i].source?.bias ?? Bias.unrated).color,
-                border: Border.all(color: Theme.of(context).cardTheme.color ?? Colors.white, width: 2),
+                border: Border.all(color: ring ?? Theme.of(context).cardTheme.color ?? Colors.white, width: 2),
               ),
               child: Text(
                 shown[i].sourceName.isEmpty ? '?' : shown[i].sourceName.characters.first.toUpperCase(),

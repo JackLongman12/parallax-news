@@ -24,6 +24,22 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(children: [
         ListTile(
+          title: const Text('Appearance'),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'dark', label: Text('Dark')),
+                ButtonSegment(value: 'light', label: Text('Light')),
+                ButtonSegment(value: 'system', label: Text('System')),
+              ],
+              selected: {app.themeMode},
+              onSelectionChanged: (x) => app.setThemeMode(x.first),
+            ),
+          ),
+        ),
+        ListTile(
           title: const Text('Home country'),
           subtitle: Text(app.homeCountryAuto
               ? 'Auto: ${countryByCode(s.homeCountry)?.name ?? s.homeCountry} (from your network)'

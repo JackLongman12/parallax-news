@@ -97,7 +97,7 @@ class CoverImages {
   }
 
   static Future<T> _limited<T>(Future<T> Function() task) async {
-    while (_active >= 3) {
+    while (_active >= 5) {
       final c = Completer<void>();
       _waiters.add(c);
       await c.future;
@@ -113,7 +113,7 @@ class CoverImages {
 
   static Future<String?> _ogImage(String url) async {
     try {
-      final html = await Net.getText(url, useCache: false, headBytes: 200 * 1024, timeout: const Duration(seconds: 8));
+      final html = await Net.getText(url, useCache: false, headBytes: 96 * 1024, timeout: const Duration(seconds: 6));
       return extractMetaImage(html, Uri.parse(url));
     } catch (_) {
       return null;

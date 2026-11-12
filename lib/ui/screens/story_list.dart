@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/story.dart';
+import 'package:provider/provider.dart';
+
+import '../../services/cover_images.dart';
+import '../../state/app_state.dart';
 import '../widgets/common.dart';
 
 /// A lazily-built, paginated story list. Only the visible cards are built,
@@ -59,6 +63,20 @@ class _StoryListState extends State<StoryList> {
   bool _refreshing = false;
   Timer? _autoTimer;
   List<Story> _pending = [];
+  final Set<String> _prefetched = {};
+
+  /// Start loading covers for the cards just below the fold.
+  void _prefetch() {
+    if (!mounted || context.read<AppState>().settings.lite) return;
+    final end = (_visible + 6).clamp(0, _all.length);
+    for (var i = 0; i < end; i++) {
+      final st = _all[i];
+      if (!_prefetched.add(st.id)) continue;
+      CoverImages.forStory(st).then((u) {
+        if (u != null && mounted) prefetchImage(context, u);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -248,13 +266,19 @@ class _StoryListState extends State<StoryList> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return ListView(physics: const NeverScrollableScrollPhysics(), children: [
+        if (widget.header != null) widget.header!,
+        for (var i = 0; i < 3; i++) const SkeletonCard(),
+      ]);
+    }
     if (_error != null && _all.isEmpty) {
       return EmptyOrError(message: _error!, onRetry: () => _load(true));
     }
     final count = _visible.clamp(0, _all.length);
     final hasHeader = widget.header != null;
     final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == _all.length);
+    if (_all.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _prefetch());
     final list = RefreshIndicator(
       onRefresh: () => _load(true),
       child: _all.isEmpty
@@ -318,5 +342,62 @@ class _StoryListState extends State<StoryList> {
         ),
       ),
     ]);
+  }
+}
+
+
+/// Pulsing placeholder shaped like a story card (shown while loading).
+class SkeletonCard extends StatefulWidget {
+  const SkeletonCard({super.key});
+
+  @override
+  State<SkeletonCard> createState() => _SkeletonCardState();
+}
+
+class _SkeletonCardState extends State<SkeletonCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final base = dark ? const Color(0xFF1C1B20) : const Color(0xFFE9E6EF);
+    final hi = dark ? const Color(0xFF2A2830) : const Color(0xFFF4F2F8);
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(color: hi, borderRadius: BorderRadius.circular(8)),
+        );
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        child: Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Color.lerp(base, hi, _c.value * 0.6),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            bar(90, 22),
+            const Spacer(),
+            bar(double.infinity, 18),
+            const SizedBox(height: 8),
+            bar(220, 18),
+            const SizedBox(height: 16),
+            bar(double.infinity, 5),
+            const SizedBox(height: 10),
+            bar(160, 12),
+          ]),
+        ),
+      ),
+    );
   }
 }

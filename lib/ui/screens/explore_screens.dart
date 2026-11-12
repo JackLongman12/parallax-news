@@ -228,7 +228,7 @@ class ExploreScreen extends StatelessWidget {
           child: Text(t, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
         );
 
-    return ReselectScroll(tab: 3, builder: (ctrl) => ListView(controller: ctrl, padding: const EdgeInsets.only(bottom: 24), children: [
+    return ReselectScroll(tab: 3, builder: (ctrl) => ListView(controller: ctrl, padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom), children: [
       const PlaceSearchPanel(shrinkWrap: true),
       if (app.followed.isNotEmpty) ...[
         section('Your places'),

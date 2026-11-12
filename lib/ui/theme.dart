@@ -68,36 +68,83 @@ class Brand {
     }
   }
 
+  /// Card / surface colours: pure black dark mode, soft off-white light mode.
+  static Color card(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark ? const Color(0xFF121214) : Colors.white;
+
   static ThemeData theme(Brightness b) {
     final dark = b == Brightness.dark;
     final scheme = ColorScheme.fromSeed(seedColor: purple, brightness: b).copyWith(
       primary: dark ? const Color(0xFFA78BFA) : purple,
       secondary: dark ? violet : deep,
-      surface: dark ? black : white,
+      surface: dark ? const Color(0xFF000000) : const Color(0xFFF5F4F8),
+      surfaceContainerHighest: dark ? const Color(0xFF1C1B20) : const Color(0xFFEDEBF2),
     );
-    return ThemeData(
-      useMaterial3: true,
+    final base = ThemeData(brightness: b, useMaterial3: true, fontFamily: 'Inter');
+    final text = base.textTheme.copyWith(
+      headlineLarge: base.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.2),
+      headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -1.0),
+      headlineSmall: base.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.6),
+      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+      titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.3),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.4),
+      bodySmall: base.textTheme.bodySmall?.copyWith(letterSpacing: 0),
+    );
+    return base.copyWith(
       colorScheme: scheme,
+      textTheme: text,
       scaffoldBackgroundColor: scheme.surface,
+      splashFactory: InkSparkle.splashFactory,
       cardTheme: CardThemeData(
         elevation: 0,
-        color: dark ? const Color(0xFF16141C) : white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        color: dark ? const Color(0xFF121214) : white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         margin: EdgeInsets.zero,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
         centerTitle: false,
+        titleTextStyle: TextStyle(
+            fontFamily: 'Inter', fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1.0, color: dark ? white : black),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: dark ? black : white,
-        indicatorColor: purple.withValues(alpha: dark ? 0.45 : 0.16),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        indicatorColor: purple.withValues(alpha: dark ? 0.55 : 0.14),
+        indicatorShape: const StadiumBorder(),
         labelTextStyle: WidgetStatePropertyAll(
-            TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: dark ? white : black)),
+            TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: dark ? white : black)),
       ),
-      chipTheme: ChipThemeData(shape: StadiumBorder(side: BorderSide(color: purple.withValues(alpha: 0.25)))),
+      chipTheme: ChipThemeData(
+        shape: const StadiumBorder(side: BorderSide.none),
+        side: BorderSide.none,
+        backgroundColor: dark ? const Color(0xFF1C1B20) : const Color(0xFFECE9F3),
+        labelStyle: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          side: const WidgetStatePropertyAll(BorderSide.none),
+          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected)
+              ? purple
+              : (dark ? const Color(0xFF1C1B20) : const Color(0xFFECE9F3))),
+          foregroundColor: WidgetStateProperty.resolveWith(
+              (s) => s.contains(WidgetState.selected) ? Colors.white : (dark ? white : black)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: dark ? const Color(0xFF1C1B20) : const Color(0xFFECE9F3),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: dark ? const Color(0xFF121214) : white,
+        showDragHandle: true,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      ),
+      dividerTheme: DividerThemeData(color: dark ? const Color(0xFF26252B) : const Color(0xFFE6E3EC), thickness: 1),
     );
   }
 }

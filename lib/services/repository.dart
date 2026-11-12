@@ -306,6 +306,39 @@ class NewsRepository {
 
   /// The daily briefing: everything the reader follows, merged, re-clustered
   /// across sources and ranked by the [Curator].
+  static const briefTopics = [
+    Category.world, Category.politics, Category.business, Category.finance, Category.technology,
+    Category.science, Category.health, Category.environment, Category.sports, Category.entertainment,
+  ];
+
+  Future<List<Story>>? _brief;
+  DateTime _briefAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// "Today in brief": the most widely covered story from EACH major topic,
+  /// independent of personal interests, so everyone sees the whole picture.
+  Future<List<Story>> dailyBrief({bool force = false}) {
+    if (offline) return Future.value(const <Story>[]);
+    if (!force && _brief != null && DateTime.now().difference(_briefAt) < _ttl) return _brief!;
+    _briefAt = DateTime.now();
+    return _brief = () async {
+      final home = countryByCode(settings.homeCountry)?.place;
+      final bundles = await runPooled<NewsBundle>([
+        () => place(Place.world, force: force),
+        if (home != null) () => place(home, force: force),
+        for (final t in briefTopics) () => topic(t, force: force),
+      ], concurrency: settings.lite ? 2 : 4);
+      final all = <Story>[for (final b in bundles) ...?b?.stories];
+      final best = <Category, Story>{};
+      for (final s in all) {
+        final cur = best[s.category];
+        if (cur == null || s.uniqueSources.length > cur.uniqueSources.length) best[s.category] = s;
+      }
+      final picks = best.values.where((s) => s.category != Category.general || best.length < 4).toList()
+        ..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
+      return picks.take(8).toList();
+    }();
+  }
+
   /// News about one company / asset, for its stock page.
   Future<NewsBundle> stockNews(String symbol, String name, {bool force = false}) =>
       _memo('stock:$symbol', force, () async {
