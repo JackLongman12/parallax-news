@@ -84,7 +84,11 @@ class SettingsScreen extends StatelessWidget {
         const ReadingBalanceTile(),
         ListTile(
           title: const Text('Clear image cache'),
-          subtitle: const Text('Photos are cached on the phone (max 150, 5 days) so feeds load instantly. Also removes old update files.'),
+          subtitle: FutureBuilder<int>(
+            future: ImageCacheStore.size(),
+            builder: (_, snap) => Text('Using ${((snap.data ?? 0) / 1048576).toStringAsFixed(1)} MB of 40 MB. '
+                'Photos are cached so feeds load instantly. Also removes old update files.'),
+          ),
           trailing: const Icon(Icons.delete_outline_rounded),
           onTap: () async {
             await ImageCacheStore.clear();

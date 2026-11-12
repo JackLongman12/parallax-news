@@ -52,6 +52,7 @@ class AppState extends ChangeNotifier {
     unawaited(s.detectHomeCountry());
     // Remove APKs left over from previous updates.
     if (!NewsRepository.offline) unawaited(Updater.cleanOldApks());
+    s._startCacheTrim();
     if (!NewsRepository.offline) {
       unawaited(CoverImages.init(prefs, [...Category.values.where((c) => c != Category.local)]));
     }
@@ -407,6 +408,17 @@ class AppState extends ChangeNotifier {
     final extra = byCoverage.where((s) => !kept.contains(s)).take(8 - kept.length);
     return [...kept, ...extra];
   }
+
+  // ---- Keep the image cache under its size limit ----
+  Timer? _trimTimer;
+  void _startCacheTrim() {
+    if (NewsRepository.offline) return;
+    onCacheTrim?.call();
+    _trimTimer = Timer.periodic(const Duration(minutes: 2), (_) => onCacheTrim?.call());
+  }
+
+  /// Set by the UI layer (which owns the image cache).
+  static void Function()? onCacheTrim;
 
   // ---- One-time tips ----
   bool tipSeen(String id) => (_prefs.getStringList('tipsSeen') ?? const []).contains(id);

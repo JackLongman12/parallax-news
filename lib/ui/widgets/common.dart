@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -53,14 +56,72 @@ class NetImage extends StatelessWidget {
       );
 }
 
-/// Disk cache for images, capped so it can't bloat the phone: at most 150
-/// images, each kept up to 5 days.
+/// Disk cache for images. Limited by count (100 photos, 3 days) AND by total
+/// size: [trim] keeps the folder under [maxBytes] by deleting the oldest
+/// files first (the cache simply re-downloads anything it later needs).
 class ImageCacheStore {
+  static const key = 'parallaxImages';
+  static const maxBytes = 40 * 1024 * 1024;
+
   static final CacheManager instance = CacheManager(Config(
-    'parallaxImages',
-    stalePeriod: Duration(days: 5),
-    maxNrOfCacheObjects: 150,
+    key,
+    stalePeriod: const Duration(days: 3),
+    maxNrOfCacheObjects: 100,
   ));
+
+  static Future<Directory?> _dir() async {
+    try {
+      final d = Directory('${(await getTemporaryDirectory()).path}/$key');
+      return await d.exists() ? d : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Current size of the image cache in bytes.
+  static Future<int> size() async {
+    final d = await _dir();
+    if (d == null) return 0;
+    var total = 0;
+    try {
+      await for (final e in d.list(recursive: true, followLinks: false)) {
+        if (e is File) total += await e.length();
+      }
+    } catch (_) {}
+    return total;
+  }
+
+  static bool _trimming = false;
+
+  /// Deletes the oldest cached photos until the cache is under [maxBytes].
+  static Future<void> trim({int limit = maxBytes}) async {
+    if (_trimming) return;
+    _trimming = true;
+    try {
+      final d = await _dir();
+      if (d == null) return;
+      final files = <(File, int, DateTime)>[];
+      var total = 0;
+      await for (final e in d.list(recursive: true, followLinks: false)) {
+        if (e is! File) continue;
+        final st = await e.stat();
+        files.add((e, st.size, st.modified));
+        total += st.size;
+      }
+      if (total <= limit) return;
+      files.sort((a, b) => a.$3.compareTo(b.$3)); // oldest first
+      for (final f in files) {
+        if (total <= limit * 0.8) break; // trim a bit below the cap
+        try {
+          await f.$1.delete();
+          total -= f.$2;
+        } catch (_) {}
+      }
+    } catch (_) {
+    } finally {
+      _trimming = false;
+    }
+  }
 
   static Future<void> clear() async {
     await instance.emptyCache();

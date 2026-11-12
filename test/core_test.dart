@@ -346,7 +346,7 @@ void main() {
   group('Cover images', () {
     test('Bing thumbnails are upscaled and flagged low-res', () {
       final up = FeedParser.upscaleImage('https://www.bing.com/th?id=OVFT.abc&pid=News');
-      expect(up, contains('w=1200'));
+      expect(up, contains('w=800'));
       expect(up, isNot(contains('pid=')));
       expect(CoverImages.isLowRes('https://www.bing.com/th?id=OVFT.abc'), isTrue);
       expect(CoverImages.isLowRes('https://cdn.site.com/big.jpg'), isFalse);

@@ -17,6 +17,7 @@ import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
 import 'ui/nav.dart';
 import 'ui/theme.dart';
+import 'ui/widgets/common.dart';
 import 'ui/update_flow.dart';
 
 Future<void> main() async {
@@ -25,6 +26,7 @@ Future<void> main() async {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(['Inter typeface'], await rootBundle.loadString('assets/fonts/Inter-LICENSE.txt'));
   });
+  AppState.onCacheTrim = () => ImageCacheStore.trim();
   final state = await AppState.create();
   runApp(ChangeNotifierProvider.value(value: state, child: const ParallaxApp()));
 }

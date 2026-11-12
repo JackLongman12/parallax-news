@@ -145,8 +145,8 @@ class FeedParser {
     final u = Uri.tryParse(url);
     if (u == null || !u.host.endsWith('bing.com') || !u.path.startsWith('/th')) return url;
     final q = Map<String, String>.from(u.queryParameters)
-      ..['w'] = '1200'
-      ..['h'] = '675'
+      ..['w'] = '800'
+      ..['h'] = '450'
       ..['c'] = '7'
       ..['rs'] = '1'
       ..['qlt'] = '90'
