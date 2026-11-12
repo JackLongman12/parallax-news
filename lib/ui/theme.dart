@@ -108,16 +108,17 @@ class Wordmark extends StatelessWidget {
 
 /// Instagram-style ring around an avatar (solid purple).
 class GradientRing extends StatelessWidget {
-  const GradientRing({super.key, required this.child, this.size = 66});
+  const GradientRing({super.key, required this.child, this.size = 66, this.active = true});
   final Widget child;
   final double size;
+  final bool active;
 
   @override
   Widget build(BuildContext context) => Container(
         width: size,
         height: size,
         padding: const EdgeInsets.all(2.5),
-        decoration: const BoxDecoration(shape: BoxShape.circle, color: Brand.purple),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: active ? Brand.purple : const Color(0xFFBDB6CC)),
         child: Container(
           padding: const EdgeInsets.all(2.5),
           decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).scaffoldBackgroundColor),

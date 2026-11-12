@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/article.dart';
 import '../models/bias.dart';
 import '../models/category.dart';
 import '../models/place.dart';
+import '../models/source.dart';
 import '../models/story.dart';
 import '../services/bias_service.dart';
 import '../services/classifier.dart';
@@ -39,6 +41,7 @@ class AppState extends ChangeNotifier {
     final s = AppState._(prefs, bias, classifier, repo, settings);
     s._load();
     repo.onModelUpdated = s._scheduleModelSave;
+    repo.onRatingsUpdated = s._scheduleRatingsSave;
     unawaited(bias.refreshRemote());
     return s;
   }
@@ -68,6 +71,11 @@ class AppState extends ChangeNotifier {
       ..maxLocalOutlets = p.getInt('maxLocalOutlets') ?? 10
       ..homeCountry = p.getString('homeCountry') ?? 'US';
     autoUpdate = p.getBool('autoUpdate') ?? true;
+    try {
+      final disc = jsonDecode(p.getString('discovered') ?? '[]') as List;
+      bias.addDiscovered(disc.whereType<Map<String, dynamic>>().map(SourceInfo.fromJson));
+      bias.lookedUp.addAll(p.getStringList('lookedUp') ?? const []);
+    } catch (_) {}
     final model = p.getString('nbModel');
     if (model != null) classifier.loadJsonString(model);
     // Age the model once a day so it follows the current news cycle.
@@ -76,8 +84,24 @@ class AppState extends ChangeNotifier {
       classifier.decay();
       p.setString('nbDecayed', DateTime.now().toIso8601String());
     }
+    try {
+      recentPlaces = (jsonDecode(p.getString('recentPlaces') ?? '[]') as List)
+          .map((e) => Place.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {}
     final prof = p.getString('profile');
     if (prof != null) profile.loadJsonString(prof);
+  }
+
+  Timer? _saveRatingsTimer;
+
+  void _scheduleRatingsSave() {
+    _saveRatingsTimer?.cancel();
+    _saveRatingsTimer = Timer(const Duration(seconds: 4), () {
+      final list = bias.discovered.take(4000).map((s) => s.toJson()).toList();
+      _prefs.setString('discovered', jsonEncode(list));
+      _prefs.setStringList('lookedUp', bias.lookedUp.take(8000).toList());
+    });
   }
 
   void _scheduleModelSave() {
@@ -117,9 +141,63 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- Engagement signals (all on-device) ----
+  Timer? _saveProfileTimer;
+  void _saveProfileSoon() {
+    _saveProfileTimer?.cancel();
+    _saveProfileTimer = Timer(const Duration(seconds: 3), () => _prefs.setString('profile', profile.toJsonString()));
+  }
+
   void recordOpen(Story s) {
     profile.recordOpen(s);
-    _prefs.setString('profile', profile.toJsonString());
+    _saveProfileSoon();
+  }
+
+  void recordImpression(Story s) {
+    profile.recordImpression(s);
+    _saveProfileSoon();
+  }
+
+  void recordDwell(Story s, Duration d) {
+    profile.recordDwell(s, d);
+    _saveProfileSoon();
+  }
+
+  void recordClickThrough(Story s, Article a) {
+    profile.recordClickThrough(s, a);
+    _saveProfileSoon();
+  }
+
+  void recordShare(Story s) {
+    profile.recordShare(s);
+    _saveProfileSoon();
+  }
+
+  void moreLikeThis(Story s) {
+    profile.moreLikeThis(s);
+    _saveProfileSoon();
+    notifyListeners();
+  }
+
+  void lessLikeThis(Story s) {
+    profile.lessLikeThis(s);
+    _saveProfileSoon();
+    notifyListeners();
+  }
+
+  void toggleHiddenSource(String domain) {
+    if (!profile.hiddenSources.remove(domain)) profile.hiddenSources.add(domain);
+    _saveProfileSoon();
+    notifyListeners();
+  }
+
+  // ---- Recent places ----
+  List<Place> recentPlaces = [];
+
+  void addRecent(Place p) {
+    if (p.level == PlaceLevel.world || (recentPlaces.isNotEmpty && recentPlaces.first == p)) return;
+    recentPlaces = [p, ...recentPlaces.where((x) => x != p)].take(10).toList();
+    _prefs.setString('recentPlaces', jsonEncode(recentPlaces.map((e) => e.toJson()).toList()));
   }
 
   void setOverride(String domain, Bias? b) {
@@ -152,7 +230,7 @@ class AppState extends ChangeNotifier {
 
   void resetLearning() {
     classifier.loadJsonString('{"c":{},"d":{}}');
-    profile.weights.clear();
+    profile.reset();
     _prefs
       ..remove('nbModel')
       ..setString('profile', profile.toJsonString());

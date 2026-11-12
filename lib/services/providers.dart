@@ -67,11 +67,16 @@ class Gdelt {
         sourceName: raw['domain']?.toString() ?? domainOf(url),
         domain: domainOf(url),
         published: _gdeltDate(raw['seendate']?.toString()),
-        imageUrl: img != null && isSafeWebUrl(img) ? img : null,
+        imageUrl: _safeImage(img),
         provider: 'gdelt',
       ));
     }
     return out;
+  }
+
+  static String? _safeImage(String? img) {
+    final u = img == null ? null : Uri.tryParse(img);
+    return u != null && u.scheme == 'https' && isPublicHost(u.host) ? u.toString() : null;
   }
 
   static DateTime? _gdeltDate(String? s) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -7,6 +9,7 @@ import '../../models/article.dart';
 import '../../models/bias.dart';
 import '../../models/source.dart';
 import '../../models/story.dart';
+import '../../services/cover_images.dart';
 import '../../services/net.dart';
 import '../../state/app_state.dart';
 import '../screens/story_screen.dart';
@@ -43,18 +46,32 @@ class BiasBar extends StatelessWidget {
       if (n > 0) segments.add(Expanded(flex: n, child: Container(color: c)));
     }
 
-    if (dist.rated == 0) {
+    if (!dist.isReliable) {
+      // Not enough rated outlets: neutral bar, no political colour at all.
       seg(1, Bias.unrated.color);
     } else {
       seg(dist.left, Side.left.color);
       seg(dist.center, Side.center.color);
       seg(dist.right, Side.right.color);
+      seg(dist.unrated, Bias.unrated.color.withValues(alpha: 0.6));
     }
     final bar = ClipRRect(
       borderRadius: BorderRadius.circular(height / 2),
       child: SizedBox(height: height, child: Row(children: segments)),
     );
     if (!showLabels) return bar;
+    if (!dist.isReliable) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        bar,
+        const SizedBox(height: 6),
+        Text('Lean unknown', style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).hintColor)),
+        Text(
+          'Only ${dist.rated} of ${dist.total} outlets covering this are rated, '
+          'so no left/right split is shown. Tap an outlet to see or set its rating.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ]);
+    }
     final pct = (Side s) => '${(dist.share(s) * 100).round()}%';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       bar,
@@ -69,7 +86,7 @@ class BiasBar extends StatelessWidget {
       if (dist.unrated > 0)
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text('${dist.unrated} unrated source${dist.unrated == 1 ? '' : 's'}',
+          child: Text('Based on ${dist.rated} rated outlets · ${dist.unrated} unrated (grey)',
               style: Theme.of(context).textTheme.bodySmall),
         ),
     ]);
@@ -116,14 +133,101 @@ class Tag extends StatelessWidget {
   }
 }
 
-class StoryCard extends StatelessWidget {
+class StoryCard extends StatefulWidget {
   const StoryCard({super.key, required this.story});
   final Story story;
 
-  void _open(BuildContext context) {
+  @override
+  State<StoryCard> createState() => _StoryCardState();
+}
+
+class _StoryCardState extends State<StoryCard> {
+  Timer? _impression;
+  Future<String?>? _cover;
+
+  Story get story => widget.story;
+
+  @override
+  void initState() {
+    super.initState();
+    // Counts as "seen" only if the card stays on screen for a moment.
+    _impression = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) context.read<AppState>().recordImpression(story);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final lite = context.read<AppState>().settings.lite;
+    _cover ??= lite ? Future.value(story.imageUrl) : CoverImages.forStory(story);
+  }
+
+  @override
+  void dispose() {
+    _impression?.cancel();
+    super.dispose();
+  }
+
+  void _open() {
+    _impression?.cancel();
     context.read<AppState>().recordOpen(story);
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryScreen(story: story)));
   }
+
+  void _share() {
+    context.read<AppState>().recordShare(story);
+    SharePlus.instance.share(ShareParams(text: '${story.title}\n${story.lead.url}\n\nCompare coverage on Parallax News'));
+  }
+
+  void _menu() {
+    final app = context.read<AppState>();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.thumb_up_alt_outlined),
+            title: const Text('More like this'),
+            onTap: () {
+              app.moreLikeThis(story);
+              Navigator.pop(ctx);
+              _toast('Got it — more stories like this');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.thumb_down_alt_outlined),
+            title: const Text('Less like this'),
+            onTap: () {
+              app.lessLikeThis(story);
+              Navigator.pop(ctx);
+              _toast('Got it — fewer stories like this');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.block),
+            title: Text('Hide ${story.lead.sourceName}'),
+            onTap: () {
+              app.toggleHiddenSource(story.lead.domain);
+              Navigator.pop(ctx);
+              _toast('${story.lead.sourceName} hidden from your feed');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.ios_share),
+            title: const Text('Share'),
+            onTap: () {
+              Navigator.pop(ctx);
+              _share();
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
+  void _toast(String msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   @override
   Widget build(BuildContext context) {
@@ -131,56 +235,71 @@ class StoryCard extends StatelessWidget {
     final dist = story.distribution;
     final sources = story.uniqueSources;
     final lite = context.select<AppState, bool>((s) => s.settings.lite);
-    final img = lite ? null : story.imageUrl;
     final blind = dist.blindspotFor;
 
-    // Hero: photo with a dark scrim, or a category gradient "post".
     final hero = SizedBox(
-      height: lite ? 150 : 190,
-      child: Stack(fit: StackFit.expand, children: [
-        ColoredBox(color: theme.brightness == Brightness.dark ? Brand.deep : Brand.purple),
-        if (img == null)
-          Positioned(
-            right: -18,
-            bottom: -24,
-            child: Icon(Brand.categoryIcon(story.category), size: 150, color: Colors.white.withValues(alpha: 0.10)),
-          ),
-        if (img != null)
-          Image.network(img, fit: BoxFit.cover, cacheWidth: 720, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-        if (img != null)
-          const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x00000000), Color(0x22000000), Color(0xB3000000)],
+      height: lite ? 150 : 200,
+      child: FutureBuilder<String?>(
+        future: _cover,
+        initialData: CoverImages.cached(story),
+        builder: (context, snap) {
+          final img = snap.data;
+          return Stack(fit: StackFit.expand, children: [
+            ColoredBox(color: theme.brightness == Brightness.dark ? Brand.deep : Brand.purple),
+            if (img == null)
+              Positioned(
+                right: -18,
+                bottom: -24,
+                child: Icon(Brand.categoryIcon(story.category), size: 150, color: Colors.white.withValues(alpha: 0.10)),
+              ),
+            if (img != null)
+              Image.network(
+                img,
+                fit: BoxFit.cover,
+                cacheWidth: 720,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                frameBuilder: (context, child, frame, sync) => AnimatedOpacity(
+                  opacity: frame == null ? 0 : 1,
+                  duration: const Duration(milliseconds: 250),
+                  child: child,
+                ),
+              ),
+            if (img != null)
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x55000000), Color(0x11000000), Color(0xC0000000)],
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 16,
+              right: 16,
+              top: 14,
+              child: Row(children: [
+                _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
+                if (story.hasLocal) const _Pill(icon: Icons.place, text: 'Local'),
+                const Spacer(),
+                Text(timeAgo(story.latest),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+              ]),
             ),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          top: 14,
-          child: Row(children: [
-            _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
-            if (story.hasLocal) const _Pill(icon: Icons.place, text: 'Local'),
-            const Spacer(),
-            Text(timeAgo(story.latest),
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 14,
-          child: Text(
-            story.title,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 19, height: 1.2, fontWeight: FontWeight.w800),
-          ),
-        ),
-      ]),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 14,
+              child: Text(
+                story.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 19, height: 1.2, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ]);
+        },
+      ),
     );
 
     return Padding(
@@ -192,11 +311,12 @@ class StoryCard extends StatelessWidget {
         elevation: 3,
         shadowColor: Brand.purple.withValues(alpha: 0.25),
         child: InkWell(
-          onTap: () => _open(context),
+          onTap: _open,
+          onLongPress: _menu,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             hero,
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 10),
+              padding: const EdgeInsets.fromLTRB(16, 12, 4, 6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (blind != null)
                   Padding(
@@ -209,10 +329,10 @@ class StoryCard extends StatelessWidget {
                     ]),
                   ),
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: 12),
                   child: BiasBar(dist: dist, height: 8),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(children: [
                   SourceAvatars(articles: sources),
                   const SizedBox(width: 8),
@@ -228,8 +348,13 @@ class StoryCard extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Share',
                     icon: const Icon(Icons.ios_share, size: 20),
-                    onPressed: () => SharePlus.instance.share(ShareParams(
-                        text: '${story.title}\n${story.lead.url}\n\nCompare coverage on Parallax News')),
+                    onPressed: _share,
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'More options',
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onPressed: _menu,
                   ),
                 ]),
               ]),
@@ -241,7 +366,7 @@ class StoryCard extends StatelessWidget {
   }
 
   static String _split(BiasDistribution d) {
-    if (d.rated == 0) return 'not yet rated';
+    if (!d.isReliable) return 'Lean unknown';
     String p(Side s) => '${(d.share(s) * 100).round()}%';
     return 'L ${p(Side.left)} · C ${p(Side.center)} · R ${p(Side.right)}';
   }
@@ -307,8 +432,9 @@ class SourceAvatars extends StatelessWidget {
 }
 
 class ArticleTile extends StatelessWidget {
-  const ArticleTile({super.key, required this.article});
+  const ArticleTile({super.key, required this.article, this.onOpen});
   final Article article;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +451,10 @@ class ArticleTile extends StatelessWidget {
           Text(timeAgo(article.published)),
         ]),
       ),
-      onTap: () => openArticle(context, article.url),
+      onTap: () {
+        onOpen?.call();
+        openArticle(context, article.url);
+      },
     );
   }
 }

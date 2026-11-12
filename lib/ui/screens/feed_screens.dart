@@ -14,18 +14,55 @@ import 'explore_screens.dart';
 import 'story_list.dart';
 
 /// "For You": the curated daily briefing with endless scroll into topics
-/// you don't follow yet (so the feed widens your view instead of narrowing it).
-class ForYouScreen extends StatelessWidget {
+/// you don't follow yet. Tapping a ring above the feed filters it in place
+/// (one tap to see a place or topic, no navigation).
+class ForYouScreen extends StatefulWidget {
   const ForYouScreen({super.key});
+
+  @override
+  State<ForYouScreen> createState() => _ForYouScreenState();
+}
+
+class _ForYouScreenState extends State<ForYouScreen> {
+  /// null = full briefing; otherwise 'p:<placeId>' or 't:<category>'.
+  String? _sel;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final key = ValueKey('${app.followed.map((p) => p.id).join(',')}|${app.followedTopics.map((c) => c.name).join(',')}|${app.settings.homeCountry}');
     final extra = Category.values
         .where((c) => c != Category.general && c != Category.local && !app.followedTopics.contains(c))
         .toList();
+    final header = BriefingHeader(selected: _sel, onSelect: (id) => setState(() => _sel = id));
 
+    Place? place;
+    Category? topic;
+    final sel = _sel;
+    if (sel != null && sel.startsWith('p:')) {
+      final id = sel.substring(2);
+      place = id == Place.world.id ? Place.world : app.followed.where((p) => p.id == id).firstOrNull;
+    } else if (sel != null && sel.startsWith('t:')) {
+      topic = Category.byName(sel.substring(2));
+    }
+
+    if (place != null) {
+      final p = place;
+      return StoryList(
+        key: ValueKey('fy-place:${p.id}'),
+        header: header,
+        loader: (force) async => Curator.rank((await app.repo.place(p, force: force)).stories, app.profile, limit: 80),
+      );
+    }
+    if (topic != null) {
+      final c = topic;
+      return StoryList(
+        key: ValueKey('fy-topic:${c.name}'),
+        header: header,
+        loader: (force) async => Curator.rank((await app.repo.topic(c, force: force)).stories, app.profile, limit: 80),
+      );
+    }
+
+    final key = ValueKey('${app.followed.map((p) => p.id).join(',')}|${app.followedTopics.map((c) => c.name).join(',')}|${app.settings.homeCountry}');
     return StoryList(
       key: key,
       loader: (force) async {
@@ -48,7 +85,7 @@ class ForYouScreen extends StatelessWidget {
         }
         return Curator.rank(stories, app.profile, limit: 30);
       },
-      header: const BriefingHeader(),
+      header: header,
     );
   }
 }
@@ -139,27 +176,49 @@ class BlindspotScreen extends StatelessWidget {
   }
 }
 
-/// Instagram-style row of gradient rings: your places and topics.
+/// Instagram-style rings: For You, +Add, then your places and topics.
+/// Tap = filter the feed in place. Long-press = open the full page.
 class BriefingHeader extends StatelessWidget {
-  const BriefingHeader({super.key});
+  const BriefingHeader({super.key, this.selected, this.onSelect});
+  final String? selected;
+  final void Function(String? id)? onSelect;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final items = <(String, Widget, VoidCallback)>[
+    void select(String? id) => onSelect?.call(id);
+
+    Future<void> add() async {
+      final p = await showPlacePicker(context);
+      if (p == null || !context.mounted) return;
+      if (!app.isFollowed(p)) app.toggleFollow(p);
+      select('p:${p.id}');
+    }
+
+    final items = <(String, Widget, String?, VoidCallback, VoidCallback?)>[
+      ('For You', _bubble(Icons.auto_awesome), null, () => select(null), null),
+      ('Add place', _bubble(Icons.add, light: true), '+', add, null),
       for (final p in [Place.world, ...app.followed])
         (
           p.name,
           _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag)),
+          'p:${p.id}',
+          () => select('p:${p.id}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p))),
         ),
       for (final c in app.followedTopics)
         (
           c.label,
           _bubble(Brand.categoryIcon(c)),
+          't:${c.name}',
+          () => select('t:${c.name}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),
         ),
     ];
+    var title = "Today's briefing";
+    for (final it in items) {
+      if (selected != null && it.$3 == selected) title = it.$1;
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(
         height: 104,
@@ -168,38 +227,48 @@ class BriefingHeader extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) => GestureDetector(
-            onTap: items[i].$3,
-            child: SizedBox(
-              width: 68,
-              child: Column(children: [
-                GradientRing(child: items[i].$2),
-                const SizedBox(height: 5),
-                Text(items[i].$1,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ]),
-            ),
-          ),
+          itemBuilder: (context, i) {
+            final it = items[i];
+            final active = it.$3 == selected;
+            return GestureDetector(
+              onTap: it.$4,
+              onLongPress: it.$5,
+              child: SizedBox(
+                width: 68,
+                child: Column(children: [
+                  GradientRing(active: active || it.$3 == '+', child: it.$2),
+                  const SizedBox(height: 5),
+                  Text(it.$1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w600)),
+                ]),
+              ),
+            );
+          },
         ),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
         child: Row(children: [
-          Text("Today's briefing",
-              style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface)),
-          const Spacer(),
-          Text('${app.followed.length} places · ${app.followedTopics.length} topics',
-              style: Theme.of(context).textTheme.bodySmall),
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface)),
+          ),
+          if (selected == null)
+            Text('${app.followed.length} places · ${app.followedTopics.length} topics',
+                style: Theme.of(context).textTheme.bodySmall)
+          else
+            TextButton(onPressed: () => select(null), child: const Text('Show all')),
         ]),
       ),
     ]);
   }
 
-  static Widget _bubble(IconData icon) => ColoredBox(
-        color: Brand.black,
+  static Widget _bubble(IconData icon, {bool light = false}) => ColoredBox(
+        color: light ? Brand.purple : Brand.black,
         child: Center(child: Icon(icon, color: Colors.white, size: 26)),
       );
 }

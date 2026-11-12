@@ -38,6 +38,19 @@ class PlaceService {
     return out;
   }
 
+  /// Place for a coordinate (used by "Near me"). Coordinates are rounded to
+  /// ~1 km before leaving the phone, for privacy.
+  static Future<Place?> reverse(double lat, double lon) async {
+    final wait = const Duration(milliseconds: 1100) - DateTime.now().difference(_lastNominatim);
+    if (!wait.isNegative) await Future<void>.delayed(wait);
+    _lastNominatim = DateTime.now();
+    final la = lat.toStringAsFixed(2), lo = lon.toStringAsFixed(2);
+    final json = await Net.getJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2'
+        '&addressdetails=1&extratags=1&zoom=10&accept-language=en&lat=$la&lon=$lo');
+    if (json is! Map) return null;
+    return _fromNominatim(json);
+  }
+
   static Place? _fromNominatim(Map r) {
     final addr = (r['address'] as Map?) ?? const {};
     final type = (r['addresstype'] ?? r['type'] ?? '').toString();
@@ -216,5 +229,51 @@ SELECT ?o ?oLabel ?site ?feed ?alignLabel ?ideoLabel ?ownerLabel WHERE {
       if (byQid.length >= limit) break;
     }
     return byQid.values.where((s) => s.domain.isNotEmpty).toList();
+  }
+
+  static final _safeDomain = RegExp(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$');
+
+  /// Looks up political alignment for outlets we have no rating for, by their
+  /// official website on Wikidata. One batched query for up to 25 domains.
+  /// Returns only domains that Wikidata actually knows (rated or not).
+  static Future<Map<String, SourceInfo>> ratingsForDomains(List<String> domains) async {
+    final safe = domains.map((d) => d.toLowerCase()).where(_safeDomain.hasMatch).take(25).toList();
+    if (safe.isEmpty) return const {};
+    final values = [
+      for (final d in safe)
+        for (final v in ['https://www.$d/', 'https://$d/', 'https://www.$d', 'https://$d', 'http://www.$d/', 'http://$d/'])
+          '<$v>'
+    ].join(' ');
+    final q = '''
+SELECT ?o ?oLabel ?site ?alignLabel ?ideoLabel ?ownerLabel WHERE {
+  VALUES ?site { $values }
+  ?o wdt:P856 ?site .
+  OPTIONAL { ?o wdt:P1387 ?align }
+  OPTIONAL { ?o wdt:P1142 ?ideo }
+  OPTIONAL { ?o wdt:P127 ?owner }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
+} LIMIT 200''';
+    final rows = await _query(q);
+    final out = <String, SourceInfo>{};
+    for (final r in rows) {
+      final site = _v(r, 'site');
+      final rawName = _v(r, 'oLabel');
+      if (site == null || rawName == null) continue;
+      final domain = domainOf(site);
+      final align = _v(r, 'alignLabel') ?? _v(r, 'ideoLabel');
+      final bias = align == null ? Bias.unrated : biasFromWikidataLabel(align);
+      final prev = out[domain];
+      if (prev != null && prev.bias != Bias.unrated) continue;
+      out[domain] = SourceInfo(
+        domain: domain,
+        name: FeedParser.cleanText(rawName),
+        bias: bias,
+        owner: _v(r, 'ownerLabel'),
+        origin: bias == Bias.unrated ? RatingOrigin.none : RatingOrigin.wikidata,
+        alignmentLabel: align,
+        wikidataId: _qidFromUri(_v(r, 'o')),
+      );
+    }
+    return out;
   }
 }

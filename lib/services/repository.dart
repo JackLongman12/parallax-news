@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import '../data/geo.dart';
 import '../models/article.dart';
+import '../models/bias.dart';
 import '../models/category.dart';
 import '../models/place.dart';
 import '../models/source.dart';
@@ -13,6 +15,7 @@ import 'curator.dart';
 import 'net.dart';
 import 'places.dart';
 import 'providers.dart';
+import 'text.dart';
 
 class FetchSettings {
   bool useBing = true;
@@ -47,6 +50,7 @@ class NewsRepository {
   final TopicClassifier classifier;
   final FetchSettings settings;
   void Function()? onModelUpdated;
+  void Function()? onRatingsUpdated;
 
   final Map<String, NewsBundle> _cache = {};
   final Map<String, Future<NewsBundle>> _inflight = {};
@@ -264,6 +268,37 @@ class NewsRepository {
     return Curator.rank(stories, profile);
   }
 
+  /// "Related" stories for the story page: same keywords first, then same
+  /// topic, nudged by the reader's own interests. Uses already-loaded news
+  /// plus the story's topic feed, so it's instant most of the time.
+  Future<List<Story>> related(Story s, InterestProfile profile, {int limit = 12}) async {
+    if (s.category != Category.general && s.category != Category.local) {
+      try {
+        await topic(s.category).timeout(const Duration(seconds: 12));
+      } catch (_) {}
+    }
+    final toks = TextTokens.stemSet(s.title);
+    final seenUrls = s.articles.map((a) => a.url).toSet();
+    final pool = <String, Story>{};
+    for (final b in _cache.values) {
+      for (final st in b.stories) {
+        if (st.id == s.id || st.articles.any((a) => seenUrls.contains(a.url))) continue;
+        pool[st.id] = st;
+      }
+    }
+    final scored = <(Story, double)>[];
+    for (final st in pool.values) {
+      final sim = StoryClusterer.similarity(toks, TextTokens.stemSet(st.title));
+      final sameTopic = st.category == s.category;
+      if (sim < 0.12 && !sameTopic) continue;
+      final score = sim * 6 + (sameTopic ? 1.0 : 0) + profile.score(st) * 0.4 +
+          math.log(1 + st.uniqueSources.length) * 0.3;
+      scored.add((st, score));
+    }
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    return scored.take(limit).map((e) => e.$1).toList();
+  }
+
   Future<List<Article>> _run(List<Future<List<Article>> Function()> tasks, List<String> errors) async {
     final wrapped = [
       for (final t in tasks)
@@ -280,7 +315,31 @@ class NewsRepository {
     return [for (final r in results) ...?r];
   }
 
-  NewsBundle _finish(List<Article> articles, List<String> errors, {List<SourceInfo> outlets = const []}) {
+  /// Rates outlets we've never seen before via Wikidata (batched, cached).
+  Future<void> _enrichUnrated(List<Article> articles) async {
+    final unknown = <String>{};
+    for (final a in articles) {
+      if (bias.lookup(a.domain, name: a.sourceName).bias == Bias.unrated && !bias.lookedUp.contains(a.domain)) {
+        unknown.add(a.domain);
+      }
+    }
+    if (unknown.isEmpty) return;
+    final list = unknown.take(50).toList();
+    bias.lookedUp.addAll(list);
+    final chunks = [for (var i = 0; i < list.length; i += 25) list.sublist(i, i + 25 > list.length ? list.length : i + 25)];
+    await Future.wait(chunks.map((c) async {
+      try {
+        final found = await PlaceService.ratingsForDomains(c).timeout(const Duration(seconds: 6));
+        bias.addDiscovered(found.values);
+      } catch (_) {
+        bias.lookedUp.removeAll(c); // retry next time
+      }
+    }));
+    onRatingsUpdated?.call();
+  }
+
+  Future<NewsBundle> _finish(List<Article> articles, List<String> errors, {List<SourceInfo> outlets = const []}) async {
+    await _enrichUnrated(articles);
     bias.annotate(articles);
     var learned = false;
     for (final a in articles) {

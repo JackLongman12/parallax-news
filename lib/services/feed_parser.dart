@@ -97,6 +97,14 @@ class FeedParser {
     String? image;
     for (final e in item.childElements) {
       final n = e.name.local;
+      // Bing: <News:Image>https://www.bing.com/th?id=...</News:Image>
+      if (n == 'Image' && e.getAttribute('url') == null) {
+        final iu = Uri.tryParse(e.innerText.trim());
+        if (iu != null && iu.scheme == 'https' && isPublicHost(iu.host)) {
+          image = iu.toString();
+          break;
+        }
+      }
       if (n == 'thumbnail' || n == 'content' || n == 'enclosure') {
         final u = e.getAttribute('url');
         final type = e.getAttribute('type') ?? 'image';

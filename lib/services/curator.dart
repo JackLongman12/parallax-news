@@ -1,93 +1,204 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import '../models/article.dart';
 import '../models/bias.dart';
 import '../models/category.dart';
 import '../models/story.dart';
+import 'text.dart';
 
-/// Learns what the reader cares about from what they open, entirely on-device.
-/// Nothing is uploaded anywhere.
+/// On-device recommendation profile, in the spirit of TikTok / Instagram
+/// ranking but computed entirely on the phone (nothing is uploaded).
+///
+/// Implicit signals, weakest to strongest:
+///   * impression – card was on screen ~1s but not opened      (-0.05)
+///   * bounce     – opened then left in under 4s               (-0.4)
+///   * open       – tapped the story                           (+1.0)
+///   * dwell      – seconds spent reading the story page       (up to +2.5)
+///   * click-through – opened an outlet's article             (+1.2, +outlet)
+///   * share                                                   (+2.5)
+/// Explicit: "More like this" (+4), "Less like this" (-4), hide outlet.
+///
+/// Each signal updates three things: the story's topic, its outlets and its
+/// headline keywords — so the feed learns "AI chips" vs "AI regulation", not
+/// just "Technology". Weights decay ~10%/day so tastes can change.
 class InterestProfile {
   final Map<Category, double> weights = {};
+  final Map<String, double> sources = {};
+  final Map<String, double> keywords = {};
   final Set<Category> muted = {};
+  final Set<String> hiddenSources = {};
   DateTime lastDecay = DateTime.now();
+  int signals = 0;
 
-  void recordOpen(Story s) {
-    weights[s.category] = (weights[s.category] ?? 0) + 1.0;
+  final Set<String> _seenThisSession = {};
+
+  static const maxKeywords = 1500;
+  static const maxSources = 800;
+
+  void _bump(Story s, double w, {double kwFactor = 0.35, double srcFactor = 0.4}) {
     _maybeDecay();
+    weights[s.category] = (weights[s.category] ?? 0) + w;
+    for (final a in s.uniqueSources.take(4)) {
+      sources[a.domain] = (sources[a.domain] ?? 0) + w * srcFactor;
+    }
+    for (final t in TextTokens.stemSet(s.title)) {
+      keywords[t] = (keywords[t] ?? 0) + w * kwFactor;
+    }
+    signals++;
+    _prune();
   }
+
+  void recordImpression(Story s) {
+    if (_seenThisSession.add(s.id)) _bump(s, -0.05);
+  }
+
+  void recordOpen(Story s) => _bump(s, 1.0);
+
+  void recordDwell(Story s, Duration d) {
+    final secs = d.inMilliseconds / 1000.0;
+    if (secs < 4) {
+      _bump(s, -0.4); // bounced: the headline over-promised
+    } else {
+      _bump(s, math.min(2.5, secs / 25));
+    }
+  }
+
+  void recordClickThrough(Story s, Article a) {
+    sources[a.domain] = (sources[a.domain] ?? 0) + 1.2;
+    _bump(s, 0.8);
+  }
+
+  void recordShare(Story s) => _bump(s, 2.5);
+  void moreLikeThis(Story s) => _bump(s, 4.0);
+  void lessLikeThis(Story s) => _bump(s, -4.0);
 
   void _maybeDecay() {
     final days = DateTime.now().difference(lastDecay).inHours / 24.0;
     if (days < 1) return;
-    final f = math.pow(0.85, days).toDouble();
+    final f = math.pow(0.9, days).toDouble();
     weights.updateAll((_, v) => v * f);
+    sources.updateAll((_, v) => v * f);
+    keywords.updateAll((_, v) => v * f);
     lastDecay = DateTime.now();
   }
 
-  /// 0..1 affinity for a category relative to the reader's favourite.
-  double affinity(Category c) {
-    if (weights.isEmpty) return 0;
-    final maxW = weights.values.fold<double>(0, math.max);
-    if (maxW <= 0) return 0;
-    return (weights[c] ?? 0) / maxW;
+  void _prune() {
+    void trim(Map<String, double> m, int max) {
+      if (m.length <= max) return;
+      final entries = m.entries.toList()..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+      m
+        ..clear()
+        ..addEntries(entries.take((max * 0.8).round()));
+    }
+
+    trim(keywords, maxKeywords);
+    trim(sources, maxSources);
+  }
+
+  static double _squash(double v, double scale) {
+    final x = v / scale;
+    final e = math.exp(2 * x);
+    return (e - 1) / (e + 1); // tanh
+  }
+
+  /// -1..1 affinity for a topic (kept for UI / simple uses).
+  double affinity(Category c) => _squash(weights[c] ?? 0, 6);
+
+  /// Personal relevance of a story, roughly -4.5..4.5.
+  double score(Story s) {
+    final cat = affinity(s.category);
+    final srcs = s.uniqueSources.take(6).toList();
+    final src = srcs.isEmpty
+        ? 0.0
+        : srcs.map((a) => _squash(sources[a.domain] ?? 0, 3)).reduce((a, b) => a + b) / srcs.length;
+    final toks = TextTokens.stemSet(s.title);
+    var kw = 0.0;
+    if (toks.isNotEmpty) {
+      // Use the strongest matching keywords (a single strong interest should count).
+      final vals = toks.map((t) => _squash(keywords[t] ?? 0, 2.5)).toList()..sort((a, b) => b.abs().compareTo(a.abs()));
+      kw = vals.take(3).fold(0.0, (a, b) => a + b) / 3;
+    }
+    return cat * 2.0 + src * 1.0 + kw * 1.5;
+  }
+
+  bool isHidden(Story s) {
+    if (hiddenSources.isEmpty) return false;
+    return s.uniqueSources.every((a) => hiddenSources.contains(a.domain));
   }
 
   String toJsonString() => jsonEncode({
         'w': weights.map((k, v) => MapEntry(k.name, v)),
+        's': sources,
+        'k': keywords,
         'm': muted.map((c) => c.name).toList(),
+        'h': hiddenSources.toList(),
         't': lastDecay.toIso8601String(),
+        'n': signals,
       });
 
   void loadJsonString(String s) {
     try {
       final j = jsonDecode(s) as Map<String, dynamic>;
-      (j['w'] as Map<String, dynamic>).forEach((k, v) {
+      (j['w'] as Map<String, dynamic>? ?? {}).forEach((k, v) {
         final c = Category.byName(k);
         if (c != null) weights[c] = (v as num).toDouble();
       });
-      for (final m in (j['m'] as List)) {
+      (j['s'] as Map<String, dynamic>? ?? {}).forEach((k, v) => sources[k] = (v as num).toDouble());
+      (j['k'] as Map<String, dynamic>? ?? {}).forEach((k, v) => keywords[k] = (v as num).toDouble());
+      for (final m in (j['m'] as List? ?? const [])) {
         final c = Category.byName(m.toString());
         if (c != null) muted.add(c);
       }
-      lastDecay = DateTime.tryParse(j['t'] as String) ?? DateTime.now();
+      hiddenSources.addAll((j['h'] as List? ?? const []).map((e) => e.toString()));
+      lastDecay = DateTime.tryParse(j['t'] as String? ?? '') ?? DateTime.now();
+      signals = (j['n'] as num?)?.toInt() ?? 0;
     } catch (_) {}
+  }
+
+  void reset() {
+    weights.clear();
+    sources.clear();
+    keywords.clear();
+    signals = 0;
   }
 }
 
-/// Builds the daily briefing: ranks stories by how widely they are covered,
-/// how fresh they are and how much they match the reader, then re-ranks for
-/// diversity so one topic (or one political side) cannot flood the feed.
+/// Builds the feed: relevance (personal score) + freshness + coverage breadth,
+/// then a diversity pass and exploration slots so the feed never collapses
+/// into a bubble — the main difference from engagement-only social feeds.
 class Curator {
-  static List<Story> rank(List<Story> stories, InterestProfile profile,
-      {int limit = 60, Set<String> localDomains = const {}}) {
+  static List<Story> rank(List<Story> stories, InterestProfile profile, {int limit = 60}) {
     final now = DateTime.now().toUtc();
+    // Personalisation strength grows with the number of signals collected.
+    final trust = math.min(1.0, profile.signals / 40.0);
     for (final s in stories) {
       final sources = s.uniqueSources.length;
       final ageH = s.latest == null ? 24.0 : now.difference(s.latest!).inMinutes / 60.0;
       final fresh = math.exp(-math.max(0, ageH) / 18.0);
       final coverage = math.log(1 + sources) / math.ln2;
-      final interest = profile.affinity(s.category);
+      final personal = profile.score(s);
       final dist = s.distribution;
-      final balance = balanceOf(dist);
-      var score = coverage * 1.6 + fresh * 3.0 + interest * 2.0 + balance * 0.6;
-      if (s.hasLocal) score += 1.2;
-      if (dist.blindspotFor != null) score += 0.4;
-      if (profile.muted.contains(s.category)) score -= 100;
+      var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
+      if (s.hasLocal) score += 1.0;
+      if (s.imageUrl != null) score += 0.2;
+      if (profile.muted.contains(s.category) || profile.isHidden(s)) score -= 100;
       s.score = score;
     }
-    final pool = stories.where((s) => s.score > -50).toList()
-      ..sort((a, b) => b.score.compareTo(a.score));
+    final pool = stories.where((s) => s.score > -50).toList()..sort((a, b) => b.score.compareTo(a.score));
 
-    // Diversity re-rank (MMR-style): each repeat of a category costs 25%.
     final picked = <Story>[];
     final catCount = <Category, int>{};
     while (picked.length < limit && pool.isNotEmpty) {
       var bestI = 0;
       var bestScore = double.negativeInfinity;
+      // Every 6th slot is exploration: favour topics the reader hasn't shown
+      // interest in yet, so new interests can be discovered.
+      final explore = picked.length % 6 == 5;
       for (var i = 0; i < pool.length && i < 80; i++) {
         final s = pool[i];
-        final adj = s.score * math.pow(0.75, catCount[s.category] ?? 0);
+        var adj = s.score * math.pow(0.75, catCount[s.category] ?? 0);
+        if (explore) adj = s.score * 0.3 + (1 - profile.affinity(s.category).clamp(0.0, 1.0)) * 3;
         if (adj > bestScore) {
           bestScore = adj.toDouble();
           bestI = i;
@@ -102,7 +213,7 @@ class Curator {
 
   /// 1.0 = covered evenly by left, center and right; 0.0 = one side only.
   static double balanceOf(BiasDistribution d) {
-    if (d.rated < 2) return 0.5;
+    if (!d.isReliable) return 0.5;
     final maxShare = [Side.left, Side.center, Side.right].map(d.share).reduce(math.max);
     return (1 - (maxShare - 1 / 3) / (2 / 3)).clamp(0.0, 1.0);
   }

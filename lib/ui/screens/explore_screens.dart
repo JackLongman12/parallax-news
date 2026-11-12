@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/geo.dart';
@@ -10,70 +13,175 @@ import '../widgets/common.dart';
 import 'sources_screen.dart';
 import 'story_list.dart';
 
-class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+/// Search-as-you-type for any place on earth, plus "Near me" and recents.
+/// Tapping a result calls [onPick] (default: open the place's page).
+class PlaceSearchPanel extends StatefulWidget {
+  const PlaceSearchPanel({super.key, this.onPick, this.autofocus = false, this.shrinkWrap = false});
+  final void Function(Place p)? onPick;
+  final bool autofocus;
+  final bool shrinkWrap;
 
   @override
-  State<ExploreScreen> createState() => _ExploreScreenState();
+  State<PlaceSearchPanel> createState() => _PlaceSearchPanelState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> {
+class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
   final _ctrl = TextEditingController();
+  Timer? _debounce;
   List<Place>? _results;
-  bool _searching = false;
+  bool _busy = false;
   String? _error;
+  int _seq = 0;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
 
-  Future<void> _search() async {
-    final q = _ctrl.text.trim();
-    if (q.length < 2) return;
+  void _pick(Place p) {
+    context.read<AppState>().addRecent(p);
+    if (widget.onPick != null) {
+      widget.onPick!(p);
+    } else {
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p)));
+    }
+  }
+
+  void _onChanged(String q) {
+    _debounce?.cancel();
+    if (q.trim().length < 2) {
+      setState(() => _results = null);
+      return;
+    }
+    // Nominatim allows ~1 request/second; debounce typing.
+    _debounce = Timer(const Duration(milliseconds: 650), () => _search(q));
+  }
+
+  Future<void> _search(String q) async {
+    final mySeq = ++_seq;
     setState(() {
-      _searching = true;
+      _busy = true;
       _error = null;
     });
     try {
       final r = await PlaceService.search(q);
-      if (mounted) setState(() => _results = r);
+      if (mounted && mySeq == _seq) setState(() => _results = r);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Search failed: $e');
+      if (mounted && mySeq == _seq) setState(() => _error = 'Search failed. Check your connection.');
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && mySeq == _seq) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _nearMe() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) throw 'Location is turned off';
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        throw 'Location permission denied';
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 15)),
+      );
+      final place = await PlaceService.reverse(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      if (place == null) throw 'Could not find your area';
+      _pick(place);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    return ListView(children: [
+    final children = <Widget>[
       Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
         child: TextField(
           controller: _ctrl,
+          autofocus: widget.autofocus,
           textInputAction: TextInputAction.search,
-          onSubmitted: (_) => _search(),
+          onChanged: _onChanged,
+          onSubmitted: _search,
           decoration: InputDecoration(
-            hintText: 'Search any city, town, suburb or village…',
+            hintText: 'City, town, suburb, village, state, country…',
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: _searching
-                ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-                : (_results != null
-                    ? IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() { _results = null; _ctrl.clear(); }))
+            suffixIcon: _busy
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+                : (_ctrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() {
+                              _ctrl.clear();
+                              _results = null;
+                            }))
                     : null),
-            border: const OutlineInputBorder(),
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
           ),
         ),
       ),
-      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
+      SizedBox(
+        height: 44,
+        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(avatar: const Icon(Icons.my_location, size: 18), label: const Text('Near me'), onPressed: _busy ? null : _nearMe),
+          ),
+          for (final p in app.recentPlaces)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(avatar: const Icon(Icons.history, size: 18), label: Text(p.name), onPressed: () => _pick(p)),
+            ),
+        ]),
+      ),
+      if (_error != null) Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Text(_error!)),
       if (_results != null) ...[
         if (_results!.isEmpty) const ListTile(title: Text('No places found')),
-        for (final p in _results!) PlaceTile(place: p),
-        const Divider(),
+        for (final p in _results!) PlaceTile(place: p, onTap: () => _pick(p)),
       ],
+    ];
+    if (widget.shrinkWrap) return Column(mainAxisSize: MainAxisSize.min, children: children);
+    return Column(children: children);
+  }
+}
+
+/// Opens the place search as a bottom sheet; returns the picked place.
+Future<Place?> showPlacePicker(BuildContext context) => showModalBottomSheet<Place>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.75,
+          child: SingleChildScrollView(
+            child: PlaceSearchPanel(autofocus: true, shrinkWrap: true, onPick: (p) => Navigator.pop(ctx, p)),
+          ),
+        ),
+      ),
+    );
+
+class ExploreScreen extends StatelessWidget {
+  const ExploreScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    return ListView(children: [
+      const PlaceSearchPanel(shrinkWrap: true),
       if (app.followed.isNotEmpty) ...[
         const _Header('Your places'),
         for (final p in app.followed) PlaceTile(place: p),
@@ -101,8 +209,9 @@ class _Header extends StatelessWidget {
 }
 
 class PlaceTile extends StatelessWidget {
-  const PlaceTile({super.key, required this.place});
+  const PlaceTile({super.key, required this.place, this.onTap});
   final Place place;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +228,7 @@ class PlaceTile extends StatelessWidget {
               icon: Icon(f ? Icons.bookmark : Icons.bookmark_border),
               onPressed: () => app.toggleFollow(place),
             ),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: place))),
+      onTap: onTap ?? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: place))),
     );
   }
 
@@ -150,6 +259,7 @@ class PlaceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    app.addRecent(place);
     final f = app.isFollowed(place);
     final showOutlets = place.level.index >= PlaceLevel.country.index;
     final tabs = [

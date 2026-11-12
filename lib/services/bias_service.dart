@@ -14,6 +14,9 @@ class BiasService {
   final Map<String, SourceInfo> _discovered = {};
   Map<String, Bias> overrides = {};
 
+  /// Domains already queried on Wikidata (so we don't ask again).
+  final Set<String> lookedUp = {};
+
   /// Optional URL of an updated catalog (same format as assets/sources.json),
   /// so ratings can be fixed without shipping a new app build.
   static const remoteCatalogUrl = String.fromEnvironment('CATALOG_URL', defaultValue: '');

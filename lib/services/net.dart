@@ -31,6 +31,9 @@ class Net {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 15),
     bool useCache = true,
+    /// If set, read at most this many bytes and return the (partial) prefix
+    /// instead of failing — used to grab <head> metadata from article pages.
+    int? headBytes,
   }) async {
     final parsed = Uri.tryParse(url);
     if (parsed == null || !(parsed.scheme == 'https' || parsed.scheme == 'http')) {
@@ -75,13 +78,15 @@ class Net {
       throw NetException('HTTP ${res.statusCode} from ${uri.host}');
     }
     final declared = res.contentLength;
-    if (declared != null && declared > maxBytes) {
+    if (headBytes == null && declared != null && declared > maxBytes) {
       unawaited(res.stream.drain<void>().catchError((_) {}));
       throw NetException('Response too large from ${uri.host}');
     }
     final bytes = <int>[];
+    // Breaking out of await-for cancels the download.
     await for (final chunk in res.stream.timeout(timeout)) {
       bytes.addAll(chunk);
+      if (headBytes != null && bytes.length >= headBytes) break;
       if (bytes.length > maxBytes) throw NetException('Response too large from ${uri.host}');
     }
     final body = utf8.decode(bytes, allowMalformed: true);

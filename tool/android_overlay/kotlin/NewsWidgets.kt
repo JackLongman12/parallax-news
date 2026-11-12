@@ -3,6 +3,7 @@ package com.parallaxnews.parallax_news
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Bundle
 import android.graphics.Color
 import android.net.Uri
 import android.text.SpannableStringBuilder
@@ -11,6 +12,7 @@ import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
+import es.antonborri.home_widget.HomeWidgetPlugin
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
@@ -35,6 +37,13 @@ private fun coverageLine(o: JSONObject): CharSequence {
     return sb
 }
 
+/** Current widget height in dp (changes as the user resizes it). */
+private fun heightDp(mgr: AppWidgetManager, id: Int): Int =
+    mgr.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 180)
+
+private fun widthDp(mgr: AppWidgetManager, id: Int): Int =
+    mgr.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 250)
+
 private fun launch(context: Context, path: String) =
     HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, Uri.parse("parallax://$path"))
 
@@ -46,14 +55,26 @@ class BriefingWidgetProvider : HomeWidgetProvider() {
         val metas = intArrayOf(R.id.meta_0, R.id.meta_1, R.id.meta_2, R.id.meta_3)
         for (id in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.widget_briefing)
+            // Responsive: show as many stories as fit the size the user picked.
+            val h = heightDp(appWidgetManager, id)
+            val rows = when {
+                h < 110 -> 1
+                h < 170 -> 2
+                h < 240 -> 3
+                else -> 4
+            }
+            val compact = h < 110 || widthDp(appWidgetManager, id) < 200
+            views.setViewVisibility(R.id.header, if (h < 90) View.GONE else View.VISIBLE)
+            views.setViewVisibility(R.id.updated, if (compact) View.GONE else View.VISIBLE)
             views.setTextViewText(R.id.updated, widgetData.getString("updated", "Open the app to load your briefing"))
             for (i in titles.indices) {
-                if (i < items.length()) {
+                if (i < items.length() && i < rows) {
                     val o = items.getJSONObject(i)
                     views.setViewVisibility(titles[i], View.VISIBLE)
                     views.setViewVisibility(metas[i], View.VISIBLE)
                     views.setTextViewText(titles[i], o.optString("t"))
                     views.setTextViewText(metas[i], coverageLine(o))
+                    views.setViewVisibility(metas[i], if (compact && rows == 1) View.GONE else View.VISIBLE)
                 } else {
                     views.setViewVisibility(titles[i], View.GONE)
                     views.setViewVisibility(metas[i], View.GONE)
@@ -62,6 +83,11 @@ class BriefingWidgetProvider : HomeWidgetProvider() {
             views.setOnClickPendingIntent(R.id.root, launch(context, "briefing"))
             appWidgetManager.updateAppWidget(id, views)
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle) {
+        super.onAppWidgetOptionsChanged(context, mgr, id, newOptions)
+        onUpdate(context, mgr, intArrayOf(id), HomeWidgetPlugin.getData(context))
     }
 }
 
@@ -80,8 +106,16 @@ class BlindspotWidgetProvider : HomeWidgetProvider() {
                 views.setTextViewText(R.id.title, "No blindspots right now")
                 views.setTextViewText(R.id.meta, "Open the app to refresh")
             }
+            val h = heightDp(appWidgetManager, id)
+            views.setViewVisibility(R.id.meta, if (h < 100) View.GONE else View.VISIBLE)
+            views.setViewVisibility(R.id.label, if (h < 70) View.GONE else View.VISIBLE)
             views.setOnClickPendingIntent(R.id.root, launch(context, "blindspot"))
             appWidgetManager.updateAppWidget(id, views)
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle) {
+        super.onAppWidgetOptionsChanged(context, mgr, id, newOptions)
+        onUpdate(context, mgr, intArrayOf(id), HomeWidgetPlugin.getData(context))
     }
 }

@@ -10,6 +10,7 @@ import 'package:parallax_news/models/story.dart';
 import 'package:parallax_news/services/bias_service.dart';
 import 'package:parallax_news/services/classifier.dart';
 import 'package:parallax_news/services/clustering.dart';
+import 'package:parallax_news/services/cover_images.dart';
 import 'package:parallax_news/services/curator.dart';
 import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
@@ -92,6 +93,27 @@ void main() {
       expect(Curator.balanceOf(s.distribution), lessThan(0.5));
     });
 
+    test('mostly-unrated coverage is "lean unknown", never a blindspot', () {
+      final s = Story(id: '2', category: Category.general, articles: [
+        art('x', 'c1.com', bias: Bias.center),
+        art('x', 'u1.com'),
+        art('x', 'u2.com'),
+      ]);
+      expect(s.distribution.isReliable, isFalse);
+      expect(s.distribution.blindspotFor, isNull);
+      final s2 = Story(id: '3', category: Category.general, articles: [
+        art('x', 'r1.com', bias: Bias.right),
+        art('x', 'r2.com', bias: Bias.right),
+        art('x', 'r3.com', bias: Bias.right),
+        art('x', 'u1.com'),
+        art('x', 'u2.com'),
+        art('x', 'u3.com'),
+      ]);
+      // 3 rated of 6 = 50% rated: enough to show a split, not enough for a blindspot.
+      expect(s2.distribution.isReliable, isTrue);
+      expect(s2.distribution.blindspotFor, isNull);
+    });
+
     test('wikidata labels map to bias', () {
       expect(biasFromWikidataLabel('centre-left'), Bias.leanLeft);
       expect(biasFromWikidataLabel('right-wing populism'), Bias.right);
@@ -129,6 +151,50 @@ void main() {
       final c2 = TopicClassifier()..loadJsonString(c.toJsonString());
       expect(c2.trainedDocs, 120);
       expect(c2.classify(art('Quidditch final tonight', 'x.com')), Category.sports);
+    });
+  });
+
+  group('Personalisation', () {
+    Story story(String id, String title, Category c, String domain) =>
+        Story(id: id, category: c, articles: [art(title, domain)]);
+
+    test('opens and dwell raise, skips and bounces lower', () {
+      final p = InterestProfile();
+      final ai = story('a', 'New AI chip doubles inference speed', Category.ai, 'tech.com');
+      final golf = story('g', 'Golf open final round delayed by rain', Category.sports, 'sport.com');
+      for (var i = 0; i < 5; i++) {
+        p.recordOpen(ai);
+        p.recordDwell(ai, const Duration(seconds: 60));
+        p.recordDwell(golf, const Duration(seconds: 1)); // bounced
+      }
+      expect(p.score(ai), greaterThan(p.score(golf)));
+      // Keyword learning generalises to a new story about the same thing.
+      final ai2 = story('a2', 'AI chip startup raises funding', Category.business, 'other.com');
+      final golf2 = story('g2', 'Golf star wins playoff', Category.business, 'other.com');
+      expect(p.score(ai2), greaterThan(p.score(golf2)));
+    });
+
+    test('profile round-trips through JSON', () {
+      final p = InterestProfile()..moreLikeThis(story('a', 'Quantum computing breakthrough', Category.science, 'x.com'));
+      p.hiddenSources.add('spam.com');
+      final q = InterestProfile()..loadJsonString(p.toJsonString());
+      expect(q.signals, 1);
+      expect(q.hiddenSources, contains('spam.com'));
+      expect(q.keywords.keys, contains('quantum'));
+    });
+  });
+
+  group('Cover images', () {
+    test('extracts og:image and rejects private/http hosts', () {
+      final base = Uri.parse('https://news.example.com/a/b');
+      expect(
+          CoverImages.extractMetaImage(
+              '<head><meta property="og:image" content="https://cdn.example.com/p.jpg?a=1&amp;b=2"></head>', base),
+          'https://cdn.example.com/p.jpg?a=1&b=2');
+      expect(CoverImages.extractMetaImage('<meta content="/img/x.png" name="twitter:image">', base),
+          'https://news.example.com/img/x.png');
+      expect(CoverImages.extractMetaImage('<meta property="og:image" content="https://10.0.0.1/x.jpg">', base), isNull);
+      expect(CoverImages.extractMetaImage('<p>no meta</p>', base), isNull);
     });
   });
 
