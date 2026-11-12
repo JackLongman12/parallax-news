@@ -186,8 +186,18 @@ class AppState extends ChangeNotifier {
     _saveProfileSoon();
   }
 
-  void recordDwell(Story s, Duration d) {
-    profile.recordDwell(s, d);
+  void recordDwell(Story s, Duration d, {double depth = 0}) {
+    profile.recordDwell(s, d, depth: depth);
+    _saveProfileSoon();
+  }
+
+  void recordLinger(Story s, Duration d) {
+    profile.recordLinger(s, d);
+    _saveProfileSoon();
+  }
+
+  void recordSearch(String query) {
+    profile.recordSearch(query);
     _saveProfileSoon();
   }
 

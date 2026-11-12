@@ -428,25 +428,19 @@ class SubPathChips extends StatelessWidget {
 
 /// One collection of stories (blindspots, underreported, ...).
 class _Collection {
-  const _Collection(this.id, this.title, this.blurb, this.colors, this.art);
+  const _Collection(this.id, this.title, this.blurb, this.tint);
   final String id;
   final String title;
   final String blurb;
-  final List<Color> colors;
-  final CustomPainter Function() art;
+  final Color tint;
 }
 
 final _collections = <_Collection>[
-  _Collection('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers',
-      [const Color(0xFF3B1E8C), Brand.purple], () => _BlindspotArt()),
-  _Collection('underreported', 'Underreported', 'Few outlets, reliable sources',
-      [const Color(0xFF1D1B26), const Color(0xFF3A3550)], () => _UnderreportedArt()),
-  _Collection('divergent', 'Divergent takes', 'Left and right both cover it: compare the framing',
-      [const Color(0xFF2B2F7A), const Color(0xFF7A2B4F)], () => _DivergentArt()),
-  _Collection('left', 'Popular with the left', 'Mostly covered by left-leaning outlets',
-      [const Color(0xFF1E2F9E), const Color(0xFF3F5BEA)], () => _SideArt(Side.left)),
-  _Collection('right', 'Popular with the right', 'Mostly covered by right-leaning outlets',
-      [const Color(0xFF8C1430), const Color(0xFFE0406A)], () => _SideArt(Side.right)),
+  const _Collection('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers', Brand.purple),
+  const _Collection('underreported', 'Underreported', 'Few outlets, reliable sources', Color(0xFF15131C)),
+  const _Collection('divergent', 'Divergent takes', 'Left and right cover it equally: compare the framing', Color(0xFF4A2A8C)),
+  const _Collection('left', 'Popular with the left', 'Mostly covered by left-leaning outlets', Color(0xFF1E3AA8)),
+  const _Collection('right', 'Popular with the right', 'Mostly covered by right-leaning outlets', Color(0xFFA3173A)),
 ];
 
 bool _inCollection(String id, Story s) {
@@ -470,67 +464,163 @@ bool _inCollection(String id, Story s) {
   return false;
 }
 
-/// Blindspot tab: big illustrated tiles, one per collection.
-class BlindspotScreen extends StatelessWidget {
+List<Story> _storiesIn(String id, List<Story> all) => all.where((s) => _inCollection(id, s)).toList()
+  ..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
+
+/// Blindspot tab: one screen, no scrolling. A big Blindspots tile on top and
+/// four smaller ones below, each showing the photo of its top story, how many
+/// stories it holds and their combined left/center/right coverage.
+class BlindspotScreen extends StatefulWidget {
   const BlindspotScreen({super.key});
 
   @override
+  State<BlindspotScreen> createState() => _BlindspotScreenState();
+}
+
+class _BlindspotScreenState extends State<BlindspotScreen> {
+  Map<String, List<Story>>? _groups;
+
+  @override
+  void initState() {
+    super.initState();
+    TabReselect.tabs[4].addListener(_reload);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    TabReselect.tabs[4].removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() => _load(force: true);
+
+  Future<void> _load({bool force = false}) async {
+    final app = context.read<AppState>();
+    try {
+      final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
+      if (!mounted) return;
+      setState(() => _groups = {for (final c in _collections) c.id: _storiesIn(c.id, all)});
+    } catch (_) {
+      if (mounted) setState(() => _groups ??= const {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ReselectScroll(
-      tab: 4,
-      builder: (ctrl) => ListView(
-        controller: ctrl,
-        padding: EdgeInsets.fromLTRB(14, 8, 14, 24 + MediaQuery.paddingOf(context).bottom),
-        children: [
-          for (final c in _collections) ...[
-            _CollectionTile(c: c),
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
+    final pad = MediaQuery.paddingOf(context).bottom;
+    Widget tile(int i, {bool big = false}) => _CollectionTile(
+          c: _collections[i],
+          stories: _groups?[_collections[i].id],
+          loading: _groups == null,
+          big: big,
+        );
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 6, 12, 12 + pad),
+      child: Column(children: [
+        Expanded(flex: 5, child: tile(0, big: true)),
+        const SizedBox(height: 10),
+        Expanded(flex: 4, child: Row(children: [Expanded(child: tile(1)), const SizedBox(width: 10), Expanded(child: tile(2))])),
+        const SizedBox(height: 10),
+        Expanded(flex: 4, child: Row(children: [Expanded(child: tile(3)), const SizedBox(width: 10), Expanded(child: tile(4))])),
+      ]),
     );
   }
 }
 
 class _CollectionTile extends StatelessWidget {
-  const _CollectionTile({required this.c});
+  const _CollectionTile({required this.c, required this.stories, required this.loading, this.big = false});
   final _Collection c;
+  final List<Story>? stories;
+  final bool loading;
+  final bool big;
+
+  String? get _photo {
+    for (final s in stories ?? const <Story>[]) {
+      final u = s.imageUrl;
+      if (u != null && !CoverImages.isWikimediaHost(Uri.tryParse(u)?.host)) return u;
+    }
+    return null;
+  }
 
   @override
-  Widget build(BuildContext context) => Material(
-        borderRadius: BorderRadius.circular(26),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CollectionPage(c: c))),
-          child: Ink(
-            height: 132,
-            decoration: BoxDecoration(gradient: LinearGradient(colors: c.colors, begin: Alignment.topLeft, end: Alignment.bottomRight)),
-            child: Stack(children: [
-              Positioned(right: 0, top: 0, bottom: 0, width: 120, child: CustomPaint(painter: c.art())),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 124, 16),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  // One line, shrunk to fit on narrow phones.
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(c.title,
-                        maxLines: 1,
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                  ),
-                  const SizedBox(height: 6),
-                  Flexible(
-                    child: Text(c.blurb,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13, height: 1.3)),
-                  ),
-                ]),
+  Widget build(BuildContext context) {
+    final list = stories ?? const <Story>[];
+    var l = 0, ce = 0, r = 0;
+    for (final s in list) {
+      final d = s.distribution;
+      l += d.left;
+      ce += d.center;
+      r += d.right;
+    }
+    final photo = _photo;
+    final count = loading
+        ? ' '
+        : list.isEmpty
+            ? 'None right now'
+            : '${list.length} ${list.length == 1 ? 'story' : 'stories'}';
+    return Material(
+      color: c.tint,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CollectionPage(c: c))),
+        child: Stack(fit: StackFit.expand, children: [
+          if (photo != null) NetImage(photo, width: big ? 900 : 500),
+          // Tint + darkening toward the text so it stays readable on any photo.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: photo == null
+                    ? [c.tint, Color.lerp(c.tint, Colors.black, 0.45)!]
+                    : [c.tint.withValues(alpha: 0.35), Colors.black.withValues(alpha: 0.85)],
               ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(big ? 18 : 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(count.toUpperCase(),
+                  style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1)),
+              const Spacer(),
+              Text(c.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: big ? 28 : 17,
+                      height: 1.1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4)),
+              if (big) ...[
+                const SizedBox(height: 4),
+                Text(c.blurb,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 13)),
+              ],
+              if (l + ce + r > 0) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: SizedBox(
+                    height: 5,
+                    child: Row(children: [
+                      if (l > 0) Expanded(flex: l, child: ColoredBox(color: Side.left.color)),
+                      if (ce > 0) Expanded(flex: ce, child: const ColoredBox(color: Color(0xFFE6E1F0))),
+                      if (r > 0) Expanded(flex: r, child: ColoredBox(color: Side.right.color)),
+                    ]),
+                  ),
+                ),
+              ],
             ]),
           ),
-        ),
-      );
+        ]),
+      ),
+    );
+  }
 }
 
 class CollectionPage extends StatelessWidget {
@@ -543,11 +633,8 @@ class CollectionPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(c.title)),
       body: StoryList(
-        loader: (force) async {
-          final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
-          return all.where((s) => _inCollection(c.id, s)).toList()
-            ..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
-        },
+        loader: (force) async =>
+            _storiesIn(c.id, await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force)),
         emptyMessage: 'Nothing here right now. More outlets get rated as you browse, so check back later.',
         header: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -556,117 +643,6 @@ class CollectionPage extends StatelessWidget {
       ),
     );
   }
-}
-
-// ---- Illustrations (drawn in code: crisp, tiny, no image files) ----
-
-/// An eye with a slash over a lopsided left/right bar.
-class _BlindspotArt extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size s) {
-    final w = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    final cx = s.width * 0.5, cy = s.height * 0.42;
-    final eye = Path()
-      ..moveTo(cx - 44, cy)
-      ..quadraticBezierTo(cx, cy - 34, cx + 44, cy)
-      ..quadraticBezierTo(cx, cy + 34, cx - 44, cy);
-    canvas.drawPath(eye, w);
-    canvas.drawCircle(Offset(cx, cy), 11, Paint()..color = Colors.white.withValues(alpha: 0.9));
-    canvas.drawLine(Offset(cx - 40, cy + 32), Offset(cx + 40, cy - 32), w..strokeWidth = 6);
-    final bar = RRect.fromLTRBR(cx - 50, s.height * 0.78, cx + 50, s.height * 0.78 + 10, const Radius.circular(5));
-    canvas.save();
-    canvas.clipRRect(bar);
-    canvas.drawRect(Rect.fromLTWH(cx - 50, bar.top, 10, 10), Paint()..color = Side.left.color);
-    canvas.drawRect(Rect.fromLTWH(cx - 40, bar.top, 90, 10), Paint()..color = Side.right.color);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-/// A tiny spotlight on a single small bar among tall empty ones.
-class _UnderreportedArt extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size s) {
-    final faint = Paint()..color = Colors.white.withValues(alpha: 0.12);
-    final bright = Paint()..color = const Color(0xFFFFD166);
-    final base = s.height * 0.82;
-    final xs = [s.width * 0.18, s.width * 0.38, s.width * 0.58, s.width * 0.78];
-    final hs = [70.0, 55.0, 16.0, 62.0];
-    for (var i = 0; i < 4; i++) {
-      final rect = RRect.fromLTRBR(xs[i] - 10, base - hs[i], xs[i] + 10, base, const Radius.circular(6));
-      canvas.drawRRect(rect, i == 2 ? bright : faint);
-    }
-    final beam = Path()
-      ..moveTo(xs[2] - 6, s.height * 0.08)
-      ..lineTo(xs[2] - 26, base - 18)
-      ..lineTo(xs[2] + 26, base - 18)
-      ..lineTo(xs[2] + 6, s.height * 0.08)
-      ..close();
-    canvas.drawPath(beam, Paint()..color = const Color(0xFFFFD166).withValues(alpha: 0.18));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-/// Two arrows leaving one point in opposite directions (blue / red).
-class _DivergentArt extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size s) {
-    final o = Offset(s.width * 0.5, s.height * 0.78);
-    void arrow(Offset to, Color c) {
-      final p = Paint()
-        ..color = c
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round;
-      canvas.drawLine(o, to, p);
-      final dir = (to - o) / (to - o).distance;
-      final n = Offset(-dir.dy, dir.dx);
-      final head = Path()
-        ..moveTo(to.dx + dir.dx * 10, to.dy + dir.dy * 10)
-        ..lineTo(to.dx - dir.dx * 8 + n.dx * 11, to.dy - dir.dy * 8 + n.dy * 11)
-        ..lineTo(to.dx - dir.dx * 8 - n.dx * 11, to.dy - dir.dy * 8 - n.dy * 11)
-        ..close();
-      canvas.drawPath(head, Paint()..color = c);
-    }
-
-    arrow(Offset(s.width * 0.2, s.height * 0.22), const Color(0xFF7D93FF));
-    arrow(Offset(s.width * 0.8, s.height * 0.22), const Color(0xFFFF8FA8));
-    canvas.drawCircle(o, 8, Paint()..color = Colors.white);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-/// Stacked "outlet" bubbles tilted to one side.
-class _SideArt extends CustomPainter {
-  _SideArt(this.side);
-  final Side side;
-
-  @override
-  void paint(Canvas canvas, Size s) {
-    final light = Paint()..color = Colors.white.withValues(alpha: 0.85);
-    final faint = Paint()..color = Colors.white.withValues(alpha: 0.18);
-    final left = side == Side.left;
-    for (var row = 0; row < 3; row++) {
-      for (var i = 0; i < 4; i++) {
-        final x = s.width * (0.2 + i * 0.2);
-        final y = s.height * (0.28 + row * 0.24);
-        final onSide = left ? i < 3 : i > 0;
-        canvas.drawCircle(Offset(x, y), 11, onSide ? light : faint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SideArt old) => old.side != side;
 }
 
 /// Instagram-style rings: For You, +Add, then your places and topics.

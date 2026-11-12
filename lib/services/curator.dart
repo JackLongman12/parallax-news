@@ -41,7 +41,18 @@ class InterestProfile {
   /// stories you open (only stories with reliable ratings count).
   final Map<String, double> readLean = {'left': 0, 'center': 0, 'right': 0};
 
+  /// Interest by weekday vs weekend: "category:we" / "category:wd".
+  final Map<String, double> weekly = {};
+
+  /// What kind of stories get opened (running averages): how old they were
+  /// (hours) and how many outlets covered them. Lets the ranking lean toward
+  /// breaking vs. slower news, and big vs. niche stories, per reader.
+  double openAgeH = 12;
+  double openSize = 8;
+
   static int get _bucket => DateTime.now().hour ~/ 6;
+  static String get _dayKind => DateTime.now().weekday >= DateTime.saturday ? 'we' : 'wd';
+  final Set<String> _openedThisSession = {};
   DateTime lastDecay = DateTime.now();
   int signals = 0;
 
@@ -76,7 +87,13 @@ class InterestProfile {
   }
 
   void recordOpen(Story s) {
-    _bump(s, 1.0);
+    // Coming back to a story is a stronger signal than the first open.
+    _bump(s, _openedThisSession.add(s.id) ? 1.0 : 1.6);
+    final age = s.latest == null ? null : DateTime.now().toUtc().difference(s.latest!.toUtc()).inMinutes / 60.0;
+    if (age != null && age >= 0) openAgeH = openAgeH * 0.9 + math.min(age, 96) * 0.1;
+    openSize = openSize * 0.9 + math.min(s.uniqueSources.length, 80) * 0.1;
+    final wk = '${s.category.name}:$_dayKind';
+    weekly[wk] = (weekly[wk] ?? 0) + 1.0;
     final d = s.distribution;
     if (d.isReliable) {
       readLean['left'] = (readLean['left'] ?? 0) + d.share(Side.left);
@@ -91,13 +108,40 @@ class InterestProfile {
   /// 0..1: how much this topic is read at the current time of day.
   double timeAffinity(Category c) => _squash(hourly['${c.name}:$_bucket'] ?? 0, 4);
 
-  void recordDwell(Story s, Duration d) {
+  /// Time on the story page, plus how far down it was read (0..1).
+  void recordDwell(Story s, Duration d, {double depth = 0}) {
     final secs = d.inMilliseconds / 1000.0;
     if (secs < 4) {
       _bump(s, -0.4); // bounced: the headline over-promised
     } else {
-      _bump(s, math.min(2.5, secs / 25));
+      _bump(s, math.min(2.5, secs / 25) + (depth >= 0.8 ? 0.8 : depth >= 0.4 ? 0.3 : 0));
     }
+  }
+
+  /// A card stayed on screen a while without being opened: the headline was
+  /// read. Weak positive; long lingers mean mild interest.
+  void recordLinger(Story s, Duration d) {
+    final secs = d.inMilliseconds / 1000.0;
+    if (secs >= 3) _bump(s, math.min(0.4, secs / 20), srcFactor: 0.1);
+  }
+
+  /// Searches say exactly what the reader wants: boost those words.
+  void recordSearch(String query) {
+    for (final t in TextTokens.stemSet(query)) {
+      keywords[t] = (keywords[t] ?? 0) + 0.8;
+    }
+    signals++;
+    _prune();
+  }
+
+  /// 0..1: how much this topic is read on this kind of day (weekday/weekend).
+  double dayAffinity(Category c) => _squash(weekly['${c.name}:$_dayKind'] ?? 0, 6);
+
+  /// 0..1: how close a story is to the age / size of stories usually opened.
+  double shapeFit(Story s) {
+    final age = s.latest == null ? 24.0 : DateTime.now().toUtc().difference(s.latest!.toUtc()).inMinutes / 60.0;
+    double near(double a, double b) => math.max(0, 1 - (math.log((a + 1) / (b + 1))).abs() / 2.5);
+    return (near(math.max(0, age), openAgeH) + near(s.uniqueSources.length.toDouble(), openSize)) / 2;
   }
 
   void recordClickThrough(Story s, Article a) {
@@ -117,6 +161,7 @@ class InterestProfile {
     sources.updateAll((_, v) => v * f);
     keywords.updateAll((_, v) => v * f);
     hourly.updateAll((_, v) => v * f);
+    weekly.updateAll((_, v) => v * f);
     lastDecay = DateTime.now();
   }
 
@@ -174,6 +219,9 @@ class InterestProfile {
         'n': signals,
         'hr': hourly,
         'rl': readLean,
+        'wk': weekly,
+        'oa': openAgeH,
+        'os': openSize,
       });
 
   void loadJsonString(String s) {
@@ -194,6 +242,9 @@ class InterestProfile {
       signals = (j['n'] as num?)?.toInt() ?? 0;
       (j['hr'] as Map<String, dynamic>? ?? {}).forEach((k, v) => hourly[k] = (v as num).toDouble());
       (j['rl'] as Map<String, dynamic>? ?? {}).forEach((k, v) => readLean[k] = (v as num).toDouble());
+      (j['wk'] as Map<String, dynamic>? ?? {}).forEach((k, v) => weekly[k] = (v as num).toDouble());
+      openAgeH = (j['oa'] as num?)?.toDouble() ?? openAgeH;
+      openSize = (j['os'] as num?)?.toDouble() ?? openSize;
     } catch (_) {}
   }
 
@@ -201,6 +252,9 @@ class InterestProfile {
     weights.clear();
     sources.clear();
     keywords.clear();
+    weekly.clear();
+    openAgeH = 12;
+    openSize = 8;
     signals = 0;
   }
 }
@@ -237,6 +291,9 @@ class Curator {
       if (sources == 1 && !s.hasLocal) score -= 1.8;
       if (sources >= 3) score += 0.8;
       if (dist.isReliable) score += 0.6;
+      // Weekday vs weekend habits, and the age/size of stories this reader
+      // tends to open (breaking vs slower, big vs niche). Grows with trust.
+      score += (profile.dayAffinity(s.category) * 0.4 + profile.shapeFit(s) * 0.5) * trust;
       // Time of day: e.g. markets in the morning, sports in the evening.
       score += profile.timeAffinity(s.category) * 0.8 * trust;
       // Developing stories: share of reports from the last 2 hours.

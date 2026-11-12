@@ -23,6 +23,7 @@ class StoryScreen extends StatefulWidget {
 
 class _StoryScreenState extends State<StoryScreen> {
   final _watch = Stopwatch()..start();
+  double _depth = 0; // how far down the page was read (0..1)
   late final AppState _app;
   late final Future<List<Story>> _related = _app.repo.related(widget.story, _app.profile);
   late final Future<String?> _cover = CoverImages.forStory(widget.story);
@@ -45,7 +46,7 @@ class _StoryScreenState extends State<StoryScreen> {
   @override
   void dispose() {
     // Reading time is one of the strongest interest signals.
-    _app.recordDwell(story, _watch.elapsed);
+    _app.recordDwell(story, _watch.elapsed, depth: _depth);
     super.dispose();
   }
 
@@ -71,7 +72,16 @@ class _StoryScreenState extends State<StoryScreen> {
       child: Scaffold(
         // One-handed: the main actions sit at the bottom, within thumb reach.
         bottomNavigationBar: _ActionBar(story: story, app: _app),
-        body: NestedScrollView(
+        body: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (n) {
+            final m = n.metrics;
+            if (m.axis == Axis.vertical && m.maxScrollExtent > 0) {
+              final f = (m.pixels / m.maxScrollExtent).clamp(0.0, 1.0);
+              if (f > _depth) _depth = f;
+            }
+            return false;
+          },
+          child: NestedScrollView(
           headerSliverBuilder: (context, _) => [
             SliverAppBar(
               pinned: true,
@@ -135,6 +145,7 @@ class _StoryScreenState extends State<StoryScreen> {
                   ),
                 ),
           ]),
+          ),
         ),
       ),
     );

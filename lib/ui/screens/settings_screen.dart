@@ -85,18 +85,18 @@ class SettingsScreen extends StatelessWidget {
         const _SourceHealth(),
         const ReadingBalanceTile(),
         ListTile(
-          title: const Text('Clear image cache'),
+          title: const Text('Clear cache'),
           subtitle: FutureBuilder<int>(
             future: ImageCacheStore.size(),
-            builder: (_, snap) => Text('Using ${((snap.data ?? 0) / 1048576).toStringAsFixed(1)} MB of 40 MB. '
-                'Photos are cached so feeds load instantly. Also removes old update files.'),
+            builder: (_, snap) => Text('Cache: ${((snap.data ?? 0) / 1048576).toStringAsFixed(1)} MB (photos are capped at 40 MB). '
+                'Clearing also removes old update files. Android may add a few MB of its own.'),
           ),
           trailing: const Icon(Icons.delete_outline_rounded),
           onTap: () async {
             await ImageCacheStore.clear();
             await Updater.cleanOldApks();
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image cache cleared')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cache cleared')));
             }
           },
         ),

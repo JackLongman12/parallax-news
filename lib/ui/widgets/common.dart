@@ -83,10 +83,15 @@ class ImageCacheStore {
     }
   }
 
-  /// Current size of the image cache in bytes.
+  /// Size of the app's whole cache folder (what Android's storage screen
+  /// counts as "Cache"): photos plus anything else left there.
   static Future<int> size() async {
-    final d = await _dir();
-    if (d == null) return 0;
+    Directory d;
+    try {
+      d = await getTemporaryDirectory();
+    } catch (_) {
+      return 0;
+    }
     var total = 0;
     try {
       await for (final e in d.list(recursive: true, followLinks: false)) {
@@ -113,6 +118,7 @@ class ImageCacheStore {
         files.add((e, st.size, st.modified));
         total += st.size;
       }
+      await _sweepOthers(d.path);
       if (total <= limit) return;
       files.sort((a, b) => a.$3.compareTo(b.$3)); // oldest first
       for (final f in files) {
@@ -128,9 +134,33 @@ class ImageCacheStore {
     }
   }
 
+  /// Removes stray files elsewhere in the cache folder (shared images,
+  /// partial downloads, plugin leftovers) once they are an hour old.
+  static Future<void> _sweepOthers(String imageDir) async {
+    try {
+      final root = await getTemporaryDirectory();
+      final cutoff = DateTime.now().subtract(const Duration(hours: 1));
+      await for (final e in root.list(recursive: true, followLinks: false)) {
+        if (e is! File || e.path.startsWith(imageDir)) continue;
+        try {
+          if ((await e.stat()).modified.isBefore(cutoff)) await e.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  /// Empties the whole cache folder.
   static Future<void> clear() async {
     await instance.emptyCache();
     PaintingBinding.instance.imageCache.clear();
+    try {
+      final root = await getTemporaryDirectory();
+      await for (final e in root.list(followLinks: false)) {
+        try {
+          await e.delete(recursive: true);
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 }
 
@@ -196,8 +226,9 @@ class BiasBar extends StatelessWidget {
     } else {
       seg(dist.left, Side.left.color);
       seg(dist.center, Side.center.color);
+      // Rated outlets only: unrated ones are counted in the caption instead,
+      // so they can't squash the left/center/right proportions.
       seg(dist.right, Side.right.color);
-      seg(dist.unrated, Bias.unrated.color.withValues(alpha: 0.6));
     }
     final bar = ClipRRect(
       borderRadius: BorderRadius.circular(height / 2),
@@ -230,7 +261,7 @@ class BiasBar extends StatelessWidget {
       if (dist.unrated > 0)
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text('Based on ${dist.rated} rated outlets · ${dist.unrated} unrated (grey)',
+          child: Text('Based on ${dist.rated} rated outlets (${dist.unrated} more are unrated)',
               style: Theme.of(context).textTheme.bodySmall),
         ),
     ]);
@@ -288,6 +319,9 @@ class StoryCard extends StatefulWidget {
 class _StoryCardState extends State<StoryCard> {
   Timer? _impression;
   Timer? _lean;
+  final _shown = Stopwatch()..start();
+  bool _opened = false;
+  AppState? _appRef; // kept for dispose(), where context lookups are unsafe
   Future<String?>? _cover;
 
   Story get story => widget.story;
@@ -316,7 +350,8 @@ class _StoryCardState extends State<StoryCard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final lite = context.read<AppState>().settings.lite;
+    _appRef = context.read<AppState>();
+    final lite = _appRef!.settings.lite;
     _cover ??= lite ? Future.value(story.imageUrl) : CoverImages.forStory(story);
   }
 
@@ -324,11 +359,16 @@ class _StoryCardState extends State<StoryCard> {
   void dispose() {
     _impression?.cancel();
     _lean?.cancel();
+    // Headline read without opening: a weak interest signal.
+    if (!_opened && _shown.elapsed.inSeconds >= 3) {
+      _appRef?.recordLinger(story, _shown.elapsed);
+    }
     super.dispose();
   }
 
   void _open() {
     _impression?.cancel();
+    _opened = true;
     context.read<AppState>().recordOpen(story);
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryScreen(story: story)));
   }

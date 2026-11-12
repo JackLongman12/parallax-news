@@ -751,7 +751,10 @@ class SearchResultsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(query)),
       body: StoryList(
-        loader: (force) async => Curator.rank((await app.repo.search(query, force: force)).stories, app.profile, limit: 60),
+        loader: (force) async {
+          if (!force) app.recordSearch(query);
+          return Curator.rank((await app.repo.search(query, force: force)).stories, app.profile, limit: 60);
+        },
         emptyMessage: 'No recent news for "$query".',
       ),
     );
