@@ -32,7 +32,7 @@ class Net {
   static Future<String> getText(
     String url, {
     Map<String, String>? headers,
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 10),
     bool useCache = true,
     /// If set, read at most this many bytes and return the (partial) prefix
     /// instead of failing — used to grab <head> metadata from article pages.

@@ -64,7 +64,10 @@ class NewsRepository {
   final Map<String, List<SourceInfo>> _outletCache = {};
   static const _ttl = Duration(minutes: 15);
 
-  int get _concurrency => settings.lite ? 2 : 4;
+  int get _concurrency => settings.lite ? 3 : 6;
+
+  /// Each source gets this long; slow ones are skipped (caught next refresh).
+  static const taskBudget = Duration(seconds: 7);
 
   bool get _useBing => settings.autoSources || settings.useBing;
 
@@ -143,7 +146,7 @@ class NewsRepository {
     final hit = _outletCache[key];
     if (hit != null) return hit;
     try {
-      final list = await PlaceService.outletsIn(p).timeout(const Duration(seconds: 25));
+      final list = await PlaceService.outletsIn(p).timeout(const Duration(seconds: 10));
       bias.addDiscovered(list);
       _outletCache[key] = list;
       return list;
@@ -302,6 +305,38 @@ class NewsRepository {
 
   /// The daily briefing: everything the reader follows, merged, re-clustered
   /// across sources and ranked by the [Curator].
+  /// Blindspot scan over a broad pool (not just your briefing): world, your
+  /// country, politics / world / business news, plus everything you follow.
+  Future<List<Story>> blindspotPool({
+    required List<Place> places,
+    required List<Category> topics,
+    bool force = false,
+  }) async {
+    final home = countryByCode(settings.homeCountry)?.place;
+    final topicSet = {Category.politics, Category.world, Category.business, ...topics};
+    final bundles = await runPooled<NewsBundle>([
+      () => place(Place.world, force: force),
+      if (home != null) () => place(home, force: force),
+      for (final p in places) () => place(p, force: force),
+      for (final t in topicSet) () => topic(t, force: force),
+    ], concurrency: settings.lite ? 2 : 3);
+    final seen = <String>{};
+    final all = <Article>[];
+    for (final b in bundles) {
+      for (final a in b?.articles ?? const <Article>[]) {
+        if (seen.add(a.url)) all.add(a);
+      }
+    }
+    final stories = _clusterAndLabel(all);
+    int rank(Story s) => s.distribution.blindspotFor != null ? 0 : 1;
+    final picked = stories.where((s) => s.distribution.blindspotFor != null || s.distribution.skewedTo != null).toList()
+      ..sort((a, b) {
+        final c = rank(a).compareTo(rank(b));
+        return c != 0 ? c : b.uniqueSources.length.compareTo(a.uniqueSources.length);
+      });
+    return picked;
+  }
+
   /// Progressive briefing for a fast start. Emits a ranked feed after each
   /// stage instead of waiting for everything:
   ///   1. World + your first 3 topics (in parallel)
@@ -395,7 +430,7 @@ class NewsRepository {
       for (final t in tasks)
         () async {
           try {
-            return await t();
+            return await t().timeout(taskBudget);
           } catch (e) {
             errors.add(e.toString());
             return <Article>[];
@@ -430,8 +465,10 @@ class NewsRepository {
   }
 
   Future<NewsBundle> _finish(List<Article> articles, List<String> errors, {List<SourceInfo> outlets = const []}) async {
-    await _enrichUnrated(articles);
     bias.annotate(articles);
+    // Rate never-seen outlets in the background; the shared Article objects
+    // are re-annotated in place, so cards pick it up on their next build.
+    unawaited(_enrichUnrated(articles).then((_) => bias.annotate(articles)).catchError((_) {}));
     var learned = false;
     for (final a in articles) {
       if (a.hintCategory != null && a.hintCategory != Category.local) {

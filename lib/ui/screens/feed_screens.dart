@@ -5,12 +5,15 @@ import 'package:provider/provider.dart';
 
 import '../../models/category.dart';
 import '../../models/story.dart';
+import '../../services/cover_images.dart';
 import '../../services/curator.dart';
 import '../../models/place.dart';
 import '../../services/home_widgets.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/markets_strip.dart';
 import 'explore_screens.dart';
+import 'feed_editor.dart';
 import 'story_list.dart';
 
 /// "For You": the curated daily briefing with endless scroll into topics
@@ -68,6 +71,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
       // Opens instantly with last session's feed, then streams fresh news in
       // stages (World + 3 topics first, then places, then other topics).
       initial: app.snapshot,
+      autoRefresh: const Duration(minutes: 8),
       streamLoader: (force) async* {
         List<Story>? last;
         await for (final stories in app.repo.briefingStream(
@@ -151,6 +155,7 @@ class _TopicsScreenState extends State<TopicsScreen> {
           ),
         ]),
       ),
+      if (_selected == Category.business || _selected == Category.finance) const MarketsStrip(),
       Expanded(
         child: StoryList(
           key: ValueKey('topic:${_selected.name}'),
@@ -168,18 +173,13 @@ class BlindspotScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     return StoryList(
-      key: ValueKey('blind:${app.followed.length}:${app.followedTopics.length}'),
-      loader: (force) => app.repo.briefing(
-        places: app.followed,
-        topics: app.followedTopics,
-        profile: app.profile,
-        force: force,
-      ),
-      filter: (s) => s.distribution.blindspotFor != null,
-      emptyMessage: 'No blindspots right now. A blindspot is a story covered mostly by one side of the political spectrum.',
+      key: ValueKey('blind:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
+      loader: (force) => app.repo.blindspotPool(places: app.followed, topics: app.followedTopics, force: force),
+      emptyMessage: 'No one-sided stories right now. More outlets get rated as you browse, '
+          'so check back later or pull to refresh.',
       header: const Padding(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-        child: Text('Stories mostly ignored by one side of the spectrum.'),
+        child: Text('Blindspots first: stories one side is barely covering. Then stories covered mostly by one side.'),
       ),
     );
   }
@@ -204,23 +204,30 @@ class BriefingHeader extends StatelessWidget {
       select('p:${p.id}');
     }
 
+    // Tapping the ring that is already selected goes back to the full feed.
+    void toggle(String id) => select(selected == id ? null : id);
+    String? photo(String key) {
+      final top = app.repo.cached(key)?.stories.firstOrNull;
+      return top == null ? null : CoverImages.cached(top);
+    }
+
     final items = <(String, Widget, String?, VoidCallback, VoidCallback?)>[
-      ('For You', _bubble(Icons.auto_awesome), null, () => select(null), null),
       ('Add place', _bubble(Icons.add, light: true), '+', add, null),
       for (final p in [Place.world, ...app.followed])
         (
           p.name,
-          _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag)),
+          _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag),
+              image: photo('place:${p.id}')),
           'p:${p.id}',
-          () => select('p:${p.id}'),
+          () => toggle('p:${p.id}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p))),
         ),
       for (final c in app.followedTopics)
         (
           c.label,
-          _bubble(Brand.categoryIcon(c)),
+          _bubble(Brand.categoryIcon(c), image: photo('topic:${c.name}')),
           't:${c.name}',
-          () => select('t:${c.name}'),
+          () => toggle('t:${c.name}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),
         ),
     ];
@@ -266,20 +273,29 @@ class BriefingHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface)),
           ),
-          if (selected == null)
-            Text('${app.followed.length} places · ${app.followedTopics.length} topics',
-                style: Theme.of(context).textTheme.bodySmall)
-          else
-            TextButton(onPressed: () => select(null), child: const Text('Show all')),
+          if (selected != null) TextButton(onPressed: () => select(null), child: const Text('Show all')),
+          IconButton(
+            tooltip: 'Customize feed',
+            icon: const Icon(Icons.tune),
+            onPressed: () => showFeedEditor(context),
+          ),
         ]),
       ),
     ]);
   }
 
-  static Widget _bubble(IconData icon, {bool light = false}) => ColoredBox(
-        color: light ? Brand.purple : Brand.black,
-        child: Center(child: Icon(icon, color: Colors.white, size: 26)),
-      );
+  /// Ring content: a photo from the latest story when we have one.
+  static Widget _bubble(IconData icon, {bool light = false, String? image}) {
+    final fallback = ColoredBox(
+      color: light ? Brand.purple : Brand.black,
+      child: Center(child: Icon(icon, color: Colors.white, size: 26)),
+    );
+    if (image == null) return fallback;
+    return Stack(fit: StackFit.expand, children: [
+      fallback,
+      Image.network(image, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+    ]);
+  }
 }
 
 class TopicPage extends StatelessWidget {

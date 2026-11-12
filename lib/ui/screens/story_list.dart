@@ -19,6 +19,7 @@ class StoryList extends StatefulWidget {
     this.onLoadMore,
     this.emptyMessage = 'No stories found right now.',
     this.filter,
+    this.autoRefresh,
   });
 
   final Future<List<Story>> Function(bool force)? loader;
@@ -32,6 +33,9 @@ class StoryList extends StatefulWidget {
   final Widget? header;
   final String emptyMessage;
   final bool Function(Story s)? filter;
+
+  /// Quietly re-check for news this often and offer a "new stories" pill.
+  final Duration? autoRefresh;
 
   @override
   State<StoryList> createState() => _StoryListState();
@@ -49,6 +53,8 @@ class _StoryListState extends State<StoryList> {
   final _scroll = ScrollController();
   StreamSubscription<List<Story>>? _sub;
   bool _refreshing = false;
+  Timer? _autoTimer;
+  List<Story> _pending = [];
 
   @override
   void initState() {
@@ -60,10 +66,34 @@ class _StoryListState extends State<StoryList> {
       _loading = false;
     }
     _load(false);
+    final every = widget.autoRefresh;
+    if (every != null) _autoTimer = Timer.periodic(every, (_) => _backgroundRefresh());
+  }
+
+  Future<void> _backgroundRefresh() async {
+    if (_refreshing || _loading || !mounted) return;
+    try {
+      final latest = widget.streamLoader != null ? await widget.streamLoader!(true).last : await widget.loader!(true);
+      final have = {for (final s in _all) for (final a in s.articles) a.url};
+      final fresh = _filtered(latest).where((s) => !s.articles.any((a) => have.contains(a.url))).toList();
+      if (fresh.isNotEmpty && mounted) setState(() => _pending = fresh);
+    } catch (_) {}
+  }
+
+  void _showPending() {
+    setState(() {
+      _all = [..._pending, ..._all];
+      _visible += _pending.length;
+      _pending = [];
+    });
+    if (_scroll.hasClients) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+    }
   }
 
   @override
   void dispose() {
+    _autoTimer?.cancel();
     _sub?.cancel();
     _scroll.dispose();
     super.dispose();
@@ -203,7 +233,7 @@ class _StoryListState extends State<StoryList> {
     final count = _visible.clamp(0, _all.length);
     final hasHeader = widget.header != null;
     final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == _all.length);
-    return RefreshIndicator(
+    final list = RefreshIndicator(
       onRefresh: () => _load(true),
       child: _all.isEmpty
           ? ListView(children: [
@@ -237,5 +267,34 @@ class _StoryListState extends State<StoryList> {
               },
             ),
     );
+    if (_pending.isEmpty) return list;
+    return Stack(children: [
+      list,
+      Positioned(
+        top: 12,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Material(
+            color: Theme.of(context).colorScheme.primary,
+            shape: const StadiumBorder(),
+            elevation: 6,
+            child: InkWell(
+              customBorder: const StadiumBorder(),
+              onTap: _showPending,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.arrow_upward, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text('${_pending.length} new ${_pending.length == 1 ? 'story' : 'stories'}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ]);
   }
 }

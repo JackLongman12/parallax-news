@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/geo.dart';
 import '../../models/bias.dart';
+import '../../models/category.dart';
 import '../../models/source.dart';
 import '../../state/app_state.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
+import 'explore_screens.dart';
 
+enum _Group { lean, country, topic }
+
+/// Sources, grouped so you never scroll through hundreds of rows:
+/// by Lean, by Country (yours first) or by Topic. Groups are collapsed with
+/// counts; search jumps straight to matches.
 class SourcesScreen extends StatefulWidget {
   const SourcesScreen({super.key});
 
@@ -15,7 +24,7 @@ class SourcesScreen extends StatefulWidget {
 
 class _SourcesScreenState extends State<SourcesScreen> {
   String _q = '';
-  Bias? _bias;
+  _Group _group = _Group.lean;
   bool _localOnly = false;
 
   @override
@@ -28,46 +37,106 @@ class _SourcesScreenState extends State<SourcesScreen> {
     for (final s in app.bias.curated) {
       map[s.domain] = app.bias.lookup(s.domain, name: s.name);
     }
-    var list = map.values.where((s) {
+    final all = map.values.where((s) {
       if (_localOnly && !s.isLocal) return false;
-      if (_bias != null && s.bias != _bias) return false;
       if (_q.isNotEmpty && !s.name.toLowerCase().contains(_q) && !s.domain.contains(_q)) return false;
       return true;
     }).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+    // Build groups.
+    final groups = <(String, Widget?, List<SourceInfo>)>[];
+    switch (_group) {
+      case _Group.lean:
+        for (final b in Bias.values) {
+          final items = all.where((s) => s.bias == b).toList();
+          if (items.isNotEmpty) {
+            groups.add((b.label, CircleAvatar(radius: 7, backgroundColor: b.color), items));
+          }
+        }
+      case _Group.country:
+        final byCc = <String, List<SourceInfo>>{};
+        for (final s in all) {
+          byCc.putIfAbsent(s.country ?? '??', () => []).add(s);
+        }
+        final home = app.settings.homeCountry;
+        final keys = byCc.keys.toList()
+          ..sort((a, b) {
+            if (a == home) return -1;
+            if (b == home) return 1;
+            return (countryByCode(a)?.name ?? 'zz').compareTo(countryByCode(b)?.name ?? 'zz');
+          });
+        for (final k in keys) {
+          groups.add((countryByCode(k)?.name ?? 'International / other', Text(flagEmoji(k == '??' ? null : k)), byCc[k]!));
+        }
+      case _Group.topic:
+        final general = all.where((s) => s.topics.isEmpty).toList();
+        for (final c in Category.values) {
+          final items = all.where((s) => s.topics.contains(c)).toList();
+          if (items.isNotEmpty) groups.add((c.label, Icon(Brand.categoryIcon(c), size: 18), items));
+        }
+        if (general.isNotEmpty) groups.add(('General news', const Icon(Icons.newspaper, size: 18), general));
+    }
+
+    final searching = _q.isNotEmpty;
     return Column(children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
         child: TextField(
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search sources', border: OutlineInputBorder(), isDense: true),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: 'Search ${map.length} sources',
+            filled: true,
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+          ),
           onChanged: (v) => setState(() => _q = v.toLowerCase().trim()),
         ),
       ),
-      SizedBox(
-        height: 48,
-        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8), children: [
-          Padding(
-            padding: const EdgeInsets.all(4),
-            child: FilterChip(label: const Text('Local'), selected: _localOnly, onSelected: (v) => setState(() => _localOnly = v)),
-          ),
-          for (final b in Bias.values)
-            Padding(
-              padding: const EdgeInsets.all(4),
-              child: ChoiceChip(
-                label: Text(b.label),
-                selected: _bias == b,
-                onSelected: (v) => setState(() => _bias = v ? b : null),
-              ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(children: [
+          Expanded(
+            child: SegmentedButton<_Group>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: _Group.lean, label: Text('Lean')),
+                ButtonSegment(value: _Group.country, label: Text('Country')),
+                ButtonSegment(value: _Group.topic, label: Text('Topic')),
+              ],
+              selected: {_group},
+              onSelectionChanged: (s) => setState(() => _group = s.first),
             ),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(label: const Text('Local'), selected: _localOnly, onSelected: (v) => setState(() => _localOnly = v)),
         ]),
       ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text('${list.length} sources · local outlets are added as you explore places',
-            style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 6),
+      Expanded(
+        child: all.isEmpty
+            ? const Center(child: Text('No sources match.'))
+            : ListView.builder(
+                itemCount: groups.length,
+                itemBuilder: (_, i) {
+                  final g = groups[i];
+                  return ExpansionTile(
+                    key: PageStorageKey('src-${_group.name}-${g.$1}'),
+                    // While searching, open every group so matches are visible.
+                    initiallyExpanded: searching || groups.length == 1,
+                    leading: g.$2,
+                    title: Text(g.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: Brand.purple.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      child: Text('${g.$3.length}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                    children: [for (final s in g.$3) SourceTile(source: s)],
+                  );
+                },
+              ),
       ),
-      Expanded(child: ListView.builder(itemCount: list.length, itemBuilder: (_, i) => SourceTile(source: list[i]))),
     ]);
   }
 }

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'services/home_widgets.dart';
 import 'state/app_state.dart';
 import 'ui/screens/explore_screens.dart';
+import 'ui/screens/feed_editor.dart';
 import 'ui/screens/feed_screens.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
@@ -30,8 +31,27 @@ class ParallaxApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: Brand.theme(Brightness.light),
       darkTheme: Brand.theme(Brightness.dark),
-      home: const HomeShell(),
+      home: const _Start(),
     );
+  }
+}
+
+/// Shows the one-time topic/area picker, then the app.
+class _Start extends StatefulWidget {
+  const _Start();
+
+  @override
+  State<_Start> createState() => _StartState();
+}
+
+class _StartState extends State<_Start> {
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    if (!app.onboarded) {
+      return OnboardingScreen(onDone: () => setState(app.finishOnboarding));
+    }
+    return const HomeShell();
   }
 }
 
@@ -47,7 +67,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _tab = widget.initialTab;
   late final _built = <int>{widget.initialTab};
 
@@ -58,9 +78,24 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     if (widget.pageOverride != null) return;
     _listenToWidgets();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.read<AppState>().autoUpdate) checkForUpdate(context);
-    });
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeCheckUpdate());
+  }
+
+  DateTime _lastUpdateCheck = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Android usually *resumes* the app rather than restarting it, so check on
+  /// every return to the app too (at most every 2 minutes).
+  void _maybeCheckUpdate() {
+    if (!mounted || !context.read<AppState>().autoUpdate) return;
+    if (DateTime.now().difference(_lastUpdateCheck) < const Duration(minutes: 2)) return;
+    _lastUpdateCheck = DateTime.now();
+    checkForUpdate(context);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _maybeCheckUpdate();
   }
 
   StreamSubscription<Uri?>? _widgetSub;
@@ -84,6 +119,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _widgetSub?.cancel();
     super.dispose();
   }

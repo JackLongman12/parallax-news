@@ -213,6 +213,25 @@ class _StoryCardState extends State<StoryCard> {
             },
           ),
           ListTile(
+            leading: Icon(app.followsTopic(story.category) ? Icons.star : Icons.star_border),
+            title: Text(app.followsTopic(story.category)
+                ? 'Unfollow ${story.category.label}'
+                : 'Follow ${story.category.label}'),
+            onTap: () {
+              app.toggleTopic(story.category);
+              Navigator.pop(ctx);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_off_outlined),
+            title: Text('Mute ${story.category.label}'),
+            onTap: () {
+              app.toggleMute(story.category);
+              Navigator.pop(ctx);
+              _toast('${story.category.label} muted — undo in Customize feed');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.block),
             title: Text('Hide ${story.lead.sourceName}'),
             onTap: () {
@@ -287,6 +306,8 @@ class _StoryCardState extends State<StoryCard> {
               top: 14,
               child: Row(children: [
                 _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
+                if (_isBreaking(story)) const _Pill(icon: Icons.flash_on, text: 'Breaking')
+                else if (_isTrending(story)) const _Pill(icon: Icons.local_fire_department, text: 'Trending'),
                 if (story.hasLocal) const _Pill(icon: Icons.place, text: 'Local'),
                 const Spacer(),
                 Text(timeAgo(story.latest),
@@ -315,7 +336,7 @@ class _StoryCardState extends State<StoryCard> {
       ),
     );
 
-    return Padding(
+    final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Material(
         color: theme.cardTheme.color,
@@ -339,6 +360,16 @@ class _StoryCardState extends State<StoryCard> {
                       const SizedBox(width: 6),
                       Text('Blindspot · barely covered by the ${blind.label.toLowerCase()}',
                           style: const TextStyle(color: Brand.red, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ]),
+                  )
+                else if (dist.skewedTo != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      Icon(Icons.balance, size: 15, color: dist.skewedTo!.color),
+                      const SizedBox(width: 6),
+                      Text('Mostly ${dist.skewedTo!.label.toLowerCase()}-leaning coverage',
+                          style: TextStyle(color: dist.skewedTo!.color, fontSize: 12, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                 Padding(
@@ -376,6 +407,31 @@ class _StoryCardState extends State<StoryCard> {
         ),
       ),
     );
+    // Cards glide in as they appear, so the feed feels alive.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      child: card,
+      builder: (context, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, 24 * (1 - v)), child: child),
+      ),
+    );
+  }
+
+  /// New and already picked up by several outlets.
+  static bool _isBreaking(Story s) {
+    final t = s.latest;
+    if (t == null) return false;
+    final first = s.articles.map((a) => a.published).whereType<DateTime>().fold<DateTime>(t, (a, b) => b.isBefore(a) ? b : a);
+    return DateTime.now().toUtc().difference(first).inMinutes < 90 && s.uniqueSources.length >= 3;
+  }
+
+  /// Widely covered in the last day.
+  static bool _isTrending(Story s) {
+    final t = s.latest;
+    return t != null && DateTime.now().toUtc().difference(t).inHours < 24 && s.uniqueSources.length >= 6;
   }
 
   static String _split(BiasDistribution d) {

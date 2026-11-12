@@ -32,12 +32,23 @@ class BiasDistribution {
   /// single rated outlet can't paint the whole story with a political colour.
   bool get isReliable => rated >= 2 && ratedShare >= 0.5;
 
-  /// The side that is under-covering this story, if it is a blindspot.
-  /// Stricter than [isReliable]: needs 3+ rated outlets and 60% rated coverage.
+  /// The side that is under-covering this story, if it is a blindspot:
+  /// 3+ rated outlets, at least half the coverage rated, and one side has
+  /// <=20% of it while the other has >=60%.
   Side? get blindspotFor {
-    if (rated < 3 || ratedShare < 0.6) return null;
-    if (share(Side.left) <= 0.15 && share(Side.right) >= 0.5) return Side.left;
-    if (share(Side.right) <= 0.15 && share(Side.left) >= 0.5) return Side.right;
+    if (rated < 3 || ratedShare < 0.5) return null;
+    if (share(Side.left) <= 0.2 && share(Side.right) >= 0.6) return Side.left;
+    if (share(Side.right) <= 0.2 && share(Side.left) >= 0.6) return Side.right;
+    return null;
+  }
+
+  /// Weaker signal than a blindspot: reliably rated coverage where one side
+  /// supplies 70%+ of it. Shown as "mostly one side", never as a blindspot.
+  Side? get skewedTo {
+    if (!isReliable) return null;
+    for (final s in Side.values) {
+      if (s != Side.center && share(s) >= 0.7) return s;
+    }
     return null;
   }
 }

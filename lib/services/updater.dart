@@ -58,15 +58,39 @@ class Updater {
     return '${info.version}+${info.buildNumber}';
   }
 
+  /// Result of the most recent check, shown in Settings for troubleshooting.
+  static String lastResult = 'Not checked yet';
+
+  static String _stamp() {
+    final n = DateTime.now();
+    return '${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}';
+  }
+
   static Future<UpdateInfo?> check() async {
-    if (!Platform.isAndroid || manifestUrl.isEmpty || !_allowed(manifestUrl)) return null;
-    final json = await Net.getJson(manifestUrl, useCache: false);
+    try {
+      final info = await _check();
+      lastResult = info == null ? 'Up to date (checked ${_stamp()})' : 'Update ${info.version} found (${_stamp()})';
+      return info;
+    } catch (e) {
+      lastResult = 'Check failed at ${_stamp()}: $e';
+      rethrow;
+    }
+  }
+
+  static Future<UpdateInfo?> _check() async {
+    if (!Platform.isAndroid) return null;
+    if (manifestUrl.isEmpty || !_allowed(manifestUrl)) {
+      throw StateError('update source not allowed');
+    }
+    // Cache-buster so no proxy/CDN can serve a stale manifest.
+    final manifest = '$manifestUrl?t=${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
+    final json = await Net.getJson(manifest, useCache: false);
     if (json is! Map) return null;
     final build = (json['build'] as num?)?.toInt() ?? 0;
     final android = json['android'];
     if (android is! Map) return null;
     final url = android['url']?.toString() ?? '';
-    if (!_allowed(url)) return null;
+    if (!_allowed(url)) throw StateError('APK host not allowed');
     // Checksum is mandatory: never install an unverified download.
     final sha = android['sha256']?.toString();
     if (sha == null || !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(sha)) return null;

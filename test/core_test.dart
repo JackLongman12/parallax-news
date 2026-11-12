@@ -10,7 +10,9 @@ import 'package:parallax_news/models/story.dart';
 import 'package:parallax_news/services/bias_service.dart';
 import 'package:parallax_news/services/classifier.dart';
 import 'package:parallax_news/services/clustering.dart';
+import 'package:parallax_news/services/country_detect.dart';
 import 'package:parallax_news/services/cover_images.dart';
+import 'package:parallax_news/services/markets.dart';
 import 'package:parallax_news/services/curator.dart';
 import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
@@ -111,9 +113,10 @@ void main() {
         art('x', 'u2.com'),
         art('x', 'u3.com'),
       ]);
-      // 3 rated of 6 = 50% rated: enough to show a split, not enough for a blindspot.
+      // 3 rated of 6 = 50% rated, all right-leaning: a (minimal) blindspot.
       expect(s2.distribution.isReliable, isTrue);
-      expect(s2.distribution.blindspotFor, isNull);
+      expect(s2.distribution.blindspotFor, Side.left);
+      expect(s2.distribution.skewedTo, Side.right);
     });
 
     test('wikidata labels map to bias', () {
@@ -237,6 +240,43 @@ void main() {
         expect(p.article.snippet, contains(p.text));
       }
       expect(sum.framing.keys, containsAll([Side.left, Side.center, Side.right]));
+    });
+  });
+
+  group('Home country & markets', () {
+    test('country from network trace and locale', () {
+      expect(CountryDetector.parseTrace('fl=1\nip=1.2.3.4\nloc=DE\ntls=TLSv1.3\n'), 'DE');
+      expect(CountryDetector.parseTrace('loc=XX\n'), isNull);
+      expect(CountryDetector.parseTrace('garbage'), isNull);
+      expect(CountryDetector.fromLocale('en_GB'), 'GB');
+      expect(CountryDetector.fromLocale('pt-BR'), 'BR');
+      expect(CountryDetector.fromLocale('fr_CA.UTF-8'), 'CA');
+      expect(CountryDetector.fromLocale('en'), isNull);
+    });
+
+    test('Yahoo chart JSON parses to a quote with % change', () {
+      final q = Markets.parseChart('S&P 500', {
+        'chart': {
+          'result': [
+            {'meta': {'regularMarketPrice': 5050.0, 'chartPreviousClose': 5000.0}}
+          ]
+        }
+      })!;
+      expect(q.changePct, closeTo(1.0, 1e-9));
+      expect(Markets.parseChart('x', {'chart': {'result': []}}), isNull);
+      expect(Markets.parseChart('x', 'nonsense'), isNull);
+    });
+  });
+
+  group('Unique covers', () {
+    test('generic logos are rejected; image queries go specific to broad', () {
+      expect(CoverImages.looksGeneric('https://site.com/static/logo-share.png'), isTrue);
+      expect(CoverImages.looksGeneric('https://site.com/img/2026/11/flood-scene.jpg'), isFalse);
+      final s = Story(id: 'q', category: Category.environment, articles: [art('Floods hit Valencia as storm Dana returns', 'x.com')]);
+      final qs = CoverImages.imageQueries(s);
+      expect(qs.first, contains('Valencia'));
+      expect(qs.last, Category.environment.label);
+      expect(qs.toSet().length, qs.length);
     });
   });
 

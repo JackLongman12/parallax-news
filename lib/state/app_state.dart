@@ -11,6 +11,7 @@ import '../models/place.dart';
 import '../models/source.dart';
 import '../models/story.dart';
 import '../services/bias_service.dart';
+import '../services/country_detect.dart';
 import '../services/cover_images.dart';
 import '../services/classifier.dart';
 import '../services/curator.dart';
@@ -44,6 +45,7 @@ class AppState extends ChangeNotifier {
     repo.onModelUpdated = s._scheduleModelSave;
     repo.onRatingsUpdated = s._scheduleRatingsSave;
     unawaited(bias.refreshRemote());
+    unawaited(s.detectHomeCountry());
     return s;
   }
 
@@ -71,7 +73,8 @@ class AppState extends ChangeNotifier {
       ..discoverLocal = p.getBool('discoverLocal') ?? true
       ..lite = p.getBool('lite') ?? false
       ..maxLocalOutlets = (p.getBool('outletsMaxV2') ?? false) ? (p.getInt('maxLocalOutlets') ?? 25) : 25
-      ..homeCountry = p.getString('homeCountry') ?? 'US';
+      ..homeCountry = p.getString('homeCountry') ?? CountryDetector.fromDevice() ?? 'US';
+    homeCountryAuto = p.getBool('homeCountryAuto') ?? true;
     autoUpdate = p.getBool('autoUpdate') ?? true;
     // One-time migration: local outlets now default to the maximum.
     if (!(p.getBool('outletsMaxV2') ?? false)) {
@@ -234,6 +237,32 @@ class AppState extends ChangeNotifier {
     ];
     _prefs.setString('snapshot', jsonEncode(data));
   }
+
+  // ---- Home country: auto-detected from the network unless set manually ----
+  bool homeCountryAuto = true;
+
+  Future<void> detectHomeCountry() async {
+    if (!homeCountryAuto || NewsRepository.offline) return;
+    final cc = await CountryDetector.detect();
+    if (cc == null || !homeCountryAuto || cc == settings.homeCountry) return;
+    updateSettings((s) => s.homeCountry = cc);
+  }
+
+  /// [code] null = Auto (detect from network); otherwise a manual choice.
+  void setHomeCountry(String? code) {
+    homeCountryAuto = code == null;
+    _prefs.setBool('homeCountryAuto', homeCountryAuto);
+    if (code != null) {
+      updateSettings((s) => s.homeCountry = code);
+    } else {
+      notifyListeners();
+      unawaited(detectHomeCountry());
+    }
+  }
+
+  // ---- First-run setup ----
+  bool get onboarded => _prefs.getBool('onboardedV1') ?? false;
+  void finishOnboarding() => _prefs.setBool('onboardedV1', true);
 
   // ---- Recent places ----
   List<Place> recentPlaces = [];

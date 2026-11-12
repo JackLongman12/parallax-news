@@ -1,407 +1,3009 @@
 {
-  "version": 1,
-  "note": "Seed catalog. Bias codes: FL,L,LL,C,LR,R,FR (country-relative). f = factuality VH,H,MF,M,L. s = state-affiliated. t = topic specialisms. Ratings are an initial community seed and need review - send PRs. Unknown outlets are rated live from Wikidata (CC0) or shown as Unrated. Local outlets are discovered live from Wikidata per place.",
-  "sources": [
-    {"d":"apnews.com","n":"Associated Press","c":"US","b":"C","f":"VH"},
-    {"d":"reuters.com","n":"Reuters","c":"GB","b":"C","f":"VH","o":"Thomson Reuters"},
-    {"d":"afp.com","n":"AFP","c":"FR","b":"C","f":"VH"},
-    {"d":"bbc.com","n":"BBC","c":"GB","b":"C","f":"H","s":true},
-    {"d":"bbc.co.uk","n":"BBC","c":"GB","b":"C","f":"H","s":true},
-    {"d":"nytimes.com","n":"The New York Times","c":"US","b":"LL","f":"H"},
-    {"d":"washingtonpost.com","n":"The Washington Post","c":"US","b":"LL","f":"H","o":"Jeff Bezos"},
-    {"d":"wsj.com","n":"The Wall Street Journal","c":"US","b":"C","f":"H","o":"News Corp"},
-    {"d":"cnn.com","n":"CNN","c":"US","b":"L","f":"MF","o":"Warner Bros. Discovery"},
-    {"d":"msnbc.com","n":"MSNBC","c":"US","b":"L","f":"MF"},
-    {"d":"nbcnews.com","n":"NBC News","c":"US","b":"LL","f":"H","o":"Comcast"},
-    {"d":"abcnews.go.com","n":"ABC News","c":"US","b":"LL","f":"H","o":"Disney"},
-    {"d":"cbsnews.com","n":"CBS News","c":"US","b":"LL","f":"H","o":"Paramount"},
-    {"d":"npr.org","n":"NPR","c":"US","b":"LL","f":"H"},
-    {"d":"pbs.org","n":"PBS","c":"US","b":"C","f":"H"},
-    {"d":"usatoday.com","n":"USA Today","c":"US","b":"LL","f":"H","o":"Gannett"},
-    {"d":"politico.com","n":"Politico","c":"US","b":"LL","f":"H","o":"Axel Springer"},
-    {"d":"axios.com","n":"Axios","c":"US","b":"C","f":"H"},
-    {"d":"thehill.com","n":"The Hill","c":"US","b":"C","f":"MF","o":"Nexstar"},
-    {"d":"bloomberg.com","n":"Bloomberg","c":"US","b":"C","f":"H","t":["business"]},
-    {"d":"newsweek.com","n":"Newsweek","c":"US","b":"C","f":"MF"},
-    {"d":"csmonitor.com","n":"Christian Science Monitor","c":"US","b":"C","f":"H"},
-    {"d":"latimes.com","n":"Los Angeles Times","c":"US","b":"LL","f":"H"},
-    {"d":"chicagotribune.com","n":"Chicago Tribune","c":"US","b":"C","f":"H"},
-    {"d":"theatlantic.com","n":"The Atlantic","c":"US","b":"L","f":"H"},
-    {"d":"vox.com","n":"Vox","c":"US","b":"L","f":"H"},
-    {"d":"huffpost.com","n":"HuffPost","c":"US","b":"L","f":"MF"},
-    {"d":"motherjones.com","n":"Mother Jones","c":"US","b":"L","f":"MF"},
-    {"d":"thenation.com","n":"The Nation","c":"US","b":"L","f":"MF"},
-    {"d":"jacobin.com","n":"Jacobin","c":"US","b":"FL","f":"MF"},
-    {"d":"theintercept.com","n":"The Intercept","c":"US","b":"L","f":"MF"},
-    {"d":"propublica.org","n":"ProPublica","c":"US","b":"LL","f":"VH"},
-    {"d":"foxnews.com","n":"Fox News","c":"US","b":"R","f":"M","o":"Fox Corporation"},
-    {"d":"foxbusiness.com","n":"Fox Business","c":"US","b":"R","f":"M","t":["business"]},
-    {"d":"nypost.com","n":"New York Post","c":"US","b":"LR","f":"M","o":"News Corp"},
-    {"d":"washingtonexaminer.com","n":"Washington Examiner","c":"US","b":"R","f":"MF"},
-    {"d":"washingtontimes.com","n":"The Washington Times","c":"US","b":"LR","f":"MF"},
-    {"d":"nationalreview.com","n":"National Review","c":"US","b":"R","f":"MF"},
-    {"d":"dailywire.com","n":"The Daily Wire","c":"US","b":"R","f":"M"},
-    {"d":"dailycaller.com","n":"The Daily Caller","c":"US","b":"R","f":"M"},
-    {"d":"thefederalist.com","n":"The Federalist","c":"US","b":"R","f":"M"},
-    {"d":"breitbart.com","n":"Breitbart","c":"US","b":"FR","f":"L"},
-    {"d":"newsmax.com","n":"Newsmax","c":"US","b":"R","f":"M"},
-    {"d":"oann.com","n":"One America News","c":"US","b":"FR","f":"L"},
-    {"d":"theblaze.com","n":"TheBlaze","c":"US","b":"R","f":"M"},
-    {"d":"reason.com","n":"Reason","c":"US","b":"LR","f":"H"},
-    {"d":"thedispatch.com","n":"The Dispatch","c":"US","b":"LR","f":"H"},
-    {"d":"realclearpolitics.com","n":"RealClearPolitics","c":"US","b":"LR","f":"MF"},
-    {"d":"voanews.com","n":"Voice of America","c":"US","b":"C","f":"H","s":true},
-    {"d":"rferl.org","n":"Radio Free Europe/Radio Liberty","c":"US","b":"C","f":"H","s":true},
-
-    {"d":"theguardian.com","n":"The Guardian","c":"GB","b":"L","f":"H"},
-    {"d":"independent.co.uk","n":"The Independent","c":"GB","b":"LL","f":"MF"},
-    {"d":"inews.co.uk","n":"i","c":"GB","b":"LL","f":"H"},
-    {"d":"mirror.co.uk","n":"Daily Mirror","c":"GB","b":"L","f":"M"},
-    {"d":"newstatesman.com","n":"New Statesman","c":"GB","b":"L","f":"H"},
-    {"d":"ft.com","n":"Financial Times","c":"GB","b":"C","f":"H","o":"Nikkei","t":["business"]},
-    {"d":"economist.com","n":"The Economist","c":"GB","b":"C","f":"H"},
-    {"d":"news.sky.com","n":"Sky News","c":"GB","b":"C","f":"H","o":"Comcast"},
-    {"d":"thetimes.com","n":"The Times","c":"GB","b":"LR","f":"H","o":"News Corp"},
-    {"d":"telegraph.co.uk","n":"The Telegraph","c":"GB","b":"R","f":"MF"},
-    {"d":"dailymail.co.uk","n":"Daily Mail","c":"GB","b":"R","f":"L"},
-    {"d":"thesun.co.uk","n":"The Sun","c":"GB","b":"R","f":"M","o":"News Corp"},
-    {"d":"express.co.uk","n":"Daily Express","c":"GB","b":"R","f":"M"},
-    {"d":"spectator.co.uk","n":"The Spectator","c":"GB","b":"R","f":"MF"},
-    {"d":"gbnews.com","n":"GB News","c":"GB","b":"R","f":"M"},
-    {"d":"irishtimes.com","n":"The Irish Times","c":"IE","b":"LL","f":"H"},
-    {"d":"rte.ie","n":"RTÉ","c":"IE","b":"C","f":"H","s":true},
-    {"d":"independent.ie","n":"Irish Independent","c":"IE","b":"C","f":"H"},
-
-    {"d":"cbc.ca","n":"CBC","c":"CA","b":"LL","f":"H","s":true},
-    {"d":"globalnews.ca","n":"Global News","c":"CA","b":"C","f":"H"},
-    {"d":"ctvnews.ca","n":"CTV News","c":"CA","b":"C","f":"H"},
-    {"d":"theglobeandmail.com","n":"The Globe and Mail","c":"CA","b":"C","f":"H"},
-    {"d":"nationalpost.com","n":"National Post","c":"CA","b":"LR","f":"H","o":"Postmedia"},
-    {"d":"torontosun.com","n":"Toronto Sun","c":"CA","b":"R","f":"MF","o":"Postmedia"},
-    {"d":"thestar.com","n":"Toronto Star","c":"CA","b":"LL","f":"H"},
-    {"d":"rebelnews.com","n":"Rebel News","c":"CA","b":"FR","f":"L"},
-    {"d":"ledevoir.com","n":"Le Devoir","c":"CA","b":"LL","f":"H"},
-
-    {"d":"abc.net.au","n":"ABC Australia","c":"AU","b":"LL","f":"H","s":true},
-    {"d":"smh.com.au","n":"Sydney Morning Herald","c":"AU","b":"LL","f":"H"},
-    {"d":"theage.com.au","n":"The Age","c":"AU","b":"LL","f":"H"},
-    {"d":"theaustralian.com.au","n":"The Australian","c":"AU","b":"R","f":"MF","o":"News Corp"},
-    {"d":"news.com.au","n":"news.com.au","c":"AU","b":"LR","f":"MF","o":"News Corp"},
-    {"d":"skynews.com.au","n":"Sky News Australia","c":"AU","b":"R","f":"M"},
-    {"d":"afr.com","n":"Australian Financial Review","c":"AU","b":"C","f":"H"},
-    {"d":"sbs.com.au","n":"SBS News","c":"AU","b":"LL","f":"H","s":true},
-    {"d":"rnz.co.nz","n":"RNZ","c":"NZ","b":"C","f":"H","s":true},
-    {"d":"nzherald.co.nz","n":"NZ Herald","c":"NZ","b":"C","f":"H"},
-    {"d":"stuff.co.nz","n":"Stuff","c":"NZ","b":"LL","f":"H"},
-    {"d":"fijitimes.com.fj","n":"The Fiji Times","c":"FJ","b":"C"},
-    {"d":"postcourier.com.pg","n":"Post-Courier","c":"PG","b":"C"},
-
-    {"d":"spiegel.de","n":"Der Spiegel","c":"DE","b":"LL","f":"H"},
-    {"d":"zeit.de","n":"Die Zeit","c":"DE","b":"LL","f":"H"},
-    {"d":"sueddeutsche.de","n":"Süddeutsche Zeitung","c":"DE","b":"LL","f":"H"},
-    {"d":"taz.de","n":"taz","c":"DE","b":"L","f":"H"},
-    {"d":"tagesschau.de","n":"Tagesschau","c":"DE","b":"C","f":"H","s":true},
-    {"d":"dw.com","n":"Deutsche Welle","c":"DE","b":"C","f":"H","s":true},
-    {"d":"faz.net","n":"Frankfurter Allgemeine","c":"DE","b":"LR","f":"H"},
-    {"d":"welt.de","n":"Die Welt","c":"DE","b":"LR","f":"H","o":"Axel Springer"},
-    {"d":"bild.de","n":"Bild","c":"DE","b":"R","f":"M","o":"Axel Springer"},
-    {"d":"handelsblatt.com","n":"Handelsblatt","c":"DE","b":"C","f":"H","t":["business"]},
-    {"d":"derstandard.at","n":"Der Standard","c":"AT","b":"LL","f":"H"},
-    {"d":"diepresse.com","n":"Die Presse","c":"AT","b":"LR","f":"H"},
-    {"d":"krone.at","n":"Kronen Zeitung","c":"AT","b":"R","f":"M"},
-    {"d":"nzz.ch","n":"Neue Zürcher Zeitung","c":"CH","b":"LR","f":"H"},
-    {"d":"srf.ch","n":"SRF","c":"CH","b":"C","f":"H","s":true},
-    {"d":"swissinfo.ch","n":"SWI swissinfo.ch","c":"CH","b":"C","f":"H","s":true},
-
-    {"d":"lemonde.fr","n":"Le Monde","c":"FR","b":"LL","f":"H"},
-    {"d":"liberation.fr","n":"Libération","c":"FR","b":"L","f":"H"},
-    {"d":"humanite.fr","n":"L'Humanité","c":"FR","b":"FL","f":"MF"},
-    {"d":"mediapart.fr","n":"Mediapart","c":"FR","b":"L","f":"H"},
-    {"d":"lefigaro.fr","n":"Le Figaro","c":"FR","b":"LR","f":"H"},
-    {"d":"cnews.fr","n":"CNews","c":"FR","b":"R","f":"M"},
-    {"d":"valeursactuelles.com","n":"Valeurs actuelles","c":"FR","b":"FR","f":"M"},
-    {"d":"france24.com","n":"France 24","c":"FR","b":"C","f":"H","s":true},
-    {"d":"francetvinfo.fr","n":"Franceinfo","c":"FR","b":"C","f":"H","s":true},
-    {"d":"leparisien.fr","n":"Le Parisien","c":"FR","b":"C","f":"H"},
-    {"d":"lesechos.fr","n":"Les Echos","c":"FR","b":"C","f":"H","t":["business"]},
-    {"d":"bfmtv.com","n":"BFMTV","c":"FR","b":"C","f":"MF"},
-    {"d":"ouest-france.fr","n":"Ouest-France","c":"FR","b":"C","f":"H"},
-    {"d":"lesoir.be","n":"Le Soir","c":"BE","b":"LL","f":"H"},
-    {"d":"vrt.be","n":"VRT NWS","c":"BE","b":"C","f":"H","s":true},
-    {"d":"politico.eu","n":"Politico Europe","c":"BE","b":"C","f":"H"},
-    {"d":"euronews.com","n":"Euronews","c":"FR","b":"C","f":"H"},
-
-    {"d":"elpais.com","n":"El País","c":"ES","b":"LL","f":"H"},
-    {"d":"eldiario.es","n":"elDiario.es","c":"ES","b":"L","f":"H"},
-    {"d":"publico.es","n":"Público","c":"ES","b":"L","f":"MF"},
-    {"d":"elmundo.es","n":"El Mundo","c":"ES","b":"LR","f":"H"},
-    {"d":"abc.es","n":"ABC (Spain)","c":"ES","b":"R","f":"MF"},
-    {"d":"larazon.es","n":"La Razón","c":"ES","b":"R","f":"MF"},
-    {"d":"okdiario.com","n":"OKDiario","c":"ES","b":"FR","f":"L"},
-    {"d":"lavanguardia.com","n":"La Vanguardia","c":"ES","b":"C","f":"H"},
-    {"d":"rtve.es","n":"RTVE","c":"ES","b":"C","f":"H","s":true},
-    {"d":"publico.pt","n":"Público (Portugal)","c":"PT","b":"LL","f":"H"},
-    {"d":"observador.pt","n":"Observador","c":"PT","b":"LR","f":"H"},
-    {"d":"rtp.pt","n":"RTP","c":"PT","b":"C","f":"H","s":true},
-
-    {"d":"repubblica.it","n":"la Repubblica","c":"IT","b":"LL","f":"H"},
-    {"d":"ilfattoquotidiano.it","n":"Il Fatto Quotidiano","c":"IT","b":"L","f":"MF"},
-    {"d":"corriere.it","n":"Corriere della Sera","c":"IT","b":"C","f":"H"},
-    {"d":"lastampa.it","n":"La Stampa","c":"IT","b":"C","f":"H"},
-    {"d":"ansa.it","n":"ANSA","c":"IT","b":"C","f":"H"},
-    {"d":"ilsole24ore.com","n":"Il Sole 24 Ore","c":"IT","b":"C","f":"H","t":["business"]},
-    {"d":"ilgiornale.it","n":"il Giornale","c":"IT","b":"R","f":"MF"},
-    {"d":"liberoquotidiano.it","n":"Libero","c":"IT","b":"R","f":"M"},
-
-    {"d":"nos.nl","n":"NOS","c":"NL","b":"C","f":"H","s":true},
-    {"d":"nrc.nl","n":"NRC","c":"NL","b":"LL","f":"H"},
-    {"d":"volkskrant.nl","n":"de Volkskrant","c":"NL","b":"LL","f":"H"},
-    {"d":"telegraaf.nl","n":"De Telegraaf","c":"NL","b":"LR","f":"MF"},
-    {"d":"svt.se","n":"SVT","c":"SE","b":"C","f":"H","s":true},
-    {"d":"dn.se","n":"Dagens Nyheter","c":"SE","b":"LL","f":"H"},
-    {"d":"aftonbladet.se","n":"Aftonbladet","c":"SE","b":"L","f":"MF"},
-    {"d":"svd.se","n":"Svenska Dagbladet","c":"SE","b":"LR","f":"H"},
-    {"d":"nrk.no","n":"NRK","c":"NO","b":"C","f":"H","s":true},
-    {"d":"aftenposten.no","n":"Aftenposten","c":"NO","b":"C","f":"H"},
-    {"d":"dr.dk","n":"DR","c":"DK","b":"C","f":"H","s":true},
-    {"d":"politiken.dk","n":"Politiken","c":"DK","b":"LL","f":"H"},
-    {"d":"jyllands-posten.dk","n":"Jyllands-Posten","c":"DK","b":"LR","f":"H"},
-    {"d":"yle.fi","n":"Yle","c":"FI","b":"C","f":"H","s":true},
-    {"d":"hs.fi","n":"Helsingin Sanomat","c":"FI","b":"C","f":"H"},
-    {"d":"ruv.is","n":"RÚV","c":"IS","b":"C","f":"H","s":true},
-
-    {"d":"tvn24.pl","n":"TVN24","c":"PL","b":"LL","f":"H"},
-    {"d":"wyborcza.pl","n":"Gazeta Wyborcza","c":"PL","b":"L","f":"H"},
-    {"d":"rp.pl","n":"Rzeczpospolita","c":"PL","b":"LR","f":"H"},
-    {"d":"wpolityce.pl","n":"wPolityce","c":"PL","b":"R","f":"M"},
-    {"d":"onet.pl","n":"Onet","c":"PL","b":"C","f":"MF"},
-    {"d":"idnes.cz","n":"iDNES.cz","c":"CZ","b":"C","f":"MF"},
-    {"d":"ct24.ceskatelevize.cz","n":"ČT24","c":"CZ","b":"C","f":"H","s":true},
-    {"d":"telex.hu","n":"Telex","c":"HU","b":"LL","f":"H"},
-    {"d":"hvg.hu","n":"HVG","c":"HU","b":"LL","f":"H"},
-    {"d":"magyarnemzet.hu","n":"Magyar Nemzet","c":"HU","b":"R","f":"M"},
-    {"d":"digi24.ro","n":"Digi24","c":"RO","b":"C","f":"MF"},
-    {"d":"kathimerini.gr","n":"Kathimerini","c":"GR","b":"LR","f":"H"},
-    {"d":"balkaninsight.com","n":"Balkan Insight","c":"RS","b":"C","f":"H"},
-    {"d":"kyivindependent.com","n":"The Kyiv Independent","c":"UA","b":"C","f":"H"},
-    {"d":"pravda.com.ua","n":"Ukrainska Pravda","c":"UA","b":"C","f":"MF"},
-    {"d":"ukrinform.net","n":"Ukrinform","c":"UA","b":"C","f":"MF","s":true},
-    {"d":"meduza.io","n":"Meduza","c":"RU","b":"LL","f":"H"},
-    {"d":"novayagazeta.eu","n":"Novaya Gazeta Europe","c":"RU","b":"LL","f":"H"},
-    {"d":"rt.com","n":"RT","c":"RU","f":"L","s":true,"o":"Government of Russia"},
-    {"d":"tass.com","n":"TASS","c":"RU","f":"M","s":true,"o":"Government of Russia"},
-    {"d":"ria.ru","n":"RIA Novosti","c":"RU","f":"L","s":true,"o":"Government of Russia"},
-
-    {"d":"dailysabah.com","n":"Daily Sabah","c":"TR","b":"R","f":"M"},
-    {"d":"hurriyetdailynews.com","n":"Hürriyet Daily News","c":"TR","b":"LR","f":"MF"},
-    {"d":"aa.com.tr","n":"Anadolu Agency","c":"TR","f":"MF","s":true},
-    {"d":"bianet.org","n":"Bianet","c":"TR","b":"L","f":"H"},
-    {"d":"aljazeera.com","n":"Al Jazeera","c":"QA","b":"LL","f":"MF","o":"Government of Qatar"},
-    {"d":"alarabiya.net","n":"Al Arabiya","c":"AE","b":"LR","f":"MF"},
-    {"d":"arabnews.com","n":"Arab News","c":"SA","b":"LR","f":"MF"},
-    {"d":"thenationalnews.com","n":"The National","c":"AE","b":"C","f":"MF"},
-    {"d":"haaretz.com","n":"Haaretz","c":"IL","b":"L","f":"H"},
-    {"d":"timesofisrael.com","n":"The Times of Israel","c":"IL","b":"C","f":"H"},
-    {"d":"ynetnews.com","n":"Ynet","c":"IL","b":"C","f":"H"},
-    {"d":"jpost.com","n":"The Jerusalem Post","c":"IL","b":"LR","f":"MF"},
-    {"d":"israelhayom.com","n":"Israel Hayom","c":"IL","b":"R","f":"MF"},
-    {"d":"middleeasteye.net","n":"Middle East Eye","c":"GB","b":"L","f":"MF"},
-    {"d":"dailystar.com.lb","n":"The Daily Star (Lebanon)","c":"LB","b":"C"},
-    {"d":"iranintl.com","n":"Iran International","c":"GB","b":"LR","f":"MF"},
-    {"d":"presstv.ir","n":"Press TV","c":"IR","f":"L","s":true,"o":"Government of Iran"},
-    {"d":"tehrantimes.com","n":"Tehran Times","c":"IR","f":"L","s":true},
-
-    {"d":"ndtv.com","n":"NDTV","c":"IN","b":"C","f":"MF","o":"Adani Group"},
-    {"d":"thehindu.com","n":"The Hindu","c":"IN","b":"LL","f":"H"},
-    {"d":"indianexpress.com","n":"The Indian Express","c":"IN","b":"C","f":"H"},
-    {"d":"timesofindia.indiatimes.com","n":"The Times of India","c":"IN","b":"C","f":"MF"},
-    {"d":"hindustantimes.com","n":"Hindustan Times","c":"IN","b":"C","f":"MF"},
-    {"d":"indiatoday.in","n":"India Today","c":"IN","b":"C","f":"MF"},
-    {"d":"theprint.in","n":"ThePrint","c":"IN","b":"C","f":"H"},
-    {"d":"thewire.in","n":"The Wire","c":"IN","b":"L","f":"MF"},
-    {"d":"scroll.in","n":"Scroll.in","c":"IN","b":"L","f":"H"},
-    {"d":"republicworld.com","n":"Republic","c":"IN","b":"R","f":"M"},
-    {"d":"opindia.com","n":"OpIndia","c":"IN","b":"FR","f":"L"},
-    {"d":"zeenews.india.com","n":"Zee News","c":"IN","b":"R","f":"M"},
-    {"d":"dawn.com","n":"Dawn","c":"PK","b":"C","f":"H"},
-    {"d":"geo.tv","n":"Geo News","c":"PK","b":"C","f":"MF"},
-    {"d":"tribune.com.pk","n":"The Express Tribune","c":"PK","b":"C","f":"MF"},
-    {"d":"thedailystar.net","n":"The Daily Star (Bangladesh)","c":"BD","b":"C","f":"H"},
-    {"d":"prothomalo.com","n":"Prothom Alo","c":"BD","b":"C","f":"H"},
-    {"d":"kathmandupost.com","n":"The Kathmandu Post","c":"NP","b":"C","f":"H"},
-    {"d":"dailymirror.lk","n":"Daily Mirror (Sri Lanka)","c":"LK","b":"C"},
-
-    {"d":"scmp.com","n":"South China Morning Post","c":"HK","b":"C","f":"MF","o":"Alibaba"},
-    {"d":"hongkongfp.com","n":"Hong Kong Free Press","c":"HK","b":"LL","f":"H"},
-    {"d":"globaltimes.cn","n":"Global Times","c":"CN","f":"L","s":true,"o":"Chinese Communist Party"},
-    {"d":"xinhuanet.com","n":"Xinhua","c":"CN","f":"M","s":true,"o":"Government of China"},
-    {"d":"news.cn","n":"Xinhua","c":"CN","f":"M","s":true,"o":"Government of China"},
-    {"d":"cgtn.com","n":"CGTN","c":"CN","f":"M","s":true,"o":"Government of China"},
-    {"d":"chinadaily.com.cn","n":"China Daily","c":"CN","f":"M","s":true},
-    {"d":"caixinglobal.com","n":"Caixin","c":"CN","b":"C","f":"H","t":["business"]},
-    {"d":"taipeitimes.com","n":"Taipei Times","c":"TW","b":"LL","f":"H"},
-    {"d":"focustaiwan.tw","n":"Focus Taiwan (CNA)","c":"TW","b":"C","f":"H","s":true},
-    {"d":"nhk.or.jp","n":"NHK","c":"JP","b":"C","f":"H","s":true},
-    {"d":"asahi.com","n":"Asahi Shimbun","c":"JP","b":"LL","f":"H"},
-    {"d":"mainichi.jp","n":"Mainichi Shimbun","c":"JP","b":"LL","f":"H"},
-    {"d":"yomiuri.co.jp","n":"Yomiuri Shimbun","c":"JP","b":"LR","f":"H"},
-    {"d":"sankei.com","n":"Sankei Shimbun","c":"JP","b":"R","f":"MF"},
-    {"d":"japantimes.co.jp","n":"The Japan Times","c":"JP","b":"C","f":"H"},
-    {"d":"asia.nikkei.com","n":"Nikkei Asia","c":"JP","b":"C","f":"H","t":["business"]},
-    {"d":"yna.co.kr","n":"Yonhap","c":"KR","b":"C","f":"H"},
-    {"d":"koreaherald.com","n":"The Korea Herald","c":"KR","b":"C","f":"H"},
-    {"d":"koreatimes.co.kr","n":"The Korea Times","c":"KR","b":"C","f":"H"},
-    {"d":"chosun.com","n":"Chosun Ilbo","c":"KR","b":"R","f":"MF"},
-    {"d":"joongang.co.kr","n":"JoongAng Ilbo","c":"KR","b":"LR","f":"H"},
-    {"d":"donga.com","n":"Dong-A Ilbo","c":"KR","b":"LR","f":"H"},
-    {"d":"hani.co.kr","n":"The Hankyoreh","c":"KR","b":"L","f":"H"},
-    {"d":"khan.co.kr","n":"Kyunghyang Shinmun","c":"KR","b":"L","f":"H"},
-    {"d":"straitstimes.com","n":"The Straits Times","c":"SG","b":"C","f":"H"},
-    {"d":"channelnewsasia.com","n":"CNA","c":"SG","b":"C","f":"H","s":true},
-    {"d":"bangkokpost.com","n":"Bangkok Post","c":"TH","b":"C","f":"H"},
-    {"d":"thaipbsworld.com","n":"Thai PBS World","c":"TH","b":"C","f":"H"},
-    {"d":"rappler.com","n":"Rappler","c":"PH","b":"LL","f":"H"},
-    {"d":"inquirer.net","n":"Philippine Daily Inquirer","c":"PH","b":"C","f":"H"},
-    {"d":"philstar.com","n":"The Philippine Star","c":"PH","b":"C","f":"MF"},
-    {"d":"thejakartapost.com","n":"The Jakarta Post","c":"ID","b":"C","f":"H"},
-    {"d":"kompas.com","n":"Kompas","c":"ID","b":"C","f":"H"},
-    {"d":"tempo.co","n":"Tempo","c":"ID","b":"LL","f":"H"},
-    {"d":"vnexpress.net","n":"VnExpress","c":"VN","b":"C","f":"MF"},
-    {"d":"malaysiakini.com","n":"Malaysiakini","c":"MY","b":"LL","f":"H"},
-    {"d":"thestar.com.my","n":"The Star (Malaysia)","c":"MY","b":"C","f":"MF"},
-    {"d":"irrawaddy.com","n":"The Irrawaddy","c":"MM","b":"LL","f":"H"},
-    {"d":"khmertimeskh.com","n":"Khmer Times","c":"KH","b":"C","f":"M"},
-    {"d":"timesca.com","n":"The Times of Central Asia","c":"KZ","b":"C"},
-    {"d":"eurasianet.org","n":"Eurasianet","c":"US","b":"C","f":"H"},
-
-    {"d":"news24.com","n":"News24","c":"ZA","b":"C","f":"H"},
-    {"d":"dailymaverick.co.za","n":"Daily Maverick","c":"ZA","b":"LL","f":"H"},
-    {"d":"timeslive.co.za","n":"TimesLIVE","c":"ZA","b":"C","f":"H"},
-    {"d":"mg.co.za","n":"Mail & Guardian","c":"ZA","b":"LL","f":"H"},
-    {"d":"iol.co.za","n":"IOL","c":"ZA","b":"C","f":"MF"},
-    {"d":"sabcnews.com","n":"SABC News","c":"ZA","b":"C","f":"MF","s":true},
-    {"d":"nation.africa","n":"Daily Nation","c":"KE","b":"C","f":"H"},
-    {"d":"standardmedia.co.ke","n":"The Standard (Kenya)","c":"KE","b":"C","f":"MF"},
-    {"d":"theeastafrican.co.ke","n":"The EastAfrican","c":"KE","b":"C","f":"H"},
-    {"d":"monitor.co.ug","n":"Daily Monitor","c":"UG","b":"C","f":"H"},
-    {"d":"thecitizen.co.tz","n":"The Citizen (Tanzania)","c":"TZ","b":"C","f":"MF"},
-    {"d":"newtimes.co.rw","n":"The New Times","c":"RW","f":"M","s":true},
-    {"d":"addisstandard.com","n":"Addis Standard","c":"ET","b":"C","f":"H"},
-    {"d":"punchng.com","n":"Punch","c":"NG","b":"C","f":"MF"},
-    {"d":"vanguardngr.com","n":"Vanguard","c":"NG","b":"C","f":"MF"},
-    {"d":"premiumtimesng.com","n":"Premium Times","c":"NG","b":"C","f":"H"},
-    {"d":"thecable.ng","n":"TheCable","c":"NG","b":"C","f":"H"},
-    {"d":"guardian.ng","n":"The Guardian Nigeria","c":"NG","b":"C","f":"MF"},
-    {"d":"myjoyonline.com","n":"MyJoyOnline","c":"GH","b":"C","f":"MF"},
-    {"d":"graphic.com.gh","n":"Daily Graphic","c":"GH","b":"C","f":"MF","s":true},
-    {"d":"ahram.org.eg","n":"Ahram Online","c":"EG","f":"M","s":true},
-    {"d":"madamasr.com","n":"Mada Masr","c":"EG","b":"LL","f":"H"},
-    {"d":"hespress.com","n":"Hespress","c":"MA","b":"C","f":"MF"},
-    {"d":"jeuneafrique.com","n":"Jeune Afrique","c":"FR","b":"C","f":"H"},
-    {"d":"africanews.com","n":"Africanews","c":"CG","b":"C","f":"H"},
-    {"d":"allafrica.com","n":"AllAfrica","c":"US","b":"C","f":"MF"},
-    {"d":"herald.co.zw","n":"The Herald (Zimbabwe)","c":"ZW","f":"M","s":true},
-    {"d":"newzimbabwe.com","n":"NewZimbabwe","c":"ZW","b":"C","f":"MF"},
-    {"d":"lusakatimes.com","n":"Lusaka Times","c":"ZM","b":"C"},
-    {"d":"namibian.com.na","n":"The Namibian","c":"NA","b":"C","f":"H"},
-
-    {"d":"folha.uol.com.br","n":"Folha de S.Paulo","c":"BR","b":"LL","f":"H"},
-    {"d":"oglobo.globo.com","n":"O Globo","c":"BR","b":"C","f":"H"},
-    {"d":"g1.globo.com","n":"g1","c":"BR","b":"C","f":"H"},
-    {"d":"estadao.com.br","n":"O Estado de S. Paulo","c":"BR","b":"LR","f":"H"},
-    {"d":"cartacapital.com.br","n":"CartaCapital","c":"BR","b":"L","f":"MF"},
-    {"d":"revistaoeste.com","n":"Revista Oeste","c":"BR","b":"R","f":"M"},
-    {"d":"clarin.com","n":"Clarín","c":"AR","b":"LR","f":"MF"},
-    {"d":"lanacion.com.ar","n":"La Nación","c":"AR","b":"LR","f":"H"},
-    {"d":"pagina12.com.ar","n":"Página/12","c":"AR","b":"L","f":"MF"},
-    {"d":"infobae.com","n":"Infobae","c":"AR","b":"C","f":"MF"},
-    {"d":"eluniversal.com.mx","n":"El Universal","c":"MX","b":"C","f":"MF"},
-    {"d":"jornada.com.mx","n":"La Jornada","c":"MX","b":"L","f":"MF"},
-    {"d":"milenio.com","n":"Milenio","c":"MX","b":"C","f":"MF"},
-    {"d":"reforma.com","n":"Reforma","c":"MX","b":"LR","f":"H"},
-    {"d":"proceso.com.mx","n":"Proceso","c":"MX","b":"L","f":"H"},
-    {"d":"animalpolitico.com","n":"Animal Político","c":"MX","b":"LL","f":"H"},
-    {"d":"eltiempo.com","n":"El Tiempo","c":"CO","b":"C","f":"H"},
-    {"d":"elespectador.com","n":"El Espectador","c":"CO","b":"LL","f":"H"},
-    {"d":"semana.com","n":"Semana","c":"CO","b":"R","f":"MF"},
-    {"d":"emol.com","n":"El Mercurio","c":"CL","b":"LR","f":"H"},
-    {"d":"latercera.com","n":"La Tercera","c":"CL","b":"LR","f":"H"},
-    {"d":"biobiochile.cl","n":"BioBioChile","c":"CL","b":"C","f":"H"},
-    {"d":"elcomercio.pe","n":"El Comercio","c":"PE","b":"LR","f":"H"},
-    {"d":"larepublica.pe","n":"La República","c":"PE","b":"LL","f":"MF"},
-    {"d":"elpais.com.uy","n":"El País (Uruguay)","c":"UY","b":"LR","f":"H"},
-    {"d":"efectococuyo.com","n":"Efecto Cocuyo","c":"VE","b":"C","f":"H"},
-    {"d":"telesurtv.net","n":"teleSUR","c":"VE","f":"M","s":true,"o":"Government of Venezuela"},
-    {"d":"granma.cu","n":"Granma","c":"CU","f":"L","s":true,"o":"Communist Party of Cuba"},
-    {"d":"jamaica-gleaner.com","n":"The Gleaner","c":"JM","b":"C","f":"H"},
-    {"d":"nacion.com","n":"La Nación (Costa Rica)","c":"CR","b":"C","f":"H"},
-    {"d":"prensalibre.com","n":"Prensa Libre","c":"GT","b":"C","f":"H"},
-    {"d":"elfaro.net","n":"El Faro","c":"SV","b":"LL","f":"H"},
-
-    {"d":"theverge.com","n":"The Verge","c":"US","t":["technology"],"rss":"https://www.theverge.com/rss/index.xml"},
-    {"d":"techcrunch.com","n":"TechCrunch","c":"US","t":["technology","business"],"rss":"https://techcrunch.com/feed/"},
-    {"d":"arstechnica.com","n":"Ars Technica","c":"US","t":["technology","science"],"rss":"https://feeds.arstechnica.com/arstechnica/index"},
-    {"d":"wired.com","n":"Wired","c":"US","b":"LL","t":["technology"],"rss":"https://www.wired.com/feed/rss"},
-    {"d":"engadget.com","n":"Engadget","c":"US","t":["technology"],"rss":"https://www.engadget.com/rss.xml"},
-    {"d":"theregister.com","n":"The Register","c":"GB","t":["technology"],"rss":"https://www.theregister.com/headlines.atom"},
-    {"d":"9to5google.com","n":"9to5Google","c":"US","t":["technology"],"rss":"https://9to5google.com/feed/"},
-    {"d":"9to5mac.com","n":"9to5Mac","c":"US","t":["technology"],"rss":"https://9to5mac.com/feed/"},
-    {"d":"androidauthority.com","n":"Android Authority","c":"US","t":["technology"],"rss":"https://www.androidauthority.com/feed/"},
-    {"d":"tomshardware.com","n":"Tom's Hardware","c":"US","t":["technology"],"rss":"https://www.tomshardware.com/feeds/all"},
-    {"d":"restofworld.org","n":"Rest of World","c":"US","t":["technology"],"rss":"https://restofworld.org/feed/latest/"},
-    {"d":"technologyreview.com","n":"MIT Technology Review","c":"US","t":["technology","ai"],"rss":"https://www.technologyreview.com/feed/"},
-    {"d":"news.ycombinator.com","n":"Hacker News","c":"US","t":["technology"],"rss":"https://news.ycombinator.com/rss"},
-    {"d":"the-decoder.com","n":"The Decoder","c":"DE","t":["ai"],"rss":"https://the-decoder.com/feed/"},
-    {"d":"venturebeat.com","n":"VentureBeat","c":"US","t":["ai","technology"],"rss":"https://venturebeat.com/category/ai/feed/"},
-    {"d":"huggingface.co","n":"Hugging Face Blog","c":"US","t":["ai"],"rss":"https://huggingface.co/blog/feed.xml"},
-    {"d":"marktechpost.com","n":"MarkTechPost","c":"US","t":["ai"],"rss":"https://www.marktechpost.com/feed/"},
-    {"d":"blog.google","n":"Google Blog","c":"US","t":["ai","technology"],"rss":"https://blog.google/technology/ai/rss/"},
-    {"d":"sciencedaily.com","n":"ScienceDaily","c":"US","t":["science"],"rss":"https://www.sciencedaily.com/rss/top/science.xml"},
-    {"d":"nature.com","n":"Nature","c":"GB","f":"VH","t":["science"],"rss":"https://www.nature.com/nature.rss"},
-    {"d":"newscientist.com","n":"New Scientist","c":"GB","t":["science"],"rss":"https://www.newscientist.com/feed/home/"},
-    {"d":"phys.org","n":"Phys.org","c":"GB","t":["science"],"rss":"https://phys.org/rss-feed/"},
-    {"d":"quantamagazine.org","n":"Quanta Magazine","c":"US","t":["science"],"rss":"https://www.quantamagazine.org/feed/"},
-    {"d":"space.com","n":"Space.com","c":"US","t":["space"],"rss":"https://www.space.com/feeds/all"},
-    {"d":"spacenews.com","n":"SpaceNews","c":"US","t":["space"],"rss":"https://spacenews.com/feed/"},
-    {"d":"nasa.gov","n":"NASA","c":"US","s":true,"t":["space"],"rss":"https://www.nasa.gov/news-release/feed/"},
-    {"d":"statnews.com","n":"STAT","c":"US","t":["health"],"rss":"https://www.statnews.com/feed/"},
-    {"d":"medicalxpress.com","n":"Medical Xpress","c":"GB","t":["health"],"rss":"https://medicalxpress.com/rss-feed/"},
-    {"d":"kffhealthnews.org","n":"KFF Health News","c":"US","t":["health"],"rss":"https://kffhealthnews.org/feed/"},
-    {"d":"espn.com","n":"ESPN","c":"US","t":["sports"],"rss":"https://www.espn.com/espn/rss/news"},
-    {"d":"skysports.com","n":"Sky Sports","c":"GB","t":["sports"],"rss":"https://www.skysports.com/rss/12040"},
-    {"d":"cbssports.com","n":"CBS Sports","c":"US","t":["sports"],"rss":"https://www.cbssports.com/rss/headlines/"},
-    {"d":"marca.com","n":"Marca","c":"ES","t":["sports"]},
-    {"d":"gazzetta.it","n":"La Gazzetta dello Sport","c":"IT","t":["sports"]},
-    {"d":"lequipe.fr","n":"L'Équipe","c":"FR","t":["sports"]},
-    {"d":"cricbuzz.com","n":"Cricbuzz","c":"IN","t":["sports"]},
-    {"d":"variety.com","n":"Variety","c":"US","t":["entertainment"],"rss":"https://variety.com/feed/"},
-    {"d":"hollywoodreporter.com","n":"The Hollywood Reporter","c":"US","t":["entertainment"],"rss":"https://www.hollywoodreporter.com/feed/"},
-    {"d":"deadline.com","n":"Deadline","c":"US","t":["entertainment"],"rss":"https://deadline.com/feed/"},
-    {"d":"rollingstone.com","n":"Rolling Stone","c":"US","b":"LL","t":["entertainment"],"rss":"https://www.rollingstone.com/feed/"},
-    {"d":"pitchfork.com","n":"Pitchfork","c":"US","t":["entertainment"],"rss":"https://pitchfork.com/rss/news/"},
-    {"d":"ign.com","n":"IGN","c":"US","t":["gaming"],"rss":"https://feeds.feedburner.com/ign/all"},
-    {"d":"polygon.com","n":"Polygon","c":"US","t":["gaming"],"rss":"https://www.polygon.com/rss/index.xml"},
-    {"d":"eurogamer.net","n":"Eurogamer","c":"GB","t":["gaming"],"rss":"https://www.eurogamer.net/feed"},
-    {"d":"pcgamer.com","n":"PC Gamer","c":"US","t":["gaming"],"rss":"https://www.pcgamer.com/rss/"},
-    {"d":"kotaku.com","n":"Kotaku","c":"US","t":["gaming"],"rss":"https://kotaku.com/rss"},
-    {"d":"cnbc.com","n":"CNBC","c":"US","b":"C","f":"H","t":["business"],"rss":"https://www.cnbc.com/id/100003114/device/rss/rss.html"},
-    {"d":"marketwatch.com","n":"MarketWatch","c":"US","b":"C","t":["finance","business"],"rss":"https://feeds.marketwatch.com/marketwatch/topstories/"},
-    {"d":"coindesk.com","n":"CoinDesk","c":"US","t":["finance"],"rss":"https://www.coindesk.com/arc/outboundfeeds/rss/"},
-    {"d":"cointelegraph.com","n":"Cointelegraph","c":"US","t":["finance"],"rss":"https://cointelegraph.com/rss"},
-    {"d":"fortune.com","n":"Fortune","c":"US","b":"C","t":["business"]},
-    {"d":"insideclimatenews.org","n":"Inside Climate News","c":"US","t":["environment"],"rss":"https://insideclimatenews.org/feed/"},
-    {"d":"carbonbrief.org","n":"Carbon Brief","c":"GB","t":["environment"],"rss":"https://www.carbonbrief.org/feed/"},
-    {"d":"grist.org","n":"Grist","c":"US","b":"L","t":["environment"],"rss":"https://grist.org/feed/"},
-    {"d":"news.mongabay.com","n":"Mongabay","c":"US","t":["environment"],"rss":"https://news.mongabay.com/feed/"},
-    {"d":"electrek.co","n":"Electrek","c":"US","t":["autos"],"rss":"https://electrek.co/feed/"},
-    {"d":"motor1.com","n":"Motor1","c":"US","t":["autos"],"rss":"https://www.motor1.com/rss/news/all/"},
-    {"d":"insideevs.com","n":"InsideEVs","c":"US","t":["autos"],"rss":"https://insideevs.com/rss/news/all/"},
-    {"d":"eater.com","n":"Eater","c":"US","t":["travel"],"rss":"https://www.eater.com/rss/index.xml"},
-    {"d":"cntraveler.com","n":"Condé Nast Traveler","c":"US","t":["travel"],"rss":"https://www.cntraveler.com/feed/rss"},
-    {"d":"chalkbeat.org","n":"Chalkbeat","c":"US","t":["education"],"rss":"https://www.chalkbeat.org/arc/outboundfeeds/rss/"},
-    {"d":"edsurge.com","n":"EdSurge","c":"US","t":["education"],"rss":"https://www.edsurge.com/articles_rss"},
-    {"d":"themarshallproject.org","n":"The Marshall Project","c":"US","b":"LL","t":["crime"]},
-    {"d":"courthousenews.com","n":"Courthouse News","c":"US","b":"C","t":["crime"],"rss":"https://www.courthousenews.com/feed/"},
-    {"d":"lifehacker.com","n":"Lifehacker","c":"US","t":["lifestyle"],"rss":"https://lifehacker.com/feed/rss"}
-  ]
+ "version": 1,
+ "note": "Seed catalog. Bias codes: FL,L,LL,C,LR,R,FR (country-relative). f = factuality VH,H,MF,M,L. s = state-affiliated. t = topic specialisms. Ratings are an initial community seed and need review - send PRs. Unknown outlets are rated live from Wikidata (CC0) or shown as Unrated. Local outlets are discovered live from Wikidata per place.",
+ "sources": [
+  {
+   "d": "apnews.com",
+   "n": "Associated Press",
+   "c": "US",
+   "b": "C",
+   "f": "VH"
+  },
+  {
+   "d": "reuters.com",
+   "n": "Reuters",
+   "c": "GB",
+   "b": "C",
+   "f": "VH",
+   "o": "Thomson Reuters"
+  },
+  {
+   "d": "afp.com",
+   "n": "AFP",
+   "c": "FR",
+   "b": "C",
+   "f": "VH"
+  },
+  {
+   "d": "bbc.com",
+   "n": "BBC",
+   "c": "GB",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "bbc.co.uk",
+   "n": "BBC",
+   "c": "GB",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "nytimes.com",
+   "n": "The New York Times",
+   "c": "US",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "washingtonpost.com",
+   "n": "The Washington Post",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Jeff Bezos"
+  },
+  {
+   "d": "wsj.com",
+   "n": "The Wall Street Journal",
+   "c": "US",
+   "b": "C",
+   "f": "H",
+   "o": "News Corp"
+  },
+  {
+   "d": "cnn.com",
+   "n": "CNN",
+   "c": "US",
+   "b": "L",
+   "f": "MF",
+   "o": "Warner Bros. Discovery"
+  },
+  {
+   "d": "msnbc.com",
+   "n": "MSNBC",
+   "c": "US",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "nbcnews.com",
+   "n": "NBC News",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Comcast"
+  },
+  {
+   "d": "abcnews.go.com",
+   "n": "ABC News",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Disney"
+  },
+  {
+   "d": "cbsnews.com",
+   "n": "CBS News",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Paramount"
+  },
+  {
+   "d": "npr.org",
+   "n": "NPR",
+   "c": "US",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "pbs.org",
+   "n": "PBS",
+   "c": "US",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "usatoday.com",
+   "n": "USA Today",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Gannett"
+  },
+  {
+   "d": "politico.com",
+   "n": "Politico",
+   "c": "US",
+   "b": "LL",
+   "f": "H",
+   "o": "Axel Springer"
+  },
+  {
+   "d": "axios.com",
+   "n": "Axios",
+   "c": "US",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "thehill.com",
+   "n": "The Hill",
+   "c": "US",
+   "b": "C",
+   "f": "MF",
+   "o": "Nexstar"
+  },
+  {
+   "d": "bloomberg.com",
+   "n": "Bloomberg",
+   "c": "US",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "newsweek.com",
+   "n": "Newsweek",
+   "c": "US",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "csmonitor.com",
+   "n": "Christian Science Monitor",
+   "c": "US",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "latimes.com",
+   "n": "Los Angeles Times",
+   "c": "US",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "chicagotribune.com",
+   "n": "Chicago Tribune",
+   "c": "US",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "theatlantic.com",
+   "n": "The Atlantic",
+   "c": "US",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "vox.com",
+   "n": "Vox",
+   "c": "US",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "huffpost.com",
+   "n": "HuffPost",
+   "c": "US",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "motherjones.com",
+   "n": "Mother Jones",
+   "c": "US",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "thenation.com",
+   "n": "The Nation",
+   "c": "US",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "jacobin.com",
+   "n": "Jacobin",
+   "c": "US",
+   "b": "FL",
+   "f": "MF"
+  },
+  {
+   "d": "theintercept.com",
+   "n": "The Intercept",
+   "c": "US",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "propublica.org",
+   "n": "ProPublica",
+   "c": "US",
+   "b": "LL",
+   "f": "VH"
+  },
+  {
+   "d": "foxnews.com",
+   "n": "Fox News",
+   "c": "US",
+   "b": "R",
+   "f": "M",
+   "o": "Fox Corporation"
+  },
+  {
+   "d": "foxbusiness.com",
+   "n": "Fox Business",
+   "c": "US",
+   "b": "R",
+   "f": "M",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "nypost.com",
+   "n": "New York Post",
+   "c": "US",
+   "b": "LR",
+   "f": "M",
+   "o": "News Corp"
+  },
+  {
+   "d": "washingtonexaminer.com",
+   "n": "Washington Examiner",
+   "c": "US",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "washingtontimes.com",
+   "n": "The Washington Times",
+   "c": "US",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "nationalreview.com",
+   "n": "National Review",
+   "c": "US",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "dailywire.com",
+   "n": "The Daily Wire",
+   "c": "US",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "dailycaller.com",
+   "n": "The Daily Caller",
+   "c": "US",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "thefederalist.com",
+   "n": "The Federalist",
+   "c": "US",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "breitbart.com",
+   "n": "Breitbart",
+   "c": "US",
+   "b": "FR",
+   "f": "L"
+  },
+  {
+   "d": "newsmax.com",
+   "n": "Newsmax",
+   "c": "US",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "oann.com",
+   "n": "One America News",
+   "c": "US",
+   "b": "FR",
+   "f": "L"
+  },
+  {
+   "d": "theblaze.com",
+   "n": "TheBlaze",
+   "c": "US",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "reason.com",
+   "n": "Reason",
+   "c": "US",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "thedispatch.com",
+   "n": "The Dispatch",
+   "c": "US",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "realclearpolitics.com",
+   "n": "RealClearPolitics",
+   "c": "US",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "voanews.com",
+   "n": "Voice of America",
+   "c": "US",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "rferl.org",
+   "n": "Radio Free Europe/Radio Liberty",
+   "c": "US",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "theguardian.com",
+   "n": "The Guardian",
+   "c": "GB",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "independent.co.uk",
+   "n": "The Independent",
+   "c": "GB",
+   "b": "LL",
+   "f": "MF"
+  },
+  {
+   "d": "inews.co.uk",
+   "n": "i",
+   "c": "GB",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "mirror.co.uk",
+   "n": "Daily Mirror",
+   "c": "GB",
+   "b": "L",
+   "f": "M"
+  },
+  {
+   "d": "newstatesman.com",
+   "n": "New Statesman",
+   "c": "GB",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "ft.com",
+   "n": "Financial Times",
+   "c": "GB",
+   "b": "C",
+   "f": "H",
+   "o": "Nikkei",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "economist.com",
+   "n": "The Economist",
+   "c": "GB",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "news.sky.com",
+   "n": "Sky News",
+   "c": "GB",
+   "b": "C",
+   "f": "H",
+   "o": "Comcast"
+  },
+  {
+   "d": "thetimes.com",
+   "n": "The Times",
+   "c": "GB",
+   "b": "LR",
+   "f": "H",
+   "o": "News Corp"
+  },
+  {
+   "d": "telegraph.co.uk",
+   "n": "The Telegraph",
+   "c": "GB",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "dailymail.co.uk",
+   "n": "Daily Mail",
+   "c": "GB",
+   "b": "R",
+   "f": "L"
+  },
+  {
+   "d": "thesun.co.uk",
+   "n": "The Sun",
+   "c": "GB",
+   "b": "R",
+   "f": "M",
+   "o": "News Corp"
+  },
+  {
+   "d": "express.co.uk",
+   "n": "Daily Express",
+   "c": "GB",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "spectator.co.uk",
+   "n": "The Spectator",
+   "c": "GB",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "gbnews.com",
+   "n": "GB News",
+   "c": "GB",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "irishtimes.com",
+   "n": "The Irish Times",
+   "c": "IE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "rte.ie",
+   "n": "RTÉ",
+   "c": "IE",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "independent.ie",
+   "n": "Irish Independent",
+   "c": "IE",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "cbc.ca",
+   "n": "CBC",
+   "c": "CA",
+   "b": "LL",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "globalnews.ca",
+   "n": "Global News",
+   "c": "CA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "ctvnews.ca",
+   "n": "CTV News",
+   "c": "CA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "theglobeandmail.com",
+   "n": "The Globe and Mail",
+   "c": "CA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "nationalpost.com",
+   "n": "National Post",
+   "c": "CA",
+   "b": "LR",
+   "f": "H",
+   "o": "Postmedia"
+  },
+  {
+   "d": "torontosun.com",
+   "n": "Toronto Sun",
+   "c": "CA",
+   "b": "R",
+   "f": "MF",
+   "o": "Postmedia"
+  },
+  {
+   "d": "thestar.com",
+   "n": "Toronto Star",
+   "c": "CA",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "rebelnews.com",
+   "n": "Rebel News",
+   "c": "CA",
+   "b": "FR",
+   "f": "L"
+  },
+  {
+   "d": "ledevoir.com",
+   "n": "Le Devoir",
+   "c": "CA",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "abc.net.au",
+   "n": "ABC Australia",
+   "c": "AU",
+   "b": "LL",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "smh.com.au",
+   "n": "Sydney Morning Herald",
+   "c": "AU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "theage.com.au",
+   "n": "The Age",
+   "c": "AU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "theaustralian.com.au",
+   "n": "The Australian",
+   "c": "AU",
+   "b": "R",
+   "f": "MF",
+   "o": "News Corp"
+  },
+  {
+   "d": "news.com.au",
+   "n": "news.com.au",
+   "c": "AU",
+   "b": "LR",
+   "f": "MF",
+   "o": "News Corp"
+  },
+  {
+   "d": "skynews.com.au",
+   "n": "Sky News Australia",
+   "c": "AU",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "afr.com",
+   "n": "Australian Financial Review",
+   "c": "AU",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "sbs.com.au",
+   "n": "SBS News",
+   "c": "AU",
+   "b": "LL",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "rnz.co.nz",
+   "n": "RNZ",
+   "c": "NZ",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "nzherald.co.nz",
+   "n": "NZ Herald",
+   "c": "NZ",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "stuff.co.nz",
+   "n": "Stuff",
+   "c": "NZ",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "fijitimes.com.fj",
+   "n": "The Fiji Times",
+   "c": "FJ",
+   "b": "C"
+  },
+  {
+   "d": "postcourier.com.pg",
+   "n": "Post-Courier",
+   "c": "PG",
+   "b": "C"
+  },
+  {
+   "d": "spiegel.de",
+   "n": "Der Spiegel",
+   "c": "DE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "zeit.de",
+   "n": "Die Zeit",
+   "c": "DE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "sueddeutsche.de",
+   "n": "Süddeutsche Zeitung",
+   "c": "DE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "taz.de",
+   "n": "taz",
+   "c": "DE",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "tagesschau.de",
+   "n": "Tagesschau",
+   "c": "DE",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "dw.com",
+   "n": "Deutsche Welle",
+   "c": "DE",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "faz.net",
+   "n": "Frankfurter Allgemeine",
+   "c": "DE",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "welt.de",
+   "n": "Die Welt",
+   "c": "DE",
+   "b": "LR",
+   "f": "H",
+   "o": "Axel Springer"
+  },
+  {
+   "d": "bild.de",
+   "n": "Bild",
+   "c": "DE",
+   "b": "R",
+   "f": "M",
+   "o": "Axel Springer"
+  },
+  {
+   "d": "handelsblatt.com",
+   "n": "Handelsblatt",
+   "c": "DE",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "derstandard.at",
+   "n": "Der Standard",
+   "c": "AT",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "diepresse.com",
+   "n": "Die Presse",
+   "c": "AT",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "krone.at",
+   "n": "Kronen Zeitung",
+   "c": "AT",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "nzz.ch",
+   "n": "Neue Zürcher Zeitung",
+   "c": "CH",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "srf.ch",
+   "n": "SRF",
+   "c": "CH",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "swissinfo.ch",
+   "n": "SWI swissinfo.ch",
+   "c": "CH",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "lemonde.fr",
+   "n": "Le Monde",
+   "c": "FR",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "liberation.fr",
+   "n": "Libération",
+   "c": "FR",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "humanite.fr",
+   "n": "L'Humanité",
+   "c": "FR",
+   "b": "FL",
+   "f": "MF"
+  },
+  {
+   "d": "mediapart.fr",
+   "n": "Mediapart",
+   "c": "FR",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "lefigaro.fr",
+   "n": "Le Figaro",
+   "c": "FR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "cnews.fr",
+   "n": "CNews",
+   "c": "FR",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "valeursactuelles.com",
+   "n": "Valeurs actuelles",
+   "c": "FR",
+   "b": "FR",
+   "f": "M"
+  },
+  {
+   "d": "france24.com",
+   "n": "France 24",
+   "c": "FR",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "francetvinfo.fr",
+   "n": "Franceinfo",
+   "c": "FR",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "leparisien.fr",
+   "n": "Le Parisien",
+   "c": "FR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "lesechos.fr",
+   "n": "Les Echos",
+   "c": "FR",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "bfmtv.com",
+   "n": "BFMTV",
+   "c": "FR",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "ouest-france.fr",
+   "n": "Ouest-France",
+   "c": "FR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "lesoir.be",
+   "n": "Le Soir",
+   "c": "BE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "vrt.be",
+   "n": "VRT NWS",
+   "c": "BE",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "politico.eu",
+   "n": "Politico Europe",
+   "c": "BE",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "euronews.com",
+   "n": "Euronews",
+   "c": "FR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "elpais.com",
+   "n": "El País",
+   "c": "ES",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "eldiario.es",
+   "n": "elDiario.es",
+   "c": "ES",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "publico.es",
+   "n": "Público",
+   "c": "ES",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "elmundo.es",
+   "n": "El Mundo",
+   "c": "ES",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "abc.es",
+   "n": "ABC (Spain)",
+   "c": "ES",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "larazon.es",
+   "n": "La Razón",
+   "c": "ES",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "okdiario.com",
+   "n": "OKDiario",
+   "c": "ES",
+   "b": "FR",
+   "f": "L"
+  },
+  {
+   "d": "lavanguardia.com",
+   "n": "La Vanguardia",
+   "c": "ES",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "rtve.es",
+   "n": "RTVE",
+   "c": "ES",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "publico.pt",
+   "n": "Público (Portugal)",
+   "c": "PT",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "observador.pt",
+   "n": "Observador",
+   "c": "PT",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "rtp.pt",
+   "n": "RTP",
+   "c": "PT",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "repubblica.it",
+   "n": "la Repubblica",
+   "c": "IT",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "ilfattoquotidiano.it",
+   "n": "Il Fatto Quotidiano",
+   "c": "IT",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "corriere.it",
+   "n": "Corriere della Sera",
+   "c": "IT",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "lastampa.it",
+   "n": "La Stampa",
+   "c": "IT",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "ansa.it",
+   "n": "ANSA",
+   "c": "IT",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "ilsole24ore.com",
+   "n": "Il Sole 24 Ore",
+   "c": "IT",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "ilgiornale.it",
+   "n": "il Giornale",
+   "c": "IT",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "liberoquotidiano.it",
+   "n": "Libero",
+   "c": "IT",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "nos.nl",
+   "n": "NOS",
+   "c": "NL",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "nrc.nl",
+   "n": "NRC",
+   "c": "NL",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "volkskrant.nl",
+   "n": "de Volkskrant",
+   "c": "NL",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "telegraaf.nl",
+   "n": "De Telegraaf",
+   "c": "NL",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "svt.se",
+   "n": "SVT",
+   "c": "SE",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "dn.se",
+   "n": "Dagens Nyheter",
+   "c": "SE",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "aftonbladet.se",
+   "n": "Aftonbladet",
+   "c": "SE",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "svd.se",
+   "n": "Svenska Dagbladet",
+   "c": "SE",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "nrk.no",
+   "n": "NRK",
+   "c": "NO",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "aftenposten.no",
+   "n": "Aftenposten",
+   "c": "NO",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "dr.dk",
+   "n": "DR",
+   "c": "DK",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "politiken.dk",
+   "n": "Politiken",
+   "c": "DK",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "jyllands-posten.dk",
+   "n": "Jyllands-Posten",
+   "c": "DK",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "yle.fi",
+   "n": "Yle",
+   "c": "FI",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "hs.fi",
+   "n": "Helsingin Sanomat",
+   "c": "FI",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "ruv.is",
+   "n": "RÚV",
+   "c": "IS",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "tvn24.pl",
+   "n": "TVN24",
+   "c": "PL",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "wyborcza.pl",
+   "n": "Gazeta Wyborcza",
+   "c": "PL",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "rp.pl",
+   "n": "Rzeczpospolita",
+   "c": "PL",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "wpolityce.pl",
+   "n": "wPolityce",
+   "c": "PL",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "onet.pl",
+   "n": "Onet",
+   "c": "PL",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "idnes.cz",
+   "n": "iDNES.cz",
+   "c": "CZ",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "ct24.ceskatelevize.cz",
+   "n": "ČT24",
+   "c": "CZ",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "telex.hu",
+   "n": "Telex",
+   "c": "HU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "hvg.hu",
+   "n": "HVG",
+   "c": "HU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "magyarnemzet.hu",
+   "n": "Magyar Nemzet",
+   "c": "HU",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "digi24.ro",
+   "n": "Digi24",
+   "c": "RO",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "kathimerini.gr",
+   "n": "Kathimerini",
+   "c": "GR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "balkaninsight.com",
+   "n": "Balkan Insight",
+   "c": "RS",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "kyivindependent.com",
+   "n": "The Kyiv Independent",
+   "c": "UA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "pravda.com.ua",
+   "n": "Ukrainska Pravda",
+   "c": "UA",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "ukrinform.net",
+   "n": "Ukrinform",
+   "c": "UA",
+   "b": "C",
+   "f": "MF",
+   "s": true
+  },
+  {
+   "d": "meduza.io",
+   "n": "Meduza",
+   "c": "RU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "novayagazeta.eu",
+   "n": "Novaya Gazeta Europe",
+   "c": "RU",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "rt.com",
+   "n": "RT",
+   "c": "RU",
+   "f": "L",
+   "s": true,
+   "o": "Government of Russia"
+  },
+  {
+   "d": "tass.com",
+   "n": "TASS",
+   "c": "RU",
+   "f": "M",
+   "s": true,
+   "o": "Government of Russia"
+  },
+  {
+   "d": "ria.ru",
+   "n": "RIA Novosti",
+   "c": "RU",
+   "f": "L",
+   "s": true,
+   "o": "Government of Russia"
+  },
+  {
+   "d": "dailysabah.com",
+   "n": "Daily Sabah",
+   "c": "TR",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "hurriyetdailynews.com",
+   "n": "Hürriyet Daily News",
+   "c": "TR",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "aa.com.tr",
+   "n": "Anadolu Agency",
+   "c": "TR",
+   "f": "MF",
+   "s": true
+  },
+  {
+   "d": "bianet.org",
+   "n": "Bianet",
+   "c": "TR",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "aljazeera.com",
+   "n": "Al Jazeera",
+   "c": "QA",
+   "b": "LL",
+   "f": "MF",
+   "o": "Government of Qatar"
+  },
+  {
+   "d": "alarabiya.net",
+   "n": "Al Arabiya",
+   "c": "AE",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "arabnews.com",
+   "n": "Arab News",
+   "c": "SA",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "thenationalnews.com",
+   "n": "The National",
+   "c": "AE",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "haaretz.com",
+   "n": "Haaretz",
+   "c": "IL",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "timesofisrael.com",
+   "n": "The Times of Israel",
+   "c": "IL",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "ynetnews.com",
+   "n": "Ynet",
+   "c": "IL",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "jpost.com",
+   "n": "The Jerusalem Post",
+   "c": "IL",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "israelhayom.com",
+   "n": "Israel Hayom",
+   "c": "IL",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "middleeasteye.net",
+   "n": "Middle East Eye",
+   "c": "GB",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "dailystar.com.lb",
+   "n": "The Daily Star (Lebanon)",
+   "c": "LB",
+   "b": "C"
+  },
+  {
+   "d": "iranintl.com",
+   "n": "Iran International",
+   "c": "GB",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "presstv.ir",
+   "n": "Press TV",
+   "c": "IR",
+   "f": "L",
+   "s": true,
+   "o": "Government of Iran"
+  },
+  {
+   "d": "tehrantimes.com",
+   "n": "Tehran Times",
+   "c": "IR",
+   "f": "L",
+   "s": true
+  },
+  {
+   "d": "ndtv.com",
+   "n": "NDTV",
+   "c": "IN",
+   "b": "C",
+   "f": "MF",
+   "o": "Adani Group"
+  },
+  {
+   "d": "thehindu.com",
+   "n": "The Hindu",
+   "c": "IN",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "indianexpress.com",
+   "n": "The Indian Express",
+   "c": "IN",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "timesofindia.indiatimes.com",
+   "n": "The Times of India",
+   "c": "IN",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "hindustantimes.com",
+   "n": "Hindustan Times",
+   "c": "IN",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "indiatoday.in",
+   "n": "India Today",
+   "c": "IN",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "theprint.in",
+   "n": "ThePrint",
+   "c": "IN",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "thewire.in",
+   "n": "The Wire",
+   "c": "IN",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "scroll.in",
+   "n": "Scroll.in",
+   "c": "IN",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "republicworld.com",
+   "n": "Republic",
+   "c": "IN",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "opindia.com",
+   "n": "OpIndia",
+   "c": "IN",
+   "b": "FR",
+   "f": "L"
+  },
+  {
+   "d": "zeenews.india.com",
+   "n": "Zee News",
+   "c": "IN",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "dawn.com",
+   "n": "Dawn",
+   "c": "PK",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "geo.tv",
+   "n": "Geo News",
+   "c": "PK",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "tribune.com.pk",
+   "n": "The Express Tribune",
+   "c": "PK",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "thedailystar.net",
+   "n": "The Daily Star (Bangladesh)",
+   "c": "BD",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "prothomalo.com",
+   "n": "Prothom Alo",
+   "c": "BD",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "kathmandupost.com",
+   "n": "The Kathmandu Post",
+   "c": "NP",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "dailymirror.lk",
+   "n": "Daily Mirror (Sri Lanka)",
+   "c": "LK",
+   "b": "C"
+  },
+  {
+   "d": "scmp.com",
+   "n": "South China Morning Post",
+   "c": "HK",
+   "b": "C",
+   "f": "MF",
+   "o": "Alibaba"
+  },
+  {
+   "d": "hongkongfp.com",
+   "n": "Hong Kong Free Press",
+   "c": "HK",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "globaltimes.cn",
+   "n": "Global Times",
+   "c": "CN",
+   "f": "L",
+   "s": true,
+   "o": "Chinese Communist Party"
+  },
+  {
+   "d": "xinhuanet.com",
+   "n": "Xinhua",
+   "c": "CN",
+   "f": "M",
+   "s": true,
+   "o": "Government of China"
+  },
+  {
+   "d": "news.cn",
+   "n": "Xinhua",
+   "c": "CN",
+   "f": "M",
+   "s": true,
+   "o": "Government of China"
+  },
+  {
+   "d": "cgtn.com",
+   "n": "CGTN",
+   "c": "CN",
+   "f": "M",
+   "s": true,
+   "o": "Government of China"
+  },
+  {
+   "d": "chinadaily.com.cn",
+   "n": "China Daily",
+   "c": "CN",
+   "f": "M",
+   "s": true
+  },
+  {
+   "d": "caixinglobal.com",
+   "n": "Caixin",
+   "c": "CN",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "taipeitimes.com",
+   "n": "Taipei Times",
+   "c": "TW",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "focustaiwan.tw",
+   "n": "Focus Taiwan (CNA)",
+   "c": "TW",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "nhk.or.jp",
+   "n": "NHK",
+   "c": "JP",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "asahi.com",
+   "n": "Asahi Shimbun",
+   "c": "JP",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "mainichi.jp",
+   "n": "Mainichi Shimbun",
+   "c": "JP",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "yomiuri.co.jp",
+   "n": "Yomiuri Shimbun",
+   "c": "JP",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "sankei.com",
+   "n": "Sankei Shimbun",
+   "c": "JP",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "japantimes.co.jp",
+   "n": "The Japan Times",
+   "c": "JP",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "asia.nikkei.com",
+   "n": "Nikkei Asia",
+   "c": "JP",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "yna.co.kr",
+   "n": "Yonhap",
+   "c": "KR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "koreaherald.com",
+   "n": "The Korea Herald",
+   "c": "KR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "koreatimes.co.kr",
+   "n": "The Korea Times",
+   "c": "KR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "chosun.com",
+   "n": "Chosun Ilbo",
+   "c": "KR",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "joongang.co.kr",
+   "n": "JoongAng Ilbo",
+   "c": "KR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "donga.com",
+   "n": "Dong-A Ilbo",
+   "c": "KR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "hani.co.kr",
+   "n": "The Hankyoreh",
+   "c": "KR",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "khan.co.kr",
+   "n": "Kyunghyang Shinmun",
+   "c": "KR",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "straitstimes.com",
+   "n": "The Straits Times",
+   "c": "SG",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "channelnewsasia.com",
+   "n": "CNA",
+   "c": "SG",
+   "b": "C",
+   "f": "H",
+   "s": true
+  },
+  {
+   "d": "bangkokpost.com",
+   "n": "Bangkok Post",
+   "c": "TH",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "thaipbsworld.com",
+   "n": "Thai PBS World",
+   "c": "TH",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "rappler.com",
+   "n": "Rappler",
+   "c": "PH",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "inquirer.net",
+   "n": "Philippine Daily Inquirer",
+   "c": "PH",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "philstar.com",
+   "n": "The Philippine Star",
+   "c": "PH",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "thejakartapost.com",
+   "n": "The Jakarta Post",
+   "c": "ID",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "kompas.com",
+   "n": "Kompas",
+   "c": "ID",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "tempo.co",
+   "n": "Tempo",
+   "c": "ID",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "vnexpress.net",
+   "n": "VnExpress",
+   "c": "VN",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "malaysiakini.com",
+   "n": "Malaysiakini",
+   "c": "MY",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "thestar.com.my",
+   "n": "The Star (Malaysia)",
+   "c": "MY",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "irrawaddy.com",
+   "n": "The Irrawaddy",
+   "c": "MM",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "khmertimeskh.com",
+   "n": "Khmer Times",
+   "c": "KH",
+   "b": "C",
+   "f": "M"
+  },
+  {
+   "d": "timesca.com",
+   "n": "The Times of Central Asia",
+   "c": "KZ",
+   "b": "C"
+  },
+  {
+   "d": "eurasianet.org",
+   "n": "Eurasianet",
+   "c": "US",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "news24.com",
+   "n": "News24",
+   "c": "ZA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "dailymaverick.co.za",
+   "n": "Daily Maverick",
+   "c": "ZA",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "timeslive.co.za",
+   "n": "TimesLIVE",
+   "c": "ZA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "mg.co.za",
+   "n": "Mail & Guardian",
+   "c": "ZA",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "iol.co.za",
+   "n": "IOL",
+   "c": "ZA",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "sabcnews.com",
+   "n": "SABC News",
+   "c": "ZA",
+   "b": "C",
+   "f": "MF",
+   "s": true
+  },
+  {
+   "d": "nation.africa",
+   "n": "Daily Nation",
+   "c": "KE",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "standardmedia.co.ke",
+   "n": "The Standard (Kenya)",
+   "c": "KE",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "theeastafrican.co.ke",
+   "n": "The EastAfrican",
+   "c": "KE",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "monitor.co.ug",
+   "n": "Daily Monitor",
+   "c": "UG",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "thecitizen.co.tz",
+   "n": "The Citizen (Tanzania)",
+   "c": "TZ",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "newtimes.co.rw",
+   "n": "The New Times",
+   "c": "RW",
+   "f": "M",
+   "s": true
+  },
+  {
+   "d": "addisstandard.com",
+   "n": "Addis Standard",
+   "c": "ET",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "punchng.com",
+   "n": "Punch",
+   "c": "NG",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "vanguardngr.com",
+   "n": "Vanguard",
+   "c": "NG",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "premiumtimesng.com",
+   "n": "Premium Times",
+   "c": "NG",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "thecable.ng",
+   "n": "TheCable",
+   "c": "NG",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "guardian.ng",
+   "n": "The Guardian Nigeria",
+   "c": "NG",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "myjoyonline.com",
+   "n": "MyJoyOnline",
+   "c": "GH",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "graphic.com.gh",
+   "n": "Daily Graphic",
+   "c": "GH",
+   "b": "C",
+   "f": "MF",
+   "s": true
+  },
+  {
+   "d": "ahram.org.eg",
+   "n": "Ahram Online",
+   "c": "EG",
+   "f": "M",
+   "s": true
+  },
+  {
+   "d": "madamasr.com",
+   "n": "Mada Masr",
+   "c": "EG",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "hespress.com",
+   "n": "Hespress",
+   "c": "MA",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "jeuneafrique.com",
+   "n": "Jeune Afrique",
+   "c": "FR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "africanews.com",
+   "n": "Africanews",
+   "c": "CG",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "allafrica.com",
+   "n": "AllAfrica",
+   "c": "US",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "herald.co.zw",
+   "n": "The Herald (Zimbabwe)",
+   "c": "ZW",
+   "f": "M",
+   "s": true
+  },
+  {
+   "d": "newzimbabwe.com",
+   "n": "NewZimbabwe",
+   "c": "ZW",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "lusakatimes.com",
+   "n": "Lusaka Times",
+   "c": "ZM",
+   "b": "C"
+  },
+  {
+   "d": "namibian.com.na",
+   "n": "The Namibian",
+   "c": "NA",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "folha.uol.com.br",
+   "n": "Folha de S.Paulo",
+   "c": "BR",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "oglobo.globo.com",
+   "n": "O Globo",
+   "c": "BR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "g1.globo.com",
+   "n": "g1",
+   "c": "BR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "estadao.com.br",
+   "n": "O Estado de S. Paulo",
+   "c": "BR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "cartacapital.com.br",
+   "n": "CartaCapital",
+   "c": "BR",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "revistaoeste.com",
+   "n": "Revista Oeste",
+   "c": "BR",
+   "b": "R",
+   "f": "M"
+  },
+  {
+   "d": "clarin.com",
+   "n": "Clarín",
+   "c": "AR",
+   "b": "LR",
+   "f": "MF"
+  },
+  {
+   "d": "lanacion.com.ar",
+   "n": "La Nación",
+   "c": "AR",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "pagina12.com.ar",
+   "n": "Página/12",
+   "c": "AR",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "infobae.com",
+   "n": "Infobae",
+   "c": "AR",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "eluniversal.com.mx",
+   "n": "El Universal",
+   "c": "MX",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "jornada.com.mx",
+   "n": "La Jornada",
+   "c": "MX",
+   "b": "L",
+   "f": "MF"
+  },
+  {
+   "d": "milenio.com",
+   "n": "Milenio",
+   "c": "MX",
+   "b": "C",
+   "f": "MF"
+  },
+  {
+   "d": "reforma.com",
+   "n": "Reforma",
+   "c": "MX",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "proceso.com.mx",
+   "n": "Proceso",
+   "c": "MX",
+   "b": "L",
+   "f": "H"
+  },
+  {
+   "d": "animalpolitico.com",
+   "n": "Animal Político",
+   "c": "MX",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "eltiempo.com",
+   "n": "El Tiempo",
+   "c": "CO",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "elespectador.com",
+   "n": "El Espectador",
+   "c": "CO",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "semana.com",
+   "n": "Semana",
+   "c": "CO",
+   "b": "R",
+   "f": "MF"
+  },
+  {
+   "d": "emol.com",
+   "n": "El Mercurio",
+   "c": "CL",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "latercera.com",
+   "n": "La Tercera",
+   "c": "CL",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "biobiochile.cl",
+   "n": "BioBioChile",
+   "c": "CL",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "elcomercio.pe",
+   "n": "El Comercio",
+   "c": "PE",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "larepublica.pe",
+   "n": "La República",
+   "c": "PE",
+   "b": "LL",
+   "f": "MF"
+  },
+  {
+   "d": "elpais.com.uy",
+   "n": "El País (Uruguay)",
+   "c": "UY",
+   "b": "LR",
+   "f": "H"
+  },
+  {
+   "d": "efectococuyo.com",
+   "n": "Efecto Cocuyo",
+   "c": "VE",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "telesurtv.net",
+   "n": "teleSUR",
+   "c": "VE",
+   "f": "M",
+   "s": true,
+   "o": "Government of Venezuela"
+  },
+  {
+   "d": "granma.cu",
+   "n": "Granma",
+   "c": "CU",
+   "f": "L",
+   "s": true,
+   "o": "Communist Party of Cuba"
+  },
+  {
+   "d": "jamaica-gleaner.com",
+   "n": "The Gleaner",
+   "c": "JM",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "nacion.com",
+   "n": "La Nación (Costa Rica)",
+   "c": "CR",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "prensalibre.com",
+   "n": "Prensa Libre",
+   "c": "GT",
+   "b": "C",
+   "f": "H"
+  },
+  {
+   "d": "elfaro.net",
+   "n": "El Faro",
+   "c": "SV",
+   "b": "LL",
+   "f": "H"
+  },
+  {
+   "d": "theverge.com",
+   "n": "The Verge",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.theverge.com/rss/index.xml"
+  },
+  {
+   "d": "techcrunch.com",
+   "n": "TechCrunch",
+   "c": "US",
+   "t": [
+    "technology",
+    "business"
+   ],
+   "rss": "https://techcrunch.com/feed/"
+  },
+  {
+   "d": "arstechnica.com",
+   "n": "Ars Technica",
+   "c": "US",
+   "t": [
+    "technology",
+    "science"
+   ],
+   "rss": "https://feeds.arstechnica.com/arstechnica/index"
+  },
+  {
+   "d": "wired.com",
+   "n": "Wired",
+   "c": "US",
+   "b": "LL",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.wired.com/feed/rss"
+  },
+  {
+   "d": "engadget.com",
+   "n": "Engadget",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.engadget.com/rss.xml"
+  },
+  {
+   "d": "theregister.com",
+   "n": "The Register",
+   "c": "GB",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.theregister.com/headlines.atom"
+  },
+  {
+   "d": "9to5google.com",
+   "n": "9to5Google",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://9to5google.com/feed/"
+  },
+  {
+   "d": "9to5mac.com",
+   "n": "9to5Mac",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://9to5mac.com/feed/"
+  },
+  {
+   "d": "androidauthority.com",
+   "n": "Android Authority",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.androidauthority.com/feed/"
+  },
+  {
+   "d": "tomshardware.com",
+   "n": "Tom's Hardware",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://www.tomshardware.com/feeds/all"
+  },
+  {
+   "d": "restofworld.org",
+   "n": "Rest of World",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://restofworld.org/feed/latest/"
+  },
+  {
+   "d": "technologyreview.com",
+   "n": "MIT Technology Review",
+   "c": "US",
+   "t": [
+    "technology",
+    "ai"
+   ],
+   "rss": "https://www.technologyreview.com/feed/"
+  },
+  {
+   "d": "news.ycombinator.com",
+   "n": "Hacker News",
+   "c": "US",
+   "t": [
+    "technology"
+   ],
+   "rss": "https://news.ycombinator.com/rss"
+  },
+  {
+   "d": "the-decoder.com",
+   "n": "The Decoder",
+   "c": "DE",
+   "t": [
+    "ai"
+   ],
+   "rss": "https://the-decoder.com/feed/"
+  },
+  {
+   "d": "venturebeat.com",
+   "n": "VentureBeat",
+   "c": "US",
+   "t": [
+    "ai",
+    "technology"
+   ],
+   "rss": "https://venturebeat.com/category/ai/feed/"
+  },
+  {
+   "d": "huggingface.co",
+   "n": "Hugging Face Blog",
+   "c": "US",
+   "t": [
+    "ai"
+   ],
+   "rss": "https://huggingface.co/blog/feed.xml"
+  },
+  {
+   "d": "marktechpost.com",
+   "n": "MarkTechPost",
+   "c": "US",
+   "t": [
+    "ai"
+   ],
+   "rss": "https://www.marktechpost.com/feed/"
+  },
+  {
+   "d": "blog.google",
+   "n": "Google Blog",
+   "c": "US",
+   "t": [
+    "ai",
+    "technology"
+   ],
+   "rss": "https://blog.google/technology/ai/rss/"
+  },
+  {
+   "d": "sciencedaily.com",
+   "n": "ScienceDaily",
+   "c": "US",
+   "t": [
+    "science"
+   ],
+   "rss": "https://www.sciencedaily.com/rss/top/science.xml"
+  },
+  {
+   "d": "nature.com",
+   "n": "Nature",
+   "c": "GB",
+   "f": "VH",
+   "t": [
+    "science"
+   ],
+   "rss": "https://www.nature.com/nature.rss"
+  },
+  {
+   "d": "newscientist.com",
+   "n": "New Scientist",
+   "c": "GB",
+   "t": [
+    "science"
+   ],
+   "rss": "https://www.newscientist.com/feed/home/"
+  },
+  {
+   "d": "phys.org",
+   "n": "Phys.org",
+   "c": "GB",
+   "t": [
+    "science"
+   ],
+   "rss": "https://phys.org/rss-feed/"
+  },
+  {
+   "d": "quantamagazine.org",
+   "n": "Quanta Magazine",
+   "c": "US",
+   "t": [
+    "science"
+   ],
+   "rss": "https://www.quantamagazine.org/feed/"
+  },
+  {
+   "d": "space.com",
+   "n": "Space.com",
+   "c": "US",
+   "t": [
+    "space"
+   ],
+   "rss": "https://www.space.com/feeds/all"
+  },
+  {
+   "d": "spacenews.com",
+   "n": "SpaceNews",
+   "c": "US",
+   "t": [
+    "space"
+   ],
+   "rss": "https://spacenews.com/feed/"
+  },
+  {
+   "d": "nasa.gov",
+   "n": "NASA",
+   "c": "US",
+   "s": true,
+   "t": [
+    "space"
+   ],
+   "rss": "https://www.nasa.gov/news-release/feed/"
+  },
+  {
+   "d": "statnews.com",
+   "n": "STAT",
+   "c": "US",
+   "t": [
+    "health"
+   ],
+   "rss": "https://www.statnews.com/feed/"
+  },
+  {
+   "d": "medicalxpress.com",
+   "n": "Medical Xpress",
+   "c": "GB",
+   "t": [
+    "health"
+   ],
+   "rss": "https://medicalxpress.com/rss-feed/"
+  },
+  {
+   "d": "kffhealthnews.org",
+   "n": "KFF Health News",
+   "c": "US",
+   "t": [
+    "health"
+   ],
+   "rss": "https://kffhealthnews.org/feed/"
+  },
+  {
+   "d": "espn.com",
+   "n": "ESPN",
+   "c": "US",
+   "t": [
+    "sports"
+   ],
+   "rss": "https://www.espn.com/espn/rss/news"
+  },
+  {
+   "d": "skysports.com",
+   "n": "Sky Sports",
+   "c": "GB",
+   "t": [
+    "sports"
+   ],
+   "rss": "https://www.skysports.com/rss/12040"
+  },
+  {
+   "d": "cbssports.com",
+   "n": "CBS Sports",
+   "c": "US",
+   "t": [
+    "sports"
+   ],
+   "rss": "https://www.cbssports.com/rss/headlines/"
+  },
+  {
+   "d": "marca.com",
+   "n": "Marca",
+   "c": "ES",
+   "t": [
+    "sports"
+   ]
+  },
+  {
+   "d": "gazzetta.it",
+   "n": "La Gazzetta dello Sport",
+   "c": "IT",
+   "t": [
+    "sports"
+   ]
+  },
+  {
+   "d": "lequipe.fr",
+   "n": "L'Équipe",
+   "c": "FR",
+   "t": [
+    "sports"
+   ]
+  },
+  {
+   "d": "cricbuzz.com",
+   "n": "Cricbuzz",
+   "c": "IN",
+   "t": [
+    "sports"
+   ]
+  },
+  {
+   "d": "variety.com",
+   "n": "Variety",
+   "c": "US",
+   "t": [
+    "entertainment"
+   ],
+   "rss": "https://variety.com/feed/"
+  },
+  {
+   "d": "hollywoodreporter.com",
+   "n": "The Hollywood Reporter",
+   "c": "US",
+   "t": [
+    "entertainment"
+   ],
+   "rss": "https://www.hollywoodreporter.com/feed/"
+  },
+  {
+   "d": "deadline.com",
+   "n": "Deadline",
+   "c": "US",
+   "t": [
+    "entertainment"
+   ],
+   "rss": "https://deadline.com/feed/"
+  },
+  {
+   "d": "rollingstone.com",
+   "n": "Rolling Stone",
+   "c": "US",
+   "b": "LL",
+   "t": [
+    "entertainment"
+   ],
+   "rss": "https://www.rollingstone.com/feed/"
+  },
+  {
+   "d": "pitchfork.com",
+   "n": "Pitchfork",
+   "c": "US",
+   "t": [
+    "entertainment"
+   ],
+   "rss": "https://pitchfork.com/rss/news/"
+  },
+  {
+   "d": "ign.com",
+   "n": "IGN",
+   "c": "US",
+   "t": [
+    "gaming"
+   ],
+   "rss": "https://feeds.feedburner.com/ign/all"
+  },
+  {
+   "d": "polygon.com",
+   "n": "Polygon",
+   "c": "US",
+   "t": [
+    "gaming"
+   ],
+   "rss": "https://www.polygon.com/rss/index.xml"
+  },
+  {
+   "d": "eurogamer.net",
+   "n": "Eurogamer",
+   "c": "GB",
+   "t": [
+    "gaming"
+   ],
+   "rss": "https://www.eurogamer.net/feed"
+  },
+  {
+   "d": "pcgamer.com",
+   "n": "PC Gamer",
+   "c": "US",
+   "t": [
+    "gaming"
+   ],
+   "rss": "https://www.pcgamer.com/rss/"
+  },
+  {
+   "d": "kotaku.com",
+   "n": "Kotaku",
+   "c": "US",
+   "t": [
+    "gaming"
+   ],
+   "rss": "https://kotaku.com/rss"
+  },
+  {
+   "d": "cnbc.com",
+   "n": "CNBC",
+   "c": "US",
+   "b": "C",
+   "f": "H",
+   "t": [
+    "business"
+   ],
+   "rss": "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+  },
+  {
+   "d": "marketwatch.com",
+   "n": "MarketWatch",
+   "c": "US",
+   "b": "C",
+   "t": [
+    "finance",
+    "business"
+   ],
+   "rss": "https://feeds.marketwatch.com/marketwatch/topstories/"
+  },
+  {
+   "d": "coindesk.com",
+   "n": "CoinDesk",
+   "c": "US",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://www.coindesk.com/arc/outboundfeeds/rss/"
+  },
+  {
+   "d": "cointelegraph.com",
+   "n": "Cointelegraph",
+   "c": "US",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://cointelegraph.com/rss"
+  },
+  {
+   "d": "fortune.com",
+   "n": "Fortune",
+   "c": "US",
+   "b": "C",
+   "t": [
+    "business"
+   ]
+  },
+  {
+   "d": "insideclimatenews.org",
+   "n": "Inside Climate News",
+   "c": "US",
+   "t": [
+    "environment"
+   ],
+   "rss": "https://insideclimatenews.org/feed/"
+  },
+  {
+   "d": "carbonbrief.org",
+   "n": "Carbon Brief",
+   "c": "GB",
+   "t": [
+    "environment"
+   ],
+   "rss": "https://www.carbonbrief.org/feed/"
+  },
+  {
+   "d": "grist.org",
+   "n": "Grist",
+   "c": "US",
+   "b": "L",
+   "t": [
+    "environment"
+   ],
+   "rss": "https://grist.org/feed/"
+  },
+  {
+   "d": "news.mongabay.com",
+   "n": "Mongabay",
+   "c": "US",
+   "t": [
+    "environment"
+   ],
+   "rss": "https://news.mongabay.com/feed/"
+  },
+  {
+   "d": "electrek.co",
+   "n": "Electrek",
+   "c": "US",
+   "t": [
+    "autos"
+   ],
+   "rss": "https://electrek.co/feed/"
+  },
+  {
+   "d": "motor1.com",
+   "n": "Motor1",
+   "c": "US",
+   "t": [
+    "autos"
+   ],
+   "rss": "https://www.motor1.com/rss/news/all/"
+  },
+  {
+   "d": "insideevs.com",
+   "n": "InsideEVs",
+   "c": "US",
+   "t": [
+    "autos"
+   ],
+   "rss": "https://insideevs.com/rss/news/all/"
+  },
+  {
+   "d": "eater.com",
+   "n": "Eater",
+   "c": "US",
+   "t": [
+    "travel"
+   ],
+   "rss": "https://www.eater.com/rss/index.xml"
+  },
+  {
+   "d": "cntraveler.com",
+   "n": "Condé Nast Traveler",
+   "c": "US",
+   "t": [
+    "travel"
+   ],
+   "rss": "https://www.cntraveler.com/feed/rss"
+  },
+  {
+   "d": "chalkbeat.org",
+   "n": "Chalkbeat",
+   "c": "US",
+   "t": [
+    "education"
+   ],
+   "rss": "https://www.chalkbeat.org/arc/outboundfeeds/rss/"
+  },
+  {
+   "d": "edsurge.com",
+   "n": "EdSurge",
+   "c": "US",
+   "t": [
+    "education"
+   ],
+   "rss": "https://www.edsurge.com/articles_rss"
+  },
+  {
+   "d": "themarshallproject.org",
+   "n": "The Marshall Project",
+   "c": "US",
+   "b": "LL",
+   "t": [
+    "crime"
+   ]
+  },
+  {
+   "d": "courthousenews.com",
+   "n": "Courthouse News",
+   "c": "US",
+   "b": "C",
+   "t": [
+    "crime"
+   ],
+   "rss": "https://www.courthousenews.com/feed/"
+  },
+  {
+   "d": "lifehacker.com",
+   "n": "Lifehacker",
+   "c": "US",
+   "t": [
+    "lifestyle"
+   ],
+   "rss": "https://lifehacker.com/feed/rss"
+  },
+  {
+   "d": "finance.yahoo.com",
+   "n": "Yahoo Finance",
+   "c": "US",
+   "b": "C",
+   "t": [
+    "finance",
+    "business"
+   ],
+   "rss": "https://finance.yahoo.com/news/rssindex"
+  },
+  {
+   "d": "investing.com",
+   "n": "Investing.com",
+   "c": "IL",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://www.investing.com/rss/news.rss"
+  },
+  {
+   "d": "seekingalpha.com",
+   "n": "Seeking Alpha",
+   "c": "US",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://seekingalpha.com/market_currents.xml"
+  },
+  {
+   "d": "businessinsider.com",
+   "n": "Business Insider",
+   "c": "US",
+   "b": "LL",
+   "t": [
+    "business"
+   ],
+   "rss": "https://feeds.businessinsider.com/custom/all"
+  },
+  {
+   "d": "nasdaq.com",
+   "n": "Nasdaq",
+   "c": "US",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://www.nasdaq.com/feed/rssoutbound?category=Markets"
+  },
+  {
+   "d": "forbes.com",
+   "n": "Forbes",
+   "c": "US",
+   "b": "C",
+   "t": [
+    "business"
+   ],
+   "rss": "https://www.forbes.com/business/feed/"
+  },
+  {
+   "d": "kiplinger.com",
+   "n": "Kiplinger",
+   "c": "US",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://www.kiplinger.com/feeds/all"
+  },
+  {
+   "d": "fxstreet.com",
+   "n": "FXStreet",
+   "c": "ES",
+   "t": [
+    "finance"
+   ],
+   "rss": "https://www.fxstreet.com/rss/news"
+  }
+ ]
 }

@@ -9,6 +9,7 @@ import '../../models/place.dart';
 import '../../models/source.dart';
 import '../../services/places.dart';
 import '../../state/app_state.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
 import 'sources_screen.dart';
 import 'story_list.dart';
@@ -174,21 +175,89 @@ Future<Place?> showPlacePicker(BuildContext context) => showModalBottomSheet<Pla
       ),
     );
 
+String flagEmoji(String? cc) {
+  if (cc == null || cc.length != 2) return '🌐';
+  final up = cc.toUpperCase();
+  return String.fromCharCodes(up.codeUnits.map((c) => 0x1F1E6 + c - 65));
+}
+
+void openPlace(BuildContext context, Place p) {
+  context.read<AppState>().addRecent(p);
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p)));
+}
+
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
+
+  static const _continentIcons = {
+    'AF': Icons.landscape,
+    'AS': Icons.temple_buddhist,
+    'EU': Icons.castle,
+    'NA': Icons.location_city,
+    'SA': Icons.forest,
+    'OC': Icons.waves,
+    'AN': Icons.ac_unit,
+  };
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    return ListView(children: [
+    final theme = Theme.of(context);
+    final home = countryByCode(app.settings.homeCountry);
+    Widget section(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+          child: Text(t, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+        );
+
+    return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
       const PlaceSearchPanel(shrinkWrap: true),
       if (app.followed.isNotEmpty) ...[
-        const _Header('Your places'),
-        for (final p in app.followed) PlaceTile(place: p),
+        section('Your places'),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: app.followed.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) => _PlaceCard(place: app.followed[i], width: 150),
+          ),
+        ),
       ],
-      const _Header('Browse the world'),
-      PlaceTile(place: Place.world),
-      for (final c in continents) PlaceTile(place: c.place),
+      if (home != null) ...[
+        section('Your country'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _PlaceCard(place: home.place, big: true),
+        ),
+      ],
+      section('Browse the world'),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.3,
+          children: [
+            _Tile(
+              icon: Icons.public,
+              title: 'World',
+              subtitle: 'Global headlines',
+              onTap: () => openPlace(context, Place.world),
+            ),
+            for (final c in continents)
+              _Tile(
+                icon: _continentIcons[c.code] ?? Icons.travel_explore,
+                title: c.name,
+                subtitle: '${countries.where((x) => x.continent == c.code).length} countries',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CountryGridScreen(continent: c))),
+              ),
+          ],
+        ),
+      ),
       const Padding(
         padding: EdgeInsets.all(16),
         child: Text('Place search © OpenStreetMap contributors. Places & local outlets from Wikidata (CC0).',
@@ -198,14 +267,167 @@ class ExploreScreen extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header(this.text);
-  final String text;
+class _Tile extends StatelessWidget {
+  const _Tile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+  Widget build(BuildContext context) => Material(
+        color: Brand.purple.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              Icon(icon, color: Brand.purple, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                ]),
+              ),
+            ]),
+          ),
+        ),
       );
+}
+
+/// Card for a place: flag/icon, name, follow toggle. Tap opens its news.
+class _PlaceCard extends StatelessWidget {
+  const _PlaceCard({required this.place, this.width, this.big = false});
+  final Place place;
+  final double? width;
+  final bool big;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final followed = app.isFollowed(place);
+    final leading = place.level == PlaceLevel.country
+        ? Text(flagEmoji(place.countryCode), style: TextStyle(fontSize: big ? 34 : 24))
+        : Icon(place.isLocalLevel ? Icons.holiday_village : Icons.map_outlined, color: Brand.purple, size: big ? 34 : 24);
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: big ? Brand.purple : Brand.purple.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => openPlace(context, place),
+          child: Padding(
+            padding: EdgeInsets.all(big ? 16 : 12),
+            child: Row(children: [
+              leading,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(place.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: big ? 18 : 14, color: big ? Colors.white : null)),
+                  Text(big ? 'Tap for national & local news' : place.levelLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: big ? Colors.white70 : Theme.of(context).hintColor)),
+                ]),
+              ),
+              if (big)
+                IconButton(
+                  tooltip: followed ? 'Unfollow' : 'Follow',
+                  icon: Icon(followed ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
+                  onPressed: () => app.toggleFollow(place),
+                ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Countries of a continent as a searchable grid of flags.
+class CountryGridScreen extends StatefulWidget {
+  const CountryGridScreen({super.key, required this.continent});
+  final Continent continent;
+
+  @override
+  State<CountryGridScreen> createState() => _CountryGridScreenState();
+}
+
+class _CountryGridScreenState extends State<CountryGridScreen> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final list = countries
+        .where((c) => c.continent == widget.continent.code)
+        .where((c) => _q.isEmpty || c.name.toLowerCase().contains(_q))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.continent.name),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.newspaper),
+            label: const Text('News'),
+            onPressed: () => openPlace(context, widget.continent.place),
+          ),
+        ],
+      ),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Find a country',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+            ),
+            onChanged: (v) => setState(() => _q = v.toLowerCase().trim()),
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.05),
+            itemCount: list.length,
+            itemBuilder: (_, i) {
+              final c = list[i];
+              return Material(
+                color: Brand.purple.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => openPlace(context, c.place),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(flagEmoji(c.code), style: const TextStyle(fontSize: 30)),
+                      const SizedBox(height: 4),
+                      Text(c.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
 }
 
 class PlaceTile extends StatelessWidget {

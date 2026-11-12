@@ -13,6 +13,8 @@ import '../update_flow.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  static const _auto = 'auto';
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -23,14 +25,19 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(children: [
         ListTile(
           title: const Text('Home country'),
-          subtitle: const Text('Edition used for World and Topics'),
+          subtitle: Text(app.homeCountryAuto
+              ? 'Auto: ${countryByCode(s.homeCountry)?.name ?? s.homeCountry} (from your network)'
+              : 'Set manually · edition used for World and Topics'),
           trailing: SizedBox(
             width: 150,
             child: DropdownButton<String>(
               isExpanded: true,
-              value: s.homeCountry,
-              items: [for (final c in sorted) DropdownMenuItem(value: c.code, child: Text(c.name, overflow: TextOverflow.ellipsis))],
-              onChanged: (v) => app.updateSettings((x) => x.homeCountry = v ?? 'US'),
+              value: app.homeCountryAuto ? _auto : s.homeCountry,
+              items: [
+                const DropdownMenuItem(value: _auto, child: Text('Auto (detect)')),
+                for (final c in sorted) DropdownMenuItem(value: c.code, child: Text(c.name, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => app.setHomeCountry(v == null || v == _auto ? null : v),
             ),
           ),
         ),
@@ -106,7 +113,8 @@ class SettingsScreen extends StatelessWidget {
           future: Updater.currentVersion(),
           builder: (_, snap) => ListTile(
             title: const Text('Version'),
-            subtitle: Text(snap.data ?? '…'),
+            subtitle: Text('${snap.data ?? '…'}\n${Updater.lastResult}'),
+            isThreeLine: true,
             trailing: TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now')),
           ),
         ),
