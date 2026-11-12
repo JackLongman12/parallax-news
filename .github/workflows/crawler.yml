@@ -2,7 +2,7 @@ name: News crawler
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -40,5 +40,5 @@ jobs:
           # A separate, non-"latest" release so app updates are unaffected.
           gh release view feed --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create feed --repo "$GITHUB_REPOSITORY" --title "Crawler feed (auto)" \
-              --notes "Updated automatically every ~30 minutes. Not an app release." --prerelease --latest=false
+              --notes "Updated automatically every ~5 minutes. Not an app release." --prerelease --latest=false
           gh release upload feed crawler/out/feed.json.gz crawler/out/state.json.gz --clobber --repo "$GITHUB_REPOSITORY"

@@ -4,11 +4,14 @@
 //   GET /og?url=...    -> { image } : preview image of an article page,
 //                         cached for a day, so phones don't fetch pages
 //   GET /health        -> "ok"
+//   cron (every 5 min) -> starts the GitHub crawler, because GitHub's own
+//                         schedule is often delayed or skipped. Needs the
+//                         GH_TOKEN secret; without it this does nothing.
 //
 // Deployed as its OWN worker ("parallax-news"), so it never touches any
 // other worker on the account.
 
-const FEED_TTL = 300; // seconds
+const FEED_TTL = 120; // seconds
 const OG_TTL = 86400;
 
 const CORS = {
@@ -123,5 +126,21 @@ export default {
     if (path === "/og") return og(request, env, ctx);
     if (path === "/health") return new Response("ok", { headers: CORS });
     return json({ error: "not found" }, 404);
+  },
+
+  async scheduled(event, env, ctx) {
+    if (!env.GH_TOKEN) return;
+    const repo = env.GH_REPO || "JackLongman12/parallax-news";
+    ctx.waitUntil(
+      fetch(`https://api.github.com/repos/${repo}/actions/workflows/crawler.yml/dispatches`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GH_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "parallax-news-worker",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      }),
+    );
   },
 };

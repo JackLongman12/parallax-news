@@ -6,10 +6,10 @@ import '../models/category.dart';
 import '../models/story.dart';
 import 'net.dart';
 
-/// Pre-built stories from our own crawler (GitHub Actions, every ~30 min):
+/// Pre-built stories from our own crawler (GitHub Actions, every ~5 min):
 /// hundreds of feeds clustered into stories with many outlets each.
 ///
-/// Kept in MEMORY only (never written to disk) and refreshed every 10 min,
+/// Kept in MEMORY only (never written to disk) and refreshed every 5 min,
 /// so it adds no storage. If the crawler or worker is unreachable, the app
 /// silently falls back to on-device fetching.
 class CrawlerFeed {
@@ -23,9 +23,17 @@ class CrawlerFeed {
   static DateTime _at = DateTime.fromMillisecondsSinceEpoch(0);
   static Future<List<Story>>? _inflight;
 
+  /// Status for Settings: when the crawler built the feed, where the app got
+  /// it from, and the last failure (null after a successful load).
+  static DateTime? builtAt;
+  static DateTime? get loadedAt => _stories == null ? null : _at;
+  static int get count => _stories?.length ?? 0;
+  static String get via => workerUrl.startsWith('https://') ? 'Cloudflare' : 'GitHub';
+  static String? lastError;
+
   static Future<List<Story>> load({bool force = false}) {
     if (!enabled) return Future.value(const []);
-    if (!force && _stories != null && DateTime.now().difference(_at) < const Duration(minutes: 10)) {
+    if (!force && _stories != null && DateTime.now().difference(_at) < const Duration(minutes: 5)) {
       return Future.value(_stories!);
     }
     return _inflight ??= _fetch().whenComplete(() => _inflight = null);
@@ -40,10 +48,20 @@ class CrawlerFeed {
         final bytes = await Net.getBytes(githubUrl, timeout: const Duration(seconds: 15));
         text = utf8.decode(gzip.decode(bytes), allowMalformed: true);
       }
-      _stories = parse(jsonDecode(text));
+      final json = jsonDecode(text);
+      final list = parse(json);
+      if (list.isEmpty) throw const FormatException('empty feed');
+      final at = json is Map ? json['at'] : null;
+      builtAt = at is int ? DateTime.fromMillisecondsSinceEpoch(at * 1000) : null;
+      _stories = list;
       _at = DateTime.now();
+      lastError = null;
       return _stories!;
+    } on FormatException {
+      lastError = 'feed was unreadable';
+      return _stories ?? const [];
     } catch (_) {
+      lastError = 'could not reach $via';
       return _stories ?? const [];
     }
   }

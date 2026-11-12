@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../data/geo.dart';
 import '../../models/category.dart';
 import '../../state/app_state.dart';
+import '../../services/crawler_feed.dart';
 import '../../services/provider_health.dart';
 import '../../services/updater.dart';
 import '../theme.dart';
@@ -80,6 +81,7 @@ class SettingsScreen extends StatelessWidget {
           title: Text('News sources'),
           subtitle: Text('Chosen automatically: Google + Bing, plus GDELT where it helps. Slow or rate-limited sources are skipped.'),
         ),
+        const CrawlerStatusTile(),
         const _SourceHealth(),
         const ReadingBalanceTile(),
         ListTile(
@@ -216,6 +218,56 @@ class _InformLevel extends StatelessWidget {
             ),
           ),
       ]),
+    );
+  }
+}
+
+
+/// Whether the crawler feed (pre-built stories with many outlets) is loaded.
+class CrawlerStatusTile extends StatefulWidget {
+  const CrawlerStatusTile({super.key});
+
+  @override
+  State<CrawlerStatusTile> createState() => _CrawlerStatusTileState();
+}
+
+class _CrawlerStatusTileState extends State<CrawlerStatusTile> {
+  bool _busy = false;
+
+  static String _ago(DateTime t) {
+    final m = DateTime.now().difference(t).inMinutes;
+    if (m < 1) return 'just now';
+    if (m < 60) return '$m min ago';
+    final h = m ~/ 60;
+    return h < 24 ? '$h h ago' : '${h ~/ 24} d ago';
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _busy = true);
+    await CrawlerFeed.load(force: true);
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = CrawlerFeed.count > 0;
+    final built = CrawlerFeed.builtAt;
+    final err = CrawlerFeed.lastError;
+    final text = ok
+        ? '${CrawlerFeed.count} stories via ${CrawlerFeed.via}'
+            '${built != null ? ', built ${_ago(built)}' : ''}'
+            '${err != null ? ' (last refresh failed: $err)' : ''}'
+        : err != null
+            ? 'Not loaded: $err. Using on-device sources only.'
+            : 'Not loaded yet. Open For You to fetch it.';
+    return ListTile(
+      leading: Icon(ok ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+          color: ok ? Brand.purple : Theme.of(context).colorScheme.error),
+      title: const Text('Crawler feed'),
+      subtitle: Text(text),
+      trailing: _busy
+          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
     );
   }
 }

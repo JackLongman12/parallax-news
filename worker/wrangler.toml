@@ -4,5 +4,9 @@ main = "src/index.js"
 compatibility_date = "2024-09-23"
 workers_dev = true
 
+# Kicks the GitHub crawler every 5 minutes (see scheduled() in index.js).
+[triggers]
+crons = ["*/5 * * * *"]
+
 [vars]
 FEED_URL = "https://github.com/JackLongman12/parallax-news/releases/download/feed/feed.json.gz"
