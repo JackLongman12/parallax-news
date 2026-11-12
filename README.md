@@ -2,6 +2,28 @@
 
 Open-source, bias-aware news reader. It covers the whole world down to individual towns and neighbourhoods, and shows how each story is covered across the political spectrum. Android comes first. The Flutter codebase can also target Windows, macOS and web later.
 
+![Parallax News](docs/img/feature_graphic.png)
+
+<p>
+  <img src="docs/img/promo_1.png" width="24%" />
+  <img src="docs/img/promo_2.png" width="24%" />
+  <img src="docs/img/promo_3.png" width="24%" />
+  <img src="docs/img/promo_4.png" width="24%" />
+</p>
+
+### Screens
+
+<p>
+  <img src="docs/img/01_for_you.png" width="16%" />
+  <img src="docs/img/02_for_you_dark.png" width="16%" />
+  <img src="docs/img/03_story_coverage.png" width="16%" />
+  <img src="docs/img/04_blindspot.png" width="16%" />
+  <img src="docs/img/05_explore.png" width="16%" />
+  <img src="docs/img/06_sources.png" width="16%" />
+</p>
+
+*Screenshots are rendered from the real widgets in CI (`screenshots/screenshot_test.dart`). The stories use fictional sample outlets.*
+
 ## What it does
 
 - **World → continent → country → state/province → county → city → neighbourhood.** Use the browse view (Wikidata subdivisions) or search for any place (OpenStreetMap Nominatim).

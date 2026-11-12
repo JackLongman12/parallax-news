@@ -35,18 +35,36 @@ class Net {
     if (uri == null || !(uri.scheme == 'https' || uri.scheme == 'http')) {
       throw NetException('Refusing non-http URL');
     }
+    if (!isPublicHost(uri.host)) {
+      throw NetException('Refusing private/local address');
+    }
     if (useCache) {
       final hit = _cache[url];
       if (hit != null && DateTime.now().difference(hit.at) < _ttl) return hit.body;
     }
-    final req = http.Request('GET', uri)
-      ..headers['User-Agent'] = userAgent
-      ..headers['Accept'] = 'application/rss+xml, application/atom+xml, application/json, text/xml, */*'
-      ..followRedirects = true
-      ..maxRedirects = 5;
-    if (headers != null) req.headers.addAll(headers);
-
-    final res = await _client.send(req).timeout(timeout);
+    // Follow redirects by hand so every hop is checked against [isPublicHost].
+    var current = uri;
+    late http.StreamedResponse res;
+    for (var hop = 0;; hop++) {
+      final req = http.Request('GET', current)
+        ..headers['User-Agent'] = userAgent
+        ..headers['Accept'] = 'application/rss+xml, application/atom+xml, application/json, text/xml, */*'
+        ..followRedirects = false;
+      if (headers != null) req.headers.addAll(headers);
+      res = await _client.send(req).timeout(timeout);
+      final loc = res.headers['location'];
+      if (res.statusCode >= 300 && res.statusCode < 400 && loc != null) {
+        unawaited(res.stream.drain<void>().catchError((_) {}));
+        if (hop >= 5) throw NetException('Too many redirects from ${uri.host}');
+        final next = current.resolve(loc);
+        if (!(next.scheme == 'https' || next.scheme == 'http') || !isPublicHost(next.host)) {
+          throw NetException('Blocked redirect from ${uri.host}');
+        }
+        current = next;
+        continue;
+      }
+      break;
+    }
     if (res.statusCode != 200) {
       // Drain so the connection can be reused.
       unawaited(res.stream.drain<void>().catchError((_) {}));
@@ -112,6 +130,31 @@ String domainOf(String url) {
     if (host.startsWith(p)) return host.substring(p.length);
   }
   return host;
+}
+
+/// Feed URLs come from editable sources (Wikidata, feeds). Don't let them make
+/// the phone talk to its own LAN / loopback (SSRF-style probing).
+bool isPublicHost(String host) {
+  final h = host.toLowerCase();
+  if (h.isEmpty || h == 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') ||
+      h.endsWith('.internal') || h.endsWith('.lan')) {
+    return false;
+  }
+  if (h.contains(':')) {
+    // IPv6 literal: block loopback, link-local, unique-local.
+    final v6 = h.replaceAll('[', '').replaceAll(']', '');
+    return !(v6 == '::1' || v6 == '::' || v6.startsWith('fe80') || v6.startsWith('fc') || v6.startsWith('fd'));
+  }
+  final parts = h.split('.');
+  if (parts.length == 4 && parts.every((p) => int.tryParse(p) != null)) {
+    final o = parts.map(int.parse).toList();
+    if (o[0] == 10 || o[0] == 127 || o[0] == 0) return false;
+    if (o[0] == 169 && o[1] == 254) return false;
+    if (o[0] == 172 && o[1] >= 16 && o[1] <= 31) return false;
+    if (o[0] == 192 && o[1] == 168) return false;
+    if (o[0] == 100 && o[1] >= 64 && o[1] <= 127) return false;
+  }
+  return true;
 }
 
 /// Only http(s) links may be opened from feed content.

@@ -144,6 +144,14 @@ void main() {
       expect(PlaceService.isQid(null), isFalse);
     });
 
+    test('private hosts are blocked', () {
+      expect(isPublicHost('news.google.com'), isTrue);
+      expect(isPublicHost('8.8.8.8'), isTrue);
+      for (final h in ['localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', '172.20.0.1', '169.254.169.254', '[::1]', 'printer.local']) {
+        expect(isPublicHost(h), isFalse, reason: h);
+      }
+    });
+
     test('domainOf strips www', () {
       expect(domainOf('https://www.bbc.co.uk/news'), 'bbc.co.uk');
     });

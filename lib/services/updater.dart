@@ -45,7 +45,7 @@ class Updater {
   static bool _allowed(String url) {
     final u = Uri.tryParse(url);
     if (u == null || u.scheme != 'https') return false;
-    return _allowedHosts.contains(u.host) || u.host.endsWith('.r2.dev') || u.host.endsWith('.pages.dev');
+    return _allowedHosts.contains(u.host);
   }
 
   static Future<int> currentBuild() async {
@@ -67,8 +67,9 @@ class Updater {
     if (android is! Map) return null;
     final url = android['url']?.toString() ?? '';
     if (!_allowed(url)) return null;
+    // Checksum is mandatory: never install an unverified download.
     final sha = android['sha256']?.toString();
-    if (sha != null && !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(sha)) return null;
+    if (sha == null || !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(sha)) return null;
     final mine = await currentBuild();
     if (build <= mine) return null;
     return UpdateInfo(

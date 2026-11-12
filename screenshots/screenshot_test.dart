@@ -45,7 +45,7 @@ Article _a(String title, String domain, {int hoursAgo = 2}) {
     published: DateTime.now().toUtc().subtract(Duration(hours: hoursAgo)),
     provider: 'rss',
     isLocal: o.$4,
-    snippet: 'Sample content for screenshots.',
+    snippet: 'The package funds roads, bridges and broadband over five years, with a final vote expected next week.',
   );
   a.source = SourceInfo(
       domain: domain, name: o.$2, bias: o.$3, origin: RatingOrigin.curated, isLocal: o.$4, factuality: Factuality.high);
