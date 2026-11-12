@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: write   # upload the feed to the "feed" release
+      actions: write    # start the next crawl (see last step)
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -29,6 +30,9 @@ jobs:
         run: |
           mkdir -p crawler/out
           gh release download feed -p state.json.gz -D crawler/out --repo "$GITHUB_REPOSITORY" || true
+
+      - name: Note start time
+        run: echo "CRAWL_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Crawl
         run: python3 crawler/crawl.py
@@ -42,3 +46,15 @@ jobs:
             gh release create feed --repo "$GITHUB_REPOSITORY" --title "Crawler feed (auto)" \
               --notes "Updated automatically every ~5 minutes. Not an app release." --prerelease --latest=false
           gh release upload feed crawler/out/feed.json.gz crawler/out/state.json.gz --clobber --repo "$GITHUB_REPOSITORY"
+
+      # GitHub's cron often runs late or not at all, so each crawl starts the
+      # next one ~5 minutes after it began. The cron above restarts the chain
+      # if it ever breaks; the concurrency group keeps at most one waiting.
+      - name: Start next crawl
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          left=$(( 300 - ($(date +%s) - ${CRAWL_START:-$(date +%s)}) ))
+          if [ "$left" -gt 0 ]; then sleep "$left"; fi
+          gh workflow run crawler.yml --repo "$GITHUB_REPOSITORY" --ref main

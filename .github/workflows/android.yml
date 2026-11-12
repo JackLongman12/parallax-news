@@ -119,7 +119,12 @@ jobs:
           notes = (os.environ.get("NOTES") or "").split("\n")[0][:300]
           manifest = {
               "version": f"0.1.{n}",
-              "build": int(n),
+              # Split-per-ABI APKs get Android version code 2000+n (arm64) or
+              # 1000+n (arm32), and apps up to 0.1.38 compare "build" against
+              # that code, so it is published as 2000+n for them. Newer apps
+              # compare "run" against the n in their own version name.
+              "build": 2000 + int(n),
+              "run": int(n),
               "notes": notes,
               "android": {
                   # Default (64-bit) kept for older app versions.

@@ -50,9 +50,13 @@ class Updater {
     return _allowedHosts.contains(u.host);
   }
 
+  /// This install's build: the N in version name 0.1.N. (Android's version
+  /// code is 2000+N or 1000+N for per-CPU APKs, so it can't be compared.)
   static Future<int> currentBuild() async {
     final info = await PackageInfo.fromPlatform();
-    return int.tryParse(info.buildNumber) ?? 0;
+    final m = RegExp(r'(\d+)$').firstMatch(info.version);
+    if (m != null) return int.parse(m[1]!);
+    return (int.tryParse(info.buildNumber) ?? 0) % 1000;
   }
 
   static Future<String> currentVersion() async {
@@ -79,7 +83,12 @@ class Updater {
     }
   }
 
-  static int _build(Map j) => (j['build'] as num?)?.toInt() ?? 0;
+  /// Build number of a manifest, comparable with [currentBuild].
+  static int _build(Map j) {
+    final run = j['run'];
+    if (run is num) return run.toInt();
+    return ((j['build'] as num?)?.toInt() ?? 0) % 1000;
+  }
 
   static Future<Map?> _manifest(String url) async {
     try {
