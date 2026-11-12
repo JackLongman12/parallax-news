@@ -20,6 +20,7 @@ class StoryList extends StatefulWidget {
     this.emptyMessage = 'No stories found right now.',
     this.filter,
     this.autoRefresh,
+    this.scrollToTop,
   });
 
   final Future<List<Story>> Function(bool force)? loader;
@@ -36,6 +37,9 @@ class StoryList extends StatefulWidget {
 
   /// Quietly re-check for news this often and offer a "new stories" pill.
   final Duration? autoRefresh;
+
+  /// Fires when the user re-taps this tab: scroll to top (or refresh if already there).
+  final Listenable? scrollToTop;
 
   @override
   State<StoryList> createState() => _StoryListState();
@@ -66,6 +70,7 @@ class _StoryListState extends State<StoryList> {
       _loading = false;
     }
     _load(false);
+    widget.scrollToTop?.addListener(_onReselect);
     final every = widget.autoRefresh;
     if (every != null) _autoTimer = Timer.periodic(every, (_) => _backgroundRefresh());
   }
@@ -91,8 +96,20 @@ class _StoryListState extends State<StoryList> {
     }
   }
 
+  void _onReselect() {
+    if (!_scroll.hasClients) return;
+    if (_pending.isNotEmpty) {
+      _showPending();
+    } else if (_scroll.offset > 8) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+    } else {
+      _load(true); // already at the top: refresh
+    }
+  }
+
   @override
   void dispose() {
+    widget.scrollToTop?.removeListener(_onReselect);
     _autoTimer?.cancel();
     _sub?.cancel();
     _scroll.dispose();
@@ -102,7 +119,7 @@ class _StoryListState extends State<StoryList> {
   List<Story> _filtered(List<Story> s) => widget.filter == null ? s : s.where(widget.filter!).toList();
 
   /// Adds newly arrived stories without moving the ones already on screen.
-  void _merge(List<Story> incoming) {
+  void _merge(List<Story> incoming, {bool prepend = false}) {
     final byUrl = <String, int>{};
     for (var i = 0; i < _all.length; i++) {
       for (final a in _all[i].articles) {
@@ -119,7 +136,7 @@ class _StoryListState extends State<StoryList> {
         fresh.add(s);
       }
     }
-    _all = [...next, ...fresh];
+    _all = prepend ? [...fresh, ...next] : [...next, ...fresh];
   }
 
   Future<void> _load(bool force) {
@@ -140,7 +157,10 @@ class _StoryListState extends State<StoryList> {
       (stories) {
         if (!mounted) return;
         setState(() {
-          if (first) {
+          if (first && force && _all.isNotEmpty) {
+            // Refresh: keep what's on screen, put new stories on top.
+            _merge(stories, prepend: true);
+          } else if (first) {
             // First fresh batch replaces the cached snapshot.
             _all = _filtered(stories);
             _visible = _pageSize;
@@ -169,7 +189,9 @@ class _StoryListState extends State<StoryList> {
         if (!firstDone.isCompleted) firstDone.complete();
       },
     );
-    return firstDone.future;
+    // Let the pull-to-refresh spinner go quickly; stories keep streaming in
+    // underneath (the thin progress line shows it is still working).
+    return Future.any([firstDone.future, Future<void>.delayed(const Duration(milliseconds: 900))]);
   }
 
   Future<void> _loadOnce(bool force) async {
@@ -262,7 +284,7 @@ class _StoryListState extends State<StoryList> {
                 }
                 return const Padding(
                   padding: EdgeInsets.all(28),
-                  child: Center(child: Text("You're all caught up ✓\nPull down to refresh.", textAlign: TextAlign.center)),
+                  child: Center(child: Text("You're all caught up.\nPull down to refresh.", textAlign: TextAlign.center)),
                 );
               },
             ),
@@ -285,7 +307,7 @@ class _StoryListState extends State<StoryList> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.arrow_upward, size: 16, color: Colors.white),
+                  const Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.white),
                   const SizedBox(width: 6),
                   Text('${_pending.length} new ${_pending.length == 1 ? 'story' : 'stories'}',
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),

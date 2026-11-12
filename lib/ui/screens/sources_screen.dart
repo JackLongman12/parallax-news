@@ -8,9 +8,59 @@ import '../../models/source.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../nav.dart';
 import 'explore_screens.dart';
 
 enum _Group { lean, country, topic }
+
+Country? _countryOf(String groupTitle) {
+  final name = groupTitle.startsWith('Outlets in ') ? groupTitle.substring(11) : groupTitle;
+  for (final c in countries) {
+    if (c.name == name) return c;
+  }
+  return null;
+}
+
+/// Outlets for a country fetched live from Wikidata (inside a group).
+class _LiveOutlets extends StatefulWidget {
+  const _LiveOutlets({required this.country, required this.exclude});
+  final Country country;
+  final Set<String> exclude;
+
+  @override
+  State<_LiveOutlets> createState() => _LiveOutletsState();
+}
+
+class _LiveOutletsState extends State<_LiveOutlets> {
+  late final Future<List<SourceInfo>> _f = context.read<AppState>().repo.outletsFor(widget.country.place);
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    return FutureBuilder<List<SourceInfo>>(
+      future: _f,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(children: [
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 12),
+              Text('Finding outlets on Wikidata...'),
+            ]),
+          );
+        }
+        final list = (snap.data ?? const <SourceInfo>[]).where((s) => !widget.exclude.contains(s.domain)).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        if (list.isEmpty) {
+          return const Padding(padding: EdgeInsets.all(16), child: Text('No more outlets listed on Wikidata for this country yet.'));
+        }
+        return Column(children: [for (final s in list) SourceTile(source: app.bias.lookup(s.domain, name: s.name))]);
+      },
+    );
+  }
+}
+
 
 /// Sources, grouped so you never scroll through hundreds of rows:
 /// by Lean, by Country (yours first) or by Topic. Groups are collapsed with
@@ -55,36 +105,49 @@ class _SourcesScreenState extends State<SourcesScreen> {
           }
         }
       case _Group.country:
+        // Every country is listed; opening one also loads its outlets live
+        // from Wikidata, so countries outside the seed catalog work too.
         final byCc = <String, List<SourceInfo>>{};
         for (final s in all) {
           byCc.putIfAbsent(s.country ?? '??', () => []).add(s);
         }
         final home = app.settings.homeCountry;
-        final keys = byCc.keys.toList()
+        final list = [...countries]
           ..sort((a, b) {
-            if (a == home) return -1;
-            if (b == home) return 1;
-            return (countryByCode(a)?.name ?? 'zz').compareTo(countryByCode(b)?.name ?? 'zz');
+            if (a.code == home) return -1;
+            if (b.code == home) return 1;
+            return a.name.compareTo(b.name);
           });
-        for (final k in keys) {
-          groups.add((countryByCode(k)?.name ?? 'International / other', Text(flagEmoji(k == '??' ? null : k)), byCc[k]!));
+        for (final c in list) {
+          final items = byCc[c.code] ?? const <SourceInfo>[];
+          final nameHit = _q.isNotEmpty && c.name.toLowerCase().contains(_q);
+          if (_q.isNotEmpty && items.isEmpty && !nameHit) continue;
+          groups.add((c.name, CountryBadge(c.code, size: 22), items));
         }
+        final intl = byCc['??'];
+        if (intl != null) groups.add(('International / other', const CountryBadge(null, size: 22), intl));
       case _Group.topic:
         final general = all.where((s) => s.topics.isEmpty).toList();
         for (final c in Category.values) {
           final items = all.where((s) => s.topics.contains(c)).toList();
           if (items.isNotEmpty) groups.add((c.label, Icon(Brand.categoryIcon(c), size: 18), items));
         }
-        if (general.isNotEmpty) groups.add(('General news', const Icon(Icons.newspaper, size: 18), general));
+        if (general.isNotEmpty) groups.add(('General news', const Icon(Icons.newspaper_rounded, size: 18), general));
     }
 
+    // Searching a country's name in any view shows that country's outlets.
+    if (_group != _Group.country && _q.length >= 3) {
+      for (final c in countries.where((c) => c.name.toLowerCase().contains(_q)).take(3)) {
+        groups.insert(0, ('Outlets in ${c.name}', CountryBadge(c.code, size: 22), const <SourceInfo>[]));
+      }
+    }
     final searching = _q.isNotEmpty;
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
         child: TextField(
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search_rounded),
             hintText: 'Search ${map.length} sources',
             filled: true,
             isDense: true,
@@ -114,9 +177,10 @@ class _SourcesScreenState extends State<SourcesScreen> {
       ),
       const SizedBox(height: 6),
       Expanded(
-        child: all.isEmpty
+        child: groups.isEmpty
             ? const Center(child: Text('No sources match.'))
-            : ListView.builder(
+            : ReselectScroll(tab: 5, builder: (ctrl) => ListView.builder(
+                controller: ctrl,
                 itemCount: groups.length,
                 itemBuilder: (_, i) {
                   final g = groups[i];
@@ -130,12 +194,16 @@ class _SourcesScreenState extends State<SourcesScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                           color: Brand.purple.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                      child: Text('${g.$3.length}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      child: Text(g.$3.isEmpty ? 'more' : '${g.$3.length}', style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
-                    children: [for (final s in g.$3) SourceTile(source: s)],
+                    children: [
+                      for (final s in g.$3) SourceTile(source: s),
+                      if (_countryOf(g.$1) != null)
+                        _LiveOutlets(country: _countryOf(g.$1)!, exclude: {for (final s in g.$3) s.domain}),
+                    ],
                   );
                 },
-              ),
+              )),
       ),
     ]);
   }
@@ -221,7 +289,7 @@ class SourceSheet extends StatelessWidget {
           ]),
           const SizedBox(height: 12),
           TextButton.icon(
-            icon: const Icon(Icons.open_in_new),
+            icon: const Icon(Icons.open_in_new_rounded),
             label: const Text('Visit website'),
             onPressed: () => openArticle(context, 'https://${s.domain}'),
           ),

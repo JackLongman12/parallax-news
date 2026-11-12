@@ -59,8 +59,8 @@ class _TopicChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final (bg, fg, icon) = switch (state) {
-      TopicState.following => (Brand.purple, Colors.white, Icons.check),
-      TopicState.muted => (dark ? const Color(0xFF26232E) : const Color(0xFFEDEBF1), Colors.grey, Icons.block),
+      TopicState.following => (Brand.purple, Colors.white, Icons.check_rounded),
+      TopicState.muted => (dark ? const Color(0xFF26232E) : const Color(0xFFEDEBF1), Colors.grey, Icons.block_rounded),
       TopicState.neutral => (Colors.transparent, dark ? Colors.white : Brand.black, Brand.categoryIcon(category)),
     };
     return Material(
@@ -119,14 +119,14 @@ class _FeedEditor extends StatelessWidget {
         );
     return ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(18, 0, 18, 32), children: [
       Text('Customize your feed', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-      h('Topics', 'Tap once to follow ✓, twice to mute ⦸, again to reset.'),
+      h('Topics', 'Tap once to follow, twice to mute, a third time to reset.'),
       const TopicPicker(),
       h('Places', 'News from these places is mixed into For You.'),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final p in app.followed)
           InputChip(label: Text(p.name), onDeleted: () => app.toggleFollow(p)),
         ActionChip(
-          avatar: const Icon(Icons.add, size: 18),
+          avatar: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Add place'),
           onPressed: () async {
             final p = await showPlacePicker(context);
@@ -135,7 +135,7 @@ class _FeedEditor extends StatelessWidget {
         ),
       ]),
       if (app.profile.hiddenSources.isNotEmpty) ...[
-        h('Hidden outlets', 'Tap ✕ to show an outlet again.'),
+        h('Hidden outlets', 'Remove an outlet from this list to see it again.'),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final d in app.profile.hiddenSources)
             InputChip(label: Text(d), onDeleted: () => app.toggleHiddenSource(d)),
@@ -153,7 +153,7 @@ class _FeedEditor extends StatelessWidget {
       Align(
         alignment: Alignment.centerLeft,
         child: OutlinedButton.icon(
-          icon: const Icon(Icons.restart_alt),
+          icon: const Icon(Icons.restart_alt_rounded),
           label: const Text('Reset learning'),
           onPressed: app.resetLearning,
         ),

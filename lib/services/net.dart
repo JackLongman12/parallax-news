@@ -105,7 +105,12 @@ class Net {
     return jsonDecode(text);
   }
 
-  static void clearCache() => _cache.clear();
+  /// Drop cached responses older than [age] (a refresh keeps very recent ones,
+  /// so repeated pulls are instant instead of re-downloading everything).
+  static void clearCache({Duration age = const Duration(seconds: 60)}) {
+    final now = DateTime.now();
+    _cache.removeWhere((_, e) => now.difference(e.at) > age);
+  }
 
   static final Map<String, bool> _dnsOk = {};
 

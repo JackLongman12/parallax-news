@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import '../data/geo.dart';
+import '../data/subtopics.dart';
 import '../models/article.dart';
 import '../models/bias.dart';
 import '../models/category.dart';
@@ -305,6 +306,38 @@ class NewsRepository {
 
   /// The daily briefing: everything the reader follows, merged, re-clustered
   /// across sources and ranked by the [Curator].
+  /// News about one company / asset, for its stock page.
+  Future<NewsBundle> stockNews(String symbol, String name, {bool force = false}) =>
+      _memo('stock:$symbol', force, () async {
+        final errors = <String>[];
+        final ed = editionFor(settings.homeCountry) ?? Edition.us;
+        final clean = name.replaceAll(RegExp(r'\b(Inc|Corp|Corporation|Ltd|PLC|Holdings|Class [A-C])\b\.?,?', caseSensitive: false), '').trim();
+        final q = '"$clean"';
+        final articles = await _run([
+          _gn(() => GoogleNews.search('$q stock when:7d', ed, hint: Category.finance), '$clean stock', hint: Category.finance),
+          _gn(() => GoogleNews.search('$q when:3d', ed, hint: Category.business), clean, hint: Category.business),
+          if (_useBing) () => BingNews.search('$clean stock'),
+        ], errors);
+        return _finish(articles, errors);
+      });
+
+  /// Focused feed for a subtopic or niche (general -> subtopic -> niche).
+  Future<NewsBundle> subtopic(SubPath sp, {bool force = false}) =>
+      _memo('sub:${sp.category.name}:${sp.leaf.label}', force, () async {
+        final errors = <String>[];
+        final ed = editionFor(settings.homeCountry) ?? Edition.us;
+        final q = sp.leaf.query;
+        final articles = await _run([
+          _gn(() => GoogleNews.search('$q when:4d', ed, hint: sp.category), q, hint: sp.category),
+          if (!ed.isEnglish) _gn(() => GoogleNews.search('$q when:4d', Edition.us, hint: sp.category), q, hint: sp.category),
+          if (_useBing) () => BingNews.search(q),
+        ], errors);
+        for (final a in articles) {
+          a.hintCategory ??= sp.category;
+        }
+        return _finish(articles, errors);
+      });
+
   /// Blindspot scan over a broad pool (not just your briefing): world, your
   /// country, politics / world / business news, plus everything you follow.
   Future<List<Story>> blindspotPool({
@@ -360,11 +393,22 @@ class NewsRepository {
 
     List<Story> ranked() => Curator.rank(_clusterAndLabel(collected), profile);
 
-    await Future.wait([
-      add(place(Place.world, force: force)),
-      for (final t in topics.take(3)) add(topic(t, force: force)),
-    ]);
-    yield ranked();
+    // Stage 1: yield as each of World + first 3 topics arrives (fastest first).
+    final stage1 = <Future<NewsBundle>>[
+      place(Place.world, force: force),
+      for (final t in topics.take(3)) topic(t, force: force),
+    ];
+    final arrivals = StreamController<void>();
+    var pending = stage1.length;
+    for (final f in stage1) {
+      add(f).whenComplete(() {
+        arrivals.add(null);
+        if (--pending == 0) arrivals.close();
+      });
+    }
+    await for (final _ in arrivals.stream) {
+      if (collected.isNotEmpty) yield ranked();
+    }
     for (final p in places) {
       await add(place(p, force: force));
       yield ranked();

@@ -49,7 +49,7 @@ class HomeWidgets {
       case 'briefing':
         return 0;
       case 'blindspot':
-        return 3;
+        return 4;
     }
     return null;
   }

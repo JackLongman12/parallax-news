@@ -163,7 +163,7 @@ class _SourceHealthState extends State<_SourceHealth> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Row(children: [
-              Icon(Icons.circle, size: 10, color: s.coolingDown ? Colors.orange : (s.requests == 0 ? Colors.grey : Colors.green)),
+              Icon(Icons.circle_rounded, size: 10, color: s.coolingDown ? Colors.orange : (s.requests == 0 ? Colors.grey : Colors.green)),
               const SizedBox(width: 8),
               SizedBox(width: 100, child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600))),
               Expanded(child: Text(s.status, style: Theme.of(context).textTheme.bodySmall)),

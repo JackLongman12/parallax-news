@@ -9,6 +9,7 @@ import '../../models/place.dart';
 import '../../models/source.dart';
 import '../../services/places.dart';
 import '../../state/app_state.dart';
+import '../nav.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'sources_screen.dart';
@@ -116,14 +117,14 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
           onSubmitted: _search,
           decoration: InputDecoration(
             hintText: 'City, town, suburb, village, state, country…',
-            prefixIcon: const Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: _busy
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
                 : (_ctrl.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear_rounded),
                         onPressed: () => setState(() {
                               _ctrl.clear();
                               _results = null;
@@ -139,12 +140,12 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
         child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(avatar: const Icon(Icons.my_location, size: 18), label: const Text('Near me'), onPressed: _busy ? null : _nearMe),
+            child: ActionChip(avatar: const Icon(Icons.my_location_rounded, size: 18), label: const Text('Near me'), onPressed: _busy ? null : _nearMe),
           ),
           for (final p in app.recentPlaces)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ActionChip(avatar: const Icon(Icons.history, size: 18), label: Text(p.name), onPressed: () => _pick(p)),
+              child: ActionChip(avatar: const Icon(Icons.history_rounded, size: 18), label: Text(p.name), onPressed: () => _pick(p)),
             ),
         ]),
       ),
@@ -175,10 +176,28 @@ Future<Place?> showPlacePicker(BuildContext context) => showModalBottomSheet<Pla
       ),
     );
 
-String flagEmoji(String? cc) {
-  if (cc == null || cc.length != 2) return '🌐';
-  final up = cc.toUpperCase();
-  return String.fromCharCodes(up.codeUnits.map((c) => 0x1F1E6 + c - 65));
+/// Clean country badge (ISO code in a rounded square) instead of emoji flags.
+class CountryBadge extends StatelessWidget {
+  const CountryBadge(this.code, {super.key, this.size = 30, this.inverted = false});
+  final String? code;
+  final double size;
+  final bool inverted;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = inverted ? Brand.purple : Colors.white;
+    final bg = inverted ? Colors.white : Brand.purple;
+    return Container(
+      width: size * 1.35,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(size * 0.28)),
+      child: code == null || code!.length != 2
+          ? Icon(Icons.public_rounded, color: fg, size: size * 0.62)
+          : Text(code!.toUpperCase(),
+              style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: size * 0.42, letterSpacing: 0.5)),
+    );
+  }
 }
 
 void openPlace(BuildContext context, Place p) {
@@ -190,13 +209,13 @@ class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
 
   static const _continentIcons = {
-    'AF': Icons.landscape,
-    'AS': Icons.temple_buddhist,
-    'EU': Icons.castle,
-    'NA': Icons.location_city,
-    'SA': Icons.forest,
-    'OC': Icons.waves,
-    'AN': Icons.ac_unit,
+    'AF': Icons.landscape_rounded,
+    'AS': Icons.temple_buddhist_rounded,
+    'EU': Icons.castle_rounded,
+    'NA': Icons.location_city_rounded,
+    'SA': Icons.forest_rounded,
+    'OC': Icons.waves_rounded,
+    'AN': Icons.ac_unit_rounded,
   };
 
   @override
@@ -209,7 +228,7 @@ class ExploreScreen extends StatelessWidget {
           child: Text(t, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
         );
 
-    return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+    return ReselectScroll(tab: 3, builder: (ctrl) => ListView(controller: ctrl, padding: const EdgeInsets.only(bottom: 24), children: [
       const PlaceSearchPanel(shrinkWrap: true),
       if (app.followed.isNotEmpty) ...[
         section('Your places'),
@@ -243,14 +262,14 @@ class ExploreScreen extends StatelessWidget {
           childAspectRatio: 2.3,
           children: [
             _Tile(
-              icon: Icons.public,
+              icon: Icons.public_rounded,
               title: 'World',
               subtitle: 'Global headlines',
               onTap: () => openPlace(context, Place.world),
             ),
             for (final c in continents)
               _Tile(
-                icon: _continentIcons[c.code] ?? Icons.travel_explore,
+                icon: _continentIcons[c.code] ?? Icons.travel_explore_rounded,
                 title: c.name,
                 subtitle: '${countries.where((x) => x.continent == c.code).length} countries',
                 onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CountryGridScreen(continent: c))),
@@ -263,7 +282,7 @@ class ExploreScreen extends StatelessWidget {
         child: Text('Place search © OpenStreetMap contributors. Places & local outlets from Wikidata (CC0).',
             style: TextStyle(fontSize: 11)),
       ),
-    ]);
+    ]));
   }
 }
 
@@ -310,8 +329,8 @@ class _PlaceCard extends StatelessWidget {
     final app = context.watch<AppState>();
     final followed = app.isFollowed(place);
     final leading = place.level == PlaceLevel.country
-        ? Text(flagEmoji(place.countryCode), style: TextStyle(fontSize: big ? 34 : 24))
-        : Icon(place.isLocalLevel ? Icons.holiday_village : Icons.map_outlined, color: Brand.purple, size: big ? 34 : 24);
+        ? CountryBadge(place.countryCode, size: big ? 34 : 26, inverted: big)
+        : Icon(place.isLocalLevel ? Icons.holiday_village_rounded : Icons.map_outlined, color: Brand.purple, size: big ? 34 : 24);
     return SizedBox(
       width: width,
       child: Material(
@@ -340,7 +359,7 @@ class _PlaceCard extends StatelessWidget {
               if (big)
                 IconButton(
                   tooltip: followed ? 'Unfollow' : 'Follow',
-                  icon: Icon(followed ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
+                  icon: Icon(followed ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, color: Colors.white),
                   onPressed: () => app.toggleFollow(place),
                 ),
             ]),
@@ -375,7 +394,7 @@ class _CountryGridScreenState extends State<CountryGridScreen> {
         title: Text(widget.continent.name),
         actions: [
           TextButton.icon(
-            icon: const Icon(Icons.newspaper),
+            icon: const Icon(Icons.newspaper_rounded),
             label: const Text('News'),
             onPressed: () => openPlace(context, widget.continent.place),
           ),
@@ -387,7 +406,7 @@ class _CountryGridScreenState extends State<CountryGridScreen> {
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Find a country',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search_rounded),
               filled: true,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
             ),
@@ -411,7 +430,7 @@ class _CountryGridScreenState extends State<CountryGridScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(6),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(flagEmoji(c.code), style: const TextStyle(fontSize: 30)),
+                      CountryBadge(c.code, size: 30),
                       const SizedBox(height: 4),
                       Text(c.name,
                           textAlign: TextAlign.center,
@@ -447,7 +466,7 @@ class PlaceTile extends StatelessWidget {
           ? null
           : IconButton(
               tooltip: f ? 'Unfollow' : 'Follow',
-              icon: Icon(f ? Icons.bookmark : Icons.bookmark_border),
+              icon: Icon(f ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
               onPressed: () => app.toggleFollow(place),
             ),
       onTap: onTap ?? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: place))),
@@ -457,9 +476,9 @@ class PlaceTile extends StatelessWidget {
   static IconData _icon(PlaceLevel l) {
     switch (l) {
       case PlaceLevel.world:
-        return Icons.public;
+        return Icons.public_rounded;
       case PlaceLevel.continent:
-        return Icons.travel_explore;
+        return Icons.travel_explore_rounded;
       case PlaceLevel.country:
         return Icons.flag_outlined;
       case PlaceLevel.region:
@@ -467,7 +486,7 @@ class PlaceTile extends StatelessWidget {
       case PlaceLevel.district:
         return Icons.layers_outlined;
       case PlaceLevel.city:
-        return Icons.location_city;
+        return Icons.location_city_rounded;
       case PlaceLevel.locality:
         return Icons.holiday_village_outlined;
     }
@@ -500,7 +519,7 @@ class PlaceScreen extends StatelessWidget {
           actions: [
             if (place.level != PlaceLevel.world)
               IconButton(
-                icon: Icon(f ? Icons.bookmark : Icons.bookmark_border),
+                icon: Icon(f ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
                 tooltip: f ? 'Unfollow' : 'Follow',
                 onPressed: () => app.toggleFollow(place),
               ),
@@ -588,7 +607,7 @@ class _ChildrenTabState extends State<_ChildrenTab> {
             Padding(
               padding: const EdgeInsets.all(8),
               child: TextField(
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list), hintText: 'Filter', isDense: true, border: OutlineInputBorder()),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list_rounded), hintText: 'Filter', isDense: true, border: OutlineInputBorder()),
                 onChanged: (v) => setState(() => _filter = v.toLowerCase()),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import '../data/subtopics.dart';
 import '../models/article.dart';
 import '../models/bias.dart';
 import '../models/category.dart';
@@ -49,8 +50,16 @@ class InterestProfile {
     _prune();
   }
 
+  final Map<Category, int> _sessionCats = {};
+
+  /// How many stories of [c] were scrolled past this session (fatigue).
+  int sessionSeen(Category c) => _sessionCats[c] ?? 0;
+
   void recordImpression(Story s) {
-    if (_seenThisSession.add(s.id)) _bump(s, -0.05);
+    if (_seenThisSession.add(s.id)) {
+      _sessionCats[s.category] = (_sessionCats[s.category] ?? 0) + 1;
+      _bump(s, -0.05);
+    }
   }
 
   void recordOpen(Story s) => _bump(s, 1.0);
@@ -182,23 +191,42 @@ class Curator {
       var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
       if (s.hasLocal) score += 1.0;
       if (s.imageUrl != null) score += 0.2;
+      // Session fatigue: topics you've already scrolled past a lot cool off.
+      score -= 0.25 * math.min(8, profile.sessionSeen(s.category));
+      // A little randomness so each refresh feels different.
+      score += (rng.nextDouble() - 0.5) * 0.6;
       if (profile.muted.contains(s.category) || profile.isHidden(s)) score -= 100;
       s.score = score;
     }
     final pool = stories.where((s) => s.score > -50).toList()..sort((a, b) => b.score.compareTo(a.score));
 
+    // Dynamic exploration: the narrower your interests look, the more often
+    // we slot in something new (every 2nd..7th story).
+    final every = exploreEvery(profile);
     final picked = <Story>[];
     final catCount = <Category, int>{};
+    final srcCount = <String, int>{};
+    Side? lastSkew;
     while (picked.length < limit && pool.isNotEmpty) {
       var bestI = 0;
       var bestScore = double.negativeInfinity;
-      // Every 6th slot is exploration: favour topics the reader hasn't shown
-      // interest in yet, so new interests can be discovered.
-      final explore = picked.length % 6 == 5;
+      final explore = picked.length % every == every - 1;
       for (var i = 0; i < pool.length && i < 80; i++) {
         final s = pool[i];
-        var adj = s.score * math.pow(0.75, catCount[s.category] ?? 0);
-        if (explore) adj = s.score * 0.3 + (1 - profile.affinity(s.category).clamp(0.0, 1.0)) * 3;
+        double adj;
+        if (explore) {
+          // Prefer topics with little interest so far, weighted by quality.
+          final novelty = 1 - profile.affinity(s.category).clamp(0.0, 1.0);
+          final unseen = catCount.containsKey(s.category) ? 0.0 : 1.5;
+          adj = s.score * 0.35 + novelty * 3 + unseen + rng.nextDouble();
+        } else {
+          adj = s.score *
+              math.pow(0.72, catCount[s.category] ?? 0) *
+              math.pow(0.85, srcCount[s.lead.domain] ?? 0);
+          // Avoid two one-sided stories from the same side in a row.
+          final skew = s.distribution.skewedTo;
+          if (skew != null && skew == lastSkew) adj *= 0.8;
+        }
         if (adj > bestScore) {
           bestScore = adj.toDouble();
           bestI = i;
@@ -207,8 +235,32 @@ class Curator {
       final s = pool.removeAt(bestI);
       picked.add(s);
       catCount[s.category] = (catCount[s.category] ?? 0) + 1;
+      srcCount[s.lead.domain] = (srcCount[s.lead.domain] ?? 0) + 1;
+      lastSkew = s.distribution.skewedTo;
     }
     return picked;
+  }
+
+  static final math.Random rng = math.Random();
+
+  /// How spread out the reader's interests are: 0 = one topic, 1 = even.
+  static double interestSpread(InterestProfile p) {
+    final pos = p.weights.values.where((w) => w > 0).toList();
+    if (pos.length < 2) return pos.isEmpty ? 1.0 : 0.0;
+    final sum = pos.fold<double>(0, (a, b) => a + b);
+    var h = 0.0;
+    for (final w in pos) {
+      final q = w / sum;
+      h -= q * math.log(q);
+    }
+    return (h / math.log(pos.length)).clamp(0.0, 1.0) * math.min(1.0, pos.length / 6);
+  }
+
+  /// Exploration slot frequency: every 2nd story for a narrow reader, up to
+  /// every 7th for someone who already reads widely. New users: every 4th.
+  static int exploreEvery(InterestProfile p) {
+    if (p.signals < 10) return 4;
+    return (2 + interestSpread(p) * 5).round().clamp(2, 7);
   }
 
   /// 1.0 = covered evenly by left, center and right; 0.0 = one side only.
@@ -216,5 +268,35 @@ class Curator {
     if (!d.isReliable) return 0.5;
     final maxShare = [Side.left, Side.center, Side.right].map(d.share).reduce(math.max);
     return (1 - (maxShare - 1 / 3) / (2 / 3)).clamp(0.0, 1.0);
+  }
+}
+
+/// Recommends subtopics / niches: some matched to the reader's interests,
+/// some deliberately outside them to break the bubble.
+class SubtopicSuggester {
+  static double _interest(InterestProfile p, SubPath sp) {
+    final kw = sp.leaf.keywords;
+    var s = 0.0;
+    for (final k in kw) {
+      s += p.keywords[k] ?? 0;
+    }
+    return s / (kw.isEmpty ? 1 : kw.length) * 2 + p.affinity(sp.category) * 1.5 + sp.chain.length * 0.1;
+  }
+
+  /// Best matches for the reader (only once there is something to go on).
+  static List<SubPath> forYou(InterestProfile p, {int n = 8}) {
+    final paths = allSubPaths().where((sp) => !p.muted.contains(sp.category)).toList();
+    final scored = [for (final sp in paths) (sp, _interest(p, sp))]..sort((a, b) => b.$2.compareTo(a.$2));
+    return scored.where((e) => e.$2 > 0.05).take(n).map((e) => e.$1).toList();
+  }
+
+  /// Subtopics from topics the reader rarely touches; reshuffled each call.
+  static List<SubPath> breakOut(InterestProfile p, {int n = 6}) {
+    final cold = allSubPaths()
+        .where((sp) => sp.chain.length == 1 && !p.muted.contains(sp.category) && p.affinity(sp.category) <= 0.15)
+        .toList()
+      ..shuffle(Curator.rng);
+    final seenCats = <Category>{};
+    return [for (final sp in cold) if (seenCats.add(sp.category)) sp].take(n).toList();
   }
 }

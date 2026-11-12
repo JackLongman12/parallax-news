@@ -13,6 +13,7 @@ import '../models/story.dart';
 import '../services/bias_service.dart';
 import '../services/country_detect.dart';
 import '../services/cover_images.dart';
+import '../services/markets.dart';
 import '../services/classifier.dart';
 import '../services/curator.dart';
 import '../services/repository.dart';
@@ -236,6 +237,7 @@ class AppState extends ChangeNotifier {
       for (final s in stories.take(40)) {...s.toJson(), 'cv': CoverImages.cached(s)}
     ];
     _prefs.setString('snapshot', jsonEncode(data));
+    notifyListeners(); // refreshes "Today in brief"
   }
 
   // ---- Home country: auto-detected from the network unless set manually ----
@@ -258,6 +260,19 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       unawaited(detectHomeCountry());
     }
+  }
+
+  // ---- Markets watchlist ----
+  List<String> get watchlist => _prefs.getStringList('watchlist') ?? Markets.defaultWatchlist;
+
+  bool watches(String symbol) => watchlist.contains(symbol);
+
+  void toggleWatch(String symbol) {
+    if (!Markets.isValidSymbol(symbol)) return;
+    final w = [...watchlist];
+    if (!w.remove(symbol)) w.add(symbol);
+    _prefs.setStringList('watchlist', w);
+    notifyListeners();
   }
 
   // ---- First-run setup ----

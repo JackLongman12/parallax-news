@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:parallax_news/data/subtopics.dart';
 import 'package:parallax_news/models/article.dart';
 import 'package:parallax_news/models/bias.dart';
 import 'package:parallax_news/models/category.dart';
@@ -19,6 +20,7 @@ import 'package:parallax_news/services/net.dart';
 import 'package:parallax_news/services/places.dart';
 import 'package:parallax_news/services/provider_health.dart';
 import 'package:parallax_news/services/summarizer.dart';
+import 'package:parallax_news/services/text.dart';
 
 Article art(String title, String domain, {Bias bias = Bias.unrated, Category? hint}) {
   final a = Article(
@@ -277,6 +279,38 @@ void main() {
       expect(qs.first, contains('Valencia'));
       expect(qs.last, Category.environment.label);
       expect(qs.toSet().length, qs.length);
+    });
+  });
+
+  group('Subtopics & diversity', () {
+    test('headlines map to general -> subtopic -> niche', () {
+      final m = matchingSubPaths(TextTokens.stemSet('Nvidia unveils new AI chips as export controls tighten'));
+      expect(m, isNotEmpty);
+      expect(m.first.category, Category.technology);
+      expect(m.map((p) => p.leaf.label), contains('AI chips'));
+    });
+
+    test('every subtopic and niche has a non-empty search query', () {
+      for (final sp in allSubPaths()) {
+        expect(sp.leaf.query.trim(), isNotEmpty, reason: sp.path);
+      }
+    });
+
+    test('narrow readers get exploration slots more often', () {
+      final narrow = InterestProfile();
+      final s = Story(id: 'n', category: Category.sports, articles: [art('Cup final tonight', 'x.com')]);
+      for (var i = 0; i < 20; i++) {
+        narrow.recordOpen(s);
+      }
+      final wide = InterestProfile();
+      for (final c in [Category.sports, Category.ai, Category.science, Category.politics, Category.health, Category.finance, Category.space]) {
+        final st = Story(id: c.name, category: c, articles: [art('Story about ${c.name}', 'x.com')]);
+        for (var i = 0; i < 3; i++) {
+          wide.recordOpen(st);
+        }
+      }
+      expect(Curator.exploreEvery(narrow), lessThan(Curator.exploreEvery(wide)));
+      expect(Curator.exploreEvery(InterestProfile()), 4); // new users
     });
   });
 

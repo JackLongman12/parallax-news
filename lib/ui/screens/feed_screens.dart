@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/subtopics.dart';
 import '../../models/category.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
@@ -11,6 +12,8 @@ import '../../models/place.dart';
 import '../../services/home_widgets.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
+import '../nav.dart';
+import '../widgets/daily_overview.dart';
 import '../widgets/markets_strip.dart';
 import 'explore_screens.dart';
 import 'feed_editor.dart';
@@ -51,6 +54,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
     if (place != null) {
       final p = place;
       return StoryList(
+        scrollToTop: TabReselect.tabs[0],
         key: ValueKey('fy-place:${p.id}'),
         header: header,
         loader: (force) async => Curator.rank((await app.repo.place(p, force: force)).stories, app.profile, limit: 80),
@@ -59,6 +63,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
     if (topic != null) {
       final c = topic;
       return StoryList(
+        scrollToTop: TabReselect.tabs[0],
         key: ValueKey('fy-topic:${c.name}'),
         header: header,
         loader: (force) async => Curator.rank((await app.repo.topic(c, force: force)).stories, app.profile, limit: 80),
@@ -68,6 +73,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
     final key = ValueKey('${app.followed.map((p) => p.id).join(',')}|${app.followedTopics.map((c) => c.name).join(',')}|${app.settings.homeCountry}');
     return StoryList(
       key: key,
+      scrollToTop: TabReselect.tabs[0],
       // Opens instantly with last session's feed, then streams fresh news in
       // stages (World + 3 topics first, then places, then other topics).
       initial: app.snapshot,
@@ -103,6 +109,8 @@ class _ForYouScreenState extends State<ForYouScreen> {
   }
 }
 
+/// Topics: a photo grid. Your topics first, then everything else.
+/// Tap a tile to read it; follow / mute from the topic page.
 class TopicsScreen extends StatefulWidget {
   const TopicsScreen({super.key});
 
@@ -111,58 +119,297 @@ class TopicsScreen extends StatefulWidget {
 }
 
 class _TopicsScreenState extends State<TopicsScreen> {
-  Category _selected = Category.technology;
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    TabReselect.tabs[1].addListener(_toTop);
+  }
+
+  void _toTop() {
+    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    TabReselect.tabs[1].removeListener(_toTop);
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final cats = Category.values.where((c) => c != Category.general && c != Category.local).toList();
-    final followed = app.followsTopic(_selected);
-    final muted = app.profile.muted.contains(_selected);
-    return Column(children: [
-      SizedBox(
-        height: 52,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          children: [
-            for (final c in cats)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(
-                  label: Text(c.label),
-                  selected: c == _selected,
-                  avatar: app.followsTopic(c) ? const Icon(Icons.star, size: 16) : null,
-                  onSelected: (_) => setState(() => _selected = c),
-                ),
-              ),
-          ],
+    final all = Category.values.where((c) => c != Category.general && c != Category.local).toList();
+    final mine = all.where(app.followsTopic).toList();
+    final rest = all.where((c) => !app.followsTopic(c)).toList();
+    Widget header(String t, [Widget? trailing]) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 8, 10),
+          child: Row(children: [
+            Expanded(child: Text(t, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
+            if (trailing != null) trailing,
+          ]),
+        );
+    SliverPadding grid(List<Category> cats) => SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.45),
+            delegate: SliverChildBuilderDelegate((_, i) => TopicTile(category: cats[i]), childCount: cats.length),
+          ),
+        );
+    final forYou = SubtopicSuggester.forYou(app.profile);
+    final breakOut = SubtopicSuggester.breakOut(app.profile);
+    return CustomScrollView(controller: _scroll, slivers: [
+      if (forYou.isNotEmpty) ...[
+        SliverToBoxAdapter(child: header('Picked for you')),
+        SliverToBoxAdapter(child: SubPathChips(paths: forYou)),
+      ],
+      SliverToBoxAdapter(child: header('Outside your bubble')),
+      SliverToBoxAdapter(child: SubPathChips(paths: breakOut, icon: Icons.explore_rounded)),
+      if (mine.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: header('Your topics',
+              TextButton.icon(icon: const Icon(Icons.tune_rounded, size: 18), label: const Text('Edit'), onPressed: () => showFeedEditor(context))),
         ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(children: [
-          FilledButton.tonalIcon(
-            icon: Icon(followed ? Icons.star : Icons.star_border),
-            label: Text(followed ? 'In your briefing' : 'Add to briefing'),
-            onPressed: () => app.toggleTopic(_selected),
+        grid(mine),
+      ],
+      SliverToBoxAdapter(child: header(mine.isEmpty ? 'Pick topics you like' : 'Discover more')),
+      grid(rest),
+      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+    ]);
+  }
+}
+
+/// Photo tile for a topic, with a follow badge.
+class TopicTile extends StatefulWidget {
+  const TopicTile({super.key, required this.category});
+  final Category category;
+
+  @override
+  State<TopicTile> createState() => _TopicTileState();
+}
+
+class _TopicTileState extends State<TopicTile> {
+  late final Future<String?> _img = CoverImages.topicImage(widget.category);
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final c = widget.category;
+    final following = app.followsTopic(c);
+    final muted = app.profile.muted.contains(c);
+    return Material(
+      color: Brand.purple,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),
+        onLongPress: () => app.toggleTopic(c),
+        child: Stack(fit: StackFit.expand, children: [
+          FutureBuilder<String?>(
+            future: _img,
+            builder: (context, snap) => snap.data == null
+                ? Align(
+                    alignment: Alignment.bottomRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(Brand.categoryIcon(c), size: 64, color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                  )
+                : Image.network(snap.data!, fit: BoxFit.cover, cacheWidth: 600, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
           ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            icon: Icon(muted ? Icons.volume_off : Icons.volume_up_outlined),
-            label: Text(muted ? 'Muted' : 'Mute'),
-            onPressed: () => app.toggleMute(_selected),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x22000000), Color(0xB0000000)],
+              ),
+            ),
           ),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 10,
+            child: Row(children: [
+              Icon(Brand.categoryIcon(c), color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(c.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        decoration: muted ? TextDecoration.lineThrough : null)),
+              ),
+            ]),
+          ),
+          if (following)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, size: 14, color: Brand.purple),
+              ),
+            ),
         ]),
       ),
-      if (_selected == Category.business || _selected == Category.finance) const MarketsStrip(),
-      Expanded(
-        child: StoryList(
-          key: ValueKey('topic:${_selected.name}'),
-          loader: (force) async => (await app.repo.topic(_selected, force: force)).stories,
-        ),
+    );
+  }
+}
+
+class TopicPage extends StatefulWidget {
+  const TopicPage({super.key, required this.category, this.initial});
+  final Category category;
+
+  /// Open directly on a subtopic or niche.
+  final SubPath? initial;
+
+  @override
+  State<TopicPage> createState() => _TopicPageState();
+}
+
+class _TopicPageState extends State<TopicPage> {
+  Sub? _sub;
+  Sub? _niche;
+
+  Category get category => widget.category;
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initial;
+    if (init != null) {
+      _sub = init.chain.first;
+      _niche = init.chain.length > 1 ? init.chain[1] : null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final following = app.followsTopic(category);
+    final muted = app.profile.muted.contains(category);
+    final subs = subtopics[category] ?? const <Sub>[];
+    final chain = [if (_sub != null) _sub!, if (_niche != null) _niche!];
+    final path = chain.isEmpty ? null : SubPath(category, chain);
+
+    Widget chips(List<Sub> items, Sub? selected, void Function(Sub?) onPick, {bool small = false}) => SizedBox(
+          height: small ? 40 : 46,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            children: [
+              for (final s in items)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(s.label, style: TextStyle(fontSize: small ? 12 : 13, fontWeight: FontWeight.w700)),
+                    selected: selected == s,
+                    showCheckmark: false,
+                    selectedColor: Brand.purple,
+                    labelStyle: TextStyle(color: selected == s ? Colors.white : null),
+                    onSelected: (v) => onPick(v ? s : null),
+                  ),
+                ),
+            ],
+          ),
+        );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(path == null ? category.label : path.leaf.label, style: const TextStyle(fontWeight: FontWeight.w900)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: following
+                ? OutlinedButton.icon(
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Following'),
+                    onPressed: () => app.toggleTopic(category),
+                  )
+                : FilledButton.icon(
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Follow'),
+                    onPressed: () => app.toggleTopic(category),
+                  ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz_rounded),
+            onSelected: (_) => app.toggleMute(category),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'mute', child: Text(muted ? 'Unmute ${category.label}' : 'Mute ${category.label}')),
+            ],
+          ),
+        ],
       ),
-    ]);
+      body: Column(children: [
+        if (subs.isNotEmpty)
+          chips(subs, _sub, (s) => setState(() {
+                _sub = s;
+                _niche = null;
+              })),
+        if (_sub != null && _sub!.niches.isNotEmpty)
+          chips(_sub!.niches, _niche, (n) => setState(() => _niche = n), small: true),
+        if (path != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(path.path, style: Theme.of(context).textTheme.bodySmall),
+            ),
+          ),
+        if (path == null && (category == Category.business || category == Category.finance)) const MarketsStrip(),
+        Expanded(
+          child: StoryList(
+            key: ValueKey('tp:${category.name}:${path?.leaf.label ?? ''}'),
+            loader: (force) async {
+              final bundle = path == null
+                  ? await app.repo.topic(category, force: force)
+                  : await app.repo.subtopic(path, force: force);
+              return Curator.rank(bundle.stories, app.profile, limit: 80);
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Chips for a list of subtopic paths; tap opens the topic page on it.
+class SubPathChips extends StatelessWidget {
+  const SubPathChips({super.key, required this.paths, this.icon});
+  final List<SubPath> paths;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    if (paths.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 46,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final sp in paths)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                avatar: Icon(icon ?? Brand.categoryIcon(sp.category), size: 16),
+                label: Text(sp.chain.map((s) => s.label).join(' > '), style: const TextStyle(fontWeight: FontWeight.w700)),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => TopicPage(category: sp.category, initial: sp))),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -173,6 +420,7 @@ class BlindspotScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     return StoryList(
+      scrollToTop: TabReselect.tabs[4],
       key: ValueKey('blind:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
       loader: (force) => app.repo.blindspotPool(places: app.followed, topics: app.followedTopics, force: force),
       emptyMessage: 'No one-sided stories right now. More outlets get rated as you browse, '
@@ -212,12 +460,17 @@ class BriefingHeader extends StatelessWidget {
     }
 
     final items = <(String, Widget, String?, VoidCallback, VoidCallback?)>[
-      ('Add place', _bubble(Icons.add, light: true), '+', add, null),
+      ('Add place', const _RingPhoto(icon: Icons.add_rounded, light: true), '+', add, null),
       for (final p in [Place.world, ...app.followed])
         (
           p.name,
-          _bubble(p.level == PlaceLevel.world ? Icons.public : (p.isLocalLevel ? Icons.holiday_village : Icons.flag),
-              image: photo('place:${p.id}')),
+          _RingPhoto(
+            icon: p.level == PlaceLevel.world ? Icons.public_rounded : (p.isLocalLevel ? Icons.holiday_village_rounded : Icons.flag_rounded),
+            image: photo('place:${p.id}'),
+            fetch: () => p.level == PlaceLevel.world
+                ? CoverImages.topicImage(Category.world)
+                : CoverImages.placeImage(p.name, p.id),
+          ),
           'p:${p.id}',
           () => toggle('p:${p.id}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PlaceScreen(place: p))),
@@ -225,7 +478,7 @@ class BriefingHeader extends StatelessWidget {
       for (final c in app.followedTopics)
         (
           c.label,
-          _bubble(Brand.categoryIcon(c), image: photo('topic:${c.name}')),
+          _RingPhoto(icon: Brand.categoryIcon(c), image: photo('topic:${c.name}'), fetch: () => CoverImages.topicImage(c)),
           't:${c.name}',
           () => toggle('t:${c.name}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),
@@ -276,38 +529,52 @@ class BriefingHeader extends StatelessWidget {
           if (selected != null) TextButton(onPressed: () => select(null), child: const Text('Show all')),
           IconButton(
             tooltip: 'Customize feed',
-            icon: const Icon(Icons.tune),
+            icon: const Icon(Icons.tune_rounded),
             onPressed: () => showFeedEditor(context),
           ),
         ]),
       ),
-    ]);
-  }
-
-  /// Ring content: a photo from the latest story when we have one.
-  static Widget _bubble(IconData icon, {bool light = false, String? image}) {
-    final fallback = ColoredBox(
-      color: light ? Brand.purple : Brand.black,
-      child: Center(child: Icon(icon, color: Colors.white, size: 26)),
-    );
-    if (image == null) return fallback;
-    return Stack(fit: StackFit.expand, children: [
-      fallback,
-      Image.network(image, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+      if (selected == null) const DailyOverview(),
     ]);
   }
 }
 
-class TopicPage extends StatelessWidget {
-  const TopicPage({super.key, required this.category});
-  final Category category;
+/// Ring content: the latest story's photo, else a photo of the place/topic.
+class _RingPhoto extends StatefulWidget {
+  const _RingPhoto({required this.icon, this.image, this.fetch, this.light = false});
+  final IconData icon;
+  final String? image;
+  final Future<String?> Function()? fetch;
+  final bool light;
+
+  @override
+  State<_RingPhoto> createState() => _RingPhotoState();
+}
+
+class _RingPhotoState extends State<_RingPhoto> {
+  Future<String?>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.image == null && widget.fetch != null) _future = widget.fetch!();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final app = context.read<AppState>();
-    return Scaffold(
-      appBar: AppBar(title: Text(category.label)),
-      body: StoryList(loader: (force) async => (await app.repo.topic(category, force: force)).stories),
+    final fallback = ColoredBox(
+      color: widget.light ? Brand.purple : Brand.black,
+      child: Center(child: Icon(widget.icon, color: Colors.white, size: 26)),
+    );
+    Widget photo(String url) => Stack(fit: StackFit.expand, children: [
+          fallback,
+          Image.network(url, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+        ]);
+    if (widget.image != null) return photo(widget.image!);
+    if (_future == null) return fallback;
+    return FutureBuilder<String?>(
+      future: _future,
+      builder: (_, snap) => snap.data == null ? fallback : photo(snap.data!),
     );
   }
 }

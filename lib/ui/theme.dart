@@ -16,45 +16,55 @@ class Brand {
   static IconData categoryIcon(Category c) {
     switch (c) {
       case Category.general:
-        return Icons.bolt;
+        return Icons.bolt_rounded;
       case Category.politics:
-        return Icons.account_balance;
+        return Icons.account_balance_rounded;
       case Category.world:
-        return Icons.public;
+        return Icons.public_rounded;
       case Category.business:
-        return Icons.business_center;
+        return Icons.business_center_rounded;
       case Category.technology:
-        return Icons.memory;
+        return Icons.memory_rounded;
       case Category.ai:
-        return Icons.auto_awesome;
+        return Icons.auto_awesome_rounded;
       case Category.science:
-        return Icons.science;
+        return Icons.science_rounded;
       case Category.space:
-        return Icons.rocket_launch;
+        return Icons.rocket_launch_rounded;
       case Category.health:
-        return Icons.favorite;
+        return Icons.favorite_rounded;
       case Category.sports:
-        return Icons.sports_soccer;
+        return Icons.sports_soccer_rounded;
       case Category.entertainment:
-        return Icons.movie;
+        return Icons.movie_rounded;
       case Category.gaming:
-        return Icons.sports_esports;
+        return Icons.sports_esports_rounded;
       case Category.environment:
-        return Icons.eco;
+        return Icons.eco_rounded;
       case Category.crime:
-        return Icons.gavel;
+        return Icons.gavel_rounded;
       case Category.education:
-        return Icons.school;
+        return Icons.school_rounded;
       case Category.finance:
-        return Icons.trending_up;
+        return Icons.trending_up_rounded;
       case Category.autos:
-        return Icons.directions_car;
+        return Icons.directions_car_rounded;
       case Category.travel:
-        return Icons.flight;
+        return Icons.flight_rounded;
       case Category.lifestyle:
-        return Icons.spa;
+        return Icons.spa_rounded;
       case Category.local:
-        return Icons.holiday_village;
+        return Icons.holiday_village_rounded;
+      case Category.energy:
+        return Icons.electric_bolt_rounded;
+      case Category.realEstate:
+        return Icons.home_work_rounded;
+      case Category.defense:
+        return Icons.shield_rounded;
+      case Category.labor:
+        return Icons.work_rounded;
+      case Category.weather:
+        return Icons.cloud_rounded;
     }
   }
 

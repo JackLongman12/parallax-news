@@ -213,7 +213,7 @@ class _StoryCardState extends State<StoryCard> {
             },
           ),
           ListTile(
-            leading: Icon(app.followsTopic(story.category) ? Icons.star : Icons.star_border),
+            leading: Icon(app.followsTopic(story.category) ? Icons.star_rounded : Icons.star_border_rounded),
             title: Text(app.followsTopic(story.category)
                 ? 'Unfollow ${story.category.label}'
                 : 'Follow ${story.category.label}'),
@@ -232,7 +232,7 @@ class _StoryCardState extends State<StoryCard> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.block),
+            leading: const Icon(Icons.block_rounded),
             title: Text('Hide ${story.lead.sourceName}'),
             onTap: () {
               app.toggleHiddenSource(story.lead.domain);
@@ -241,7 +241,7 @@ class _StoryCardState extends State<StoryCard> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.ios_share),
+            leading: const Icon(Icons.ios_share_rounded),
             title: const Text('Share'),
             onTap: () {
               Navigator.pop(ctx);
@@ -306,9 +306,9 @@ class _StoryCardState extends State<StoryCard> {
               top: 14,
               child: Row(children: [
                 _Pill(icon: Brand.categoryIcon(story.category), text: story.category.label),
-                if (_isBreaking(story)) const _Pill(icon: Icons.flash_on, text: 'Breaking')
-                else if (_isTrending(story)) const _Pill(icon: Icons.local_fire_department, text: 'Trending'),
-                if (story.hasLocal) const _Pill(icon: Icons.place, text: 'Local'),
+                if (_isBreaking(story)) const _Pill(icon: Icons.flash_on_rounded, text: 'Breaking')
+                else if (_isTrending(story)) const _Pill(icon: Icons.local_fire_department_rounded, text: 'Trending'),
+                if (story.hasLocal) const _Pill(icon: Icons.place_rounded, text: 'Local'),
                 const Spacer(),
                 Text(timeAgo(story.latest),
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -356,7 +356,7 @@ class _StoryCardState extends State<StoryCard> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(children: [
-                      const Icon(Icons.visibility_off, size: 15, color: Brand.red),
+                      const Icon(Icons.visibility_off_rounded, size: 15, color: Brand.red),
                       const SizedBox(width: 6),
                       Text('Blindspot · barely covered by the ${blind.label.toLowerCase()}',
                           style: const TextStyle(color: Brand.red, fontSize: 12, fontWeight: FontWeight.w700)),
@@ -366,7 +366,7 @@ class _StoryCardState extends State<StoryCard> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(children: [
-                      Icon(Icons.balance, size: 15, color: dist.skewedTo!.color),
+                      Icon(Icons.balance_rounded, size: 15, color: dist.skewedTo!.color),
                       const SizedBox(width: 6),
                       Text('Mostly ${dist.skewedTo!.label.toLowerCase()}-leaning coverage',
                           style: TextStyle(color: dist.skewedTo!.color, fontSize: 12, fontWeight: FontWeight.w700)),
@@ -391,13 +391,13 @@ class _StoryCardState extends State<StoryCard> {
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Share',
-                    icon: const Icon(Icons.ios_share, size: 20),
+                    icon: const Icon(Icons.ios_share_rounded, size: 20),
                     onPressed: _share,
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'More options',
-                    icon: const Icon(Icons.more_vert, size: 20),
+                    icon: const Icon(Icons.more_horiz_rounded, size: 20),
                     onPressed: _menu,
                   ),
                 ]),

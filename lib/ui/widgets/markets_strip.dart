@@ -53,8 +53,12 @@ class _MarketsStripState extends State<MarketsStrip> {
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
                   Text(q[i].label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                  Text('${_fmt(q[i].price)}  ${up ? '▲' : '▼'}${q[i].changePct.abs().toStringAsFixed(2)}%',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_fmt(q[i].price), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                    Icon(up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded, color: color, size: 20),
+                    Text('${q[i].changePct.abs().toStringAsFixed(2)}%',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+                  ]),
                 ]),
               );
             },

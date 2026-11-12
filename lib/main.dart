@@ -10,8 +10,10 @@ import 'state/app_state.dart';
 import 'ui/screens/explore_screens.dart';
 import 'ui/screens/feed_editor.dart';
 import 'ui/screens/feed_screens.dart';
+import 'ui/screens/markets_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
+import 'ui/nav.dart';
 import 'ui/theme.dart';
 import 'ui/update_flow.dart';
 
@@ -71,7 +73,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _tab = widget.initialTab;
   late final _built = <int>{widget.initialTab};
 
-  static const _titles = ['For You', 'Topics', 'Explore', 'Blindspot', 'Sources'];
+  static const _titles = ['For You', 'Topics', 'Markets', 'Explore', 'Blindspot', 'Sources'];
 
   @override
   void initState() {
@@ -133,8 +135,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       case 1:
         return const TopicsScreen();
       case 2:
-        return const ExploreScreen();
+        return const MarketsScreen();
       case 3:
+        return const ExploreScreen();
+      case 4:
         return const BlindspotScreen();
       default:
         return const SourcesScreen();
@@ -148,7 +152,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         title: _tab == 0 ? const Wordmark() : Text(_titles[_tab], style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            icon: const Icon(Icons.tune_rounded),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
           ),
         ],
@@ -156,20 +161,30 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       // Tabs are built lazily on first visit, then kept alive.
       body: IndexedStack(
         index: _tab,
-        children: [for (var i = 0; i < 5; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+        children: [for (var i = 0; i < 6; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() {
-          _tab = i;
-          _built.add(i);
-        }),
+        height: 66,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        onDestinationSelected: (i) {
+          // Tapping the tab you're already on scrolls it back to the top.
+          if (i == _tab) {
+            TabReselect.fire(i);
+            return;
+          }
+          setState(() {
+            _tab = i;
+            _built.add(i);
+          });
+        },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome), label: 'For You'),
-          NavigationDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: 'Topics'),
-          NavigationDestination(icon: Icon(Icons.public_outlined), selectedIcon: Icon(Icons.public), label: 'Explore'),
-          NavigationDestination(icon: Icon(Icons.visibility_off_outlined), selectedIcon: Icon(Icons.visibility_off), label: 'Blindspot'),
-          NavigationDestination(icon: Icon(Icons.newspaper_outlined), selectedIcon: Icon(Icons.newspaper), label: 'Sources'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'For You'),
+          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view_rounded), label: 'Topics'),
+          NavigationDestination(icon: Icon(Icons.show_chart_rounded), selectedIcon: Icon(Icons.insights_rounded), label: 'Markets'),
+          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore_rounded), label: 'Explore'),
+          NavigationDestination(icon: Icon(Icons.visibility_off_outlined), selectedIcon: Icon(Icons.visibility_off_rounded), label: 'Blindspot'),
+          NavigationDestination(icon: Icon(Icons.newspaper_outlined), selectedIcon: Icon(Icons.newspaper_rounded), label: 'Sources'),
         ],
       ),
     );

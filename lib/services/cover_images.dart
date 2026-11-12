@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/category.dart';
 import '../models/story.dart';
 import 'feed_parser.dart';
 import 'net.dart';
@@ -146,8 +147,11 @@ class CoverImages {
     for (final t in thumbs) {
       if (_claim(t, id)) return t;
     }
-    // 5. A relevant photo by keywords from Wikimedia Commons (not used elsewhere).
-    return commonsImage(s);
+    // 5. A relevant photo by the story's key words from Wikimedia Commons.
+    final kw = await commonsImage(s);
+    if (kw != null) return kw;
+    // 6. Last resort: a fitting photo for the topic (never the same twice).
+    return topicImage(s.category, claimFor: id);
   }
 
   static final _caps = RegExp(r"\b[A-Z][a-zA-Z'’-]{2,}(?:\s+[A-Z][a-zA-Z'’-]{2,})*");
@@ -188,30 +192,110 @@ class CoverImages {
     return [for (final q in qs) if (q.trim().isNotEmpty && seen.add(q.toLowerCase())) q];
   }
 
-  static Future<String?> commonsImage(Story s) async {
-    for (final q in imageQueries(s).take(4)) {
-      try {
-        final url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
-            '&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1200'
-            '&gsrsearch=${Uri.encodeQueryComponent('filetype:bitmap $q')}';
-        final json = await Net.getJson(url).timeout(const Duration(seconds: 8));
-        final query = json is Map ? json['query'] : null;
-        final pages = query is Map ? query['pages'] : null;
-        if (pages is! Map) continue;
-        // Keep search-relevance order.
-        final ordered = pages.values.whereType<Map>().toList()
-          ..sort((a, b) => ((a['index'] as num?) ?? 999).compareTo((b['index'] as num?) ?? 999));
-        for (final p in ordered) {
-          final info = (p['imageinfo'] as List?)?.firstOrNull;
-          if (info is! Map) continue;
-          if ((info['width'] as num? ?? 0) < 800 || !'${info['mime']}'.startsWith('image/')) continue;
-          final thumb = Uri.tryParse('${info['thumburl'] ?? info['url']}');
-          if (thumb == null || thumb.scheme != 'https' || thumb.host != 'upload.wikimedia.org') continue;
-          if (_claim(thumb.toString(), s.id)) return thumb.toString();
+  /// Photo concepts per topic, used when a story has no specific image.
+  static const Map<Category, List<String>> concepts = {
+    Category.general: ['news studio', 'printing press newspaper', 'city skyline night'],
+    Category.politics: ['parliament chamber', 'ballot box election', 'capitol building'],
+    Category.world: ['united nations general assembly', 'globe world map', 'flags of the world'],
+    Category.business: ['business district skyscrapers', 'container port cargo', 'office meeting'],
+    Category.technology: ['circuit board', 'data center servers', 'smartphone'],
+    Category.ai: ['humanoid robot', 'artificial intelligence', 'neural network visualization'],
+    Category.science: ['laboratory scientist', 'microscope', 'particle accelerator'],
+    Category.space: ['rocket launch', 'galaxy', 'international space station'],
+    Category.health: ['hospital doctor', 'stethoscope', 'medical laboratory'],
+    Category.sports: ['football stadium', 'athletics race track', 'basketball game'],
+    Category.entertainment: ['cinema theatre', 'concert stage lights', 'film camera'],
+    Category.gaming: ['video game controller', 'esports tournament', 'arcade'],
+    Category.environment: ['wind turbines', 'forest landscape', 'flood'],
+    Category.crime: ['courtroom', 'police car', 'scales of justice'],
+    Category.education: ['university library', 'classroom', 'graduation ceremony'],
+    Category.finance: ['stock exchange trading floor', 'stock market chart', 'banknotes'],
+    Category.autos: ['electric car charging', 'car assembly line', 'highway traffic'],
+    Category.travel: ['airport airplane', 'restaurant food', 'tourist landmark'],
+    Category.lifestyle: ['fashion runway', 'yoga', 'home interior'],
+    Category.local: ['town hall', 'main street town', 'community park'],
+    Category.energy: ['oil refinery', 'solar panels', 'power plant'],
+    Category.realEstate: ['residential houses neighborhood', 'apartment building', 'construction crane'],
+    Category.defense: ['military parade', 'fighter jet', 'warship'],
+    Category.labor: ['factory workers', 'labor union rally', 'office workers'],
+    Category.weather: ['storm clouds', 'snowstorm', 'lightning'],
+  };
+
+  static final Map<String, String?> _keyed = {};
+
+  /// One Commons search; returns the first unused image whose file title
+  /// passes [accept] (used to make sure the photo is actually relevant).
+  static Future<String?> _commons(String q, String claimId, {bool Function(String title)? accept}) async {
+    try {
+      final url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
+          '&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1200'
+          '&gsrsearch=${Uri.encodeQueryComponent('filetype:bitmap $q')}';
+      final json = await Net.getJson(url).timeout(const Duration(seconds: 8));
+      final query = json is Map ? json['query'] : null;
+      final pages = query is Map ? query['pages'] : null;
+      if (pages is! Map) return null;
+      final ordered = pages.values.whereType<Map>().toList()
+        ..sort((a, b) => ((a['index'] as num?) ?? 999).compareTo((b['index'] as num?) ?? 999));
+      for (final p in ordered) {
+        final title = '${p['title'] ?? ''}'.toLowerCase();
+        if (accept != null && !accept(title)) continue;
+        if (RegExp(r'(map|logo|flag|coat of arms|diagram|chart|seal|signature|icon)', caseSensitive: false).hasMatch(title) &&
+            !q.contains('map') && !q.contains('chart') && !q.contains('flag')) {
+          continue; // avoid maps/logos/diagrams unless asked for
         }
-      } catch (_) {}
+        final info = (p['imageinfo'] as List?)?.firstOrNull;
+        if (info is! Map) continue;
+        if ((info['width'] as num? ?? 0) < 800 || !'${info['mime']}'.startsWith('image/')) continue;
+        final thumb = Uri.tryParse('${info['thumburl'] ?? info['url']}');
+        if (thumb == null || thumb.scheme != 'https' || thumb.host != 'upload.wikimedia.org') continue;
+        if (_claim(thumb.toString(), claimId)) return thumb.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// A relevant photo by the story's own keywords: the file title must
+  /// contain at least one of the story's key words, so no random matches.
+  static Future<String?> commonsImage(Story s) async {
+    final keys = {
+      ..._properNouns(s.title).expand((p) => p.toLowerCase().split(RegExp(r'\s+'))),
+      ...TextTokens.tokens(s.title).where((w) => w.length >= 5),
+    }.where((w) => w.length >= 4).toSet();
+    bool relevant(String title) => keys.any(title.contains);
+    for (final q in imageQueries(s).where((q) => q != s.category.label).take(3)) {
+      final img = await _commons(q, s.id, accept: relevant);
+      if (img != null) return img;
     }
     return null;
+  }
+
+  /// A good photo for a topic (Topics grid, rings, and story fallback).
+  static Future<String?> topicImage(Category c, {String? claimFor}) async {
+    final key = 'topic:${c.name}:${claimFor ?? ''}';
+    if (_keyed.containsKey(key)) return _keyed[key];
+    if (!enabled) return null;
+    String? found;
+    for (final q in concepts[c] ?? const <String>[]) {
+      found = await _commons(q, claimFor ?? key);
+      if (found != null) break;
+    }
+    _keyed[key] = found;
+    return found;
+  }
+
+  /// A photo of a place (rings / cards), e.g. its skyline or landmark.
+  static Future<String?> placeImage(String name, String id) async {
+    final key = 'place:$id';
+    if (_keyed.containsKey(key)) return _keyed[key];
+    if (!enabled) return null;
+    final n = name.toLowerCase();
+    String? found;
+    for (final q in ['$name skyline', '$name city', name]) {
+      found = await _commons(q, key, accept: (t) => t.contains(n.split(' ').first));
+      if (found != null) break;
+    }
+    _keyed[key] = found;
+    return found;
   }
 
   static final _meta = RegExp(r'<meta\s[^>]*>', caseSensitive: false);

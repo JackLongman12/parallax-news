@@ -42,6 +42,11 @@ class TopicClassifier {
     Category.autos: ['car ', 'cars', 'tesla', 'electric vehicle', ' ev ', 'automaker', 'toyota', 'ford', 'volkswagen', 'byd', 'recall', 'motor'],
     Category.travel: ['travel', 'airline', 'flight', 'airport', 'tourism', 'tourist', 'hotel', 'restaurant', 'recipe', 'food', 'chef', 'cruise'],
     Category.lifestyle: ['fashion', 'wellness', 'relationship', 'parenting', 'home decor', 'beauty', 'fitness', 'diet'],
+    Category.energy: ['oil price', 'opec', 'natural gas', 'crude', 'refinery', 'pipeline', 'solar power', 'nuclear plant', 'power grid', 'electricity', 'lng'],
+    Category.realEstate: ['housing market', 'mortgage', 'home prices', 'real estate', 'rent', 'landlord', 'property market', 'homebuyers'],
+    Category.defense: ['military', 'army', 'navy', 'air force', 'pentagon', 'defense ministry', 'troops', 'drone strike', 'fighter jet', 'warship'],
+    Category.labor: ['jobs report', 'unemployment', 'layoffs', 'union', 'strike', 'wages', 'workers', 'hiring', 'payrolls'],
+    Category.weather: ['forecast', 'storm', 'hurricane', 'typhoon', 'heatwave', 'snow', 'tornado', 'rainfall', 'weather'],
     Category.local: ['council', 'city hall', 'county', 'township', 'neighborhood', 'neighbourhood', 'local residents', 'road closure', 'school board', 'community'],
   };
 
