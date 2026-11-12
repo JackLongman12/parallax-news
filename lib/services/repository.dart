@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 
 import '../data/geo.dart';
@@ -142,18 +145,41 @@ class NewsRepository {
   Future<NewsBundle> topic(Category c, {bool force = false}) =>
       _memo('topic:${c.name}', force, () => _loadTopic(c));
 
+  /// Persistent store for slow lookups (set by AppState).
+  SharedPreferences? store;
+  final Map<String, Future<List<SourceInfo>>> _outletInflight = {};
+
+  /// Local outlets for a place. Wikidata is slow, so results are kept on the
+  /// phone for 7 days and repeat visits never wait for it.
   Future<List<SourceInfo>> outletsFor(Place p) async {
     final key = p.id;
     final hit = _outletCache[key];
     if (hit != null) return hit;
     try {
-      final list = await PlaceService.outletsIn(p).timeout(const Duration(seconds: 10));
-      bias.addDiscovered(list);
-      _outletCache[key] = list;
-      return list;
-    } catch (_) {
-      return const [];
-    }
+      final raw = store?.getString('outlets:$key');
+      if (raw != null) {
+        final j = jsonDecode(raw) as Map<String, dynamic>;
+        final at = DateTime.tryParse(j['at'] as String? ?? '');
+        if (at != null && DateTime.now().difference(at) < const Duration(days: 7)) {
+          final list = (j['o'] as List).whereType<Map<String, dynamic>>().map(SourceInfo.fromJson).toList();
+          bias.addDiscovered(list);
+          return _outletCache[key] = list;
+        }
+      }
+    } catch (_) {}
+    return _outletInflight[key] ??= () async {
+      try {
+        final list = await PlaceService.outletsIn(p).timeout(const Duration(seconds: 15));
+        bias.addDiscovered(list);
+        _outletCache[key] = list;
+        store?.setString('outlets:$key', jsonEncode({'at': DateTime.now().toIso8601String(), 'o': list.map((s) => s.toJson()).toList()}));
+        return list;
+      } catch (_) {
+        return const <SourceInfo>[];
+      } finally {
+        _outletInflight.remove(key);
+      }
+    }();
   }
 
   Edition _edition(Place p) =>
@@ -202,7 +228,7 @@ class NewsRepository {
     // Local outlet discovery: real community papers, radio and TV stations.
     var outlets = <SourceInfo>[];
     if (settings.discoverLocal && p.level.index >= PlaceLevel.country.index) {
-      outlets = await outletsFor(p);
+      outlets = await outletsFor(p).timeout(const Duration(milliseconds: 1500), onTimeout: () => const <SourceInfo>[]);
       final maxOutlets = p.level == PlaceLevel.country
           ? 6
           : (settings.lite ? (settings.maxLocalOutlets ~/ 2) : settings.maxLocalOutlets);

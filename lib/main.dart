@@ -88,6 +88,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     if (widget.pageOverride != null) return;
     _listenToWidgets();
+    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<AppState>().touch());
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeCheckUpdate());
   }
@@ -164,10 +165,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ),
         ],
       ),
-      // Tabs are built lazily on first visit, then kept alive.
-      body: IndexedStack(
+      // Tabs are built lazily on first visit, then kept alive. Touches reset
+      // the idle timer that drives background preloading.
+      body: Listener(
+        onPointerDown: (_) => context.read<AppState>().touch(),
+        child: IndexedStack(
         index: _tab,
         children: [for (var i = 0; i < 5; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+      ),
       ),
       // Thumb-reach shortcuts above the bottom bar.
       floatingActionButton: _tab == 3

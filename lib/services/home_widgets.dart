@@ -29,14 +29,7 @@ class HomeWidgets {
       final mm = now.minute.toString().padLeft(2, '0');
       await HomeWidget.saveWidgetData<String>('briefing', jsonEncode(briefing.take(4).map(_item).toList()));
       await HomeWidget.saveWidgetData<String>('updated', 'Updated $hh:$mm');
-      final blind = briefing.where((s) => s.distribution.blindspotFor != null).toList();
-      if (blind.isNotEmpty) {
-        final b = blind.first;
-        await HomeWidget.saveWidgetData<String>(
-            'blindspot', jsonEncode({..._item(b), 'side': b.distribution.blindspotFor!.label.toLowerCase()}));
-      }
       await HomeWidget.updateWidget(qualifiedAndroidName: '$_pkg.BriefingWidgetProvider');
-      await HomeWidget.updateWidget(qualifiedAndroidName: '$_pkg.BlindspotWidgetProvider');
     } catch (_) {
       // Widgets are optional; never break the feed over them.
     }

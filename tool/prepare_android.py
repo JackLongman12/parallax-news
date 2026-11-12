@@ -131,7 +131,6 @@ def add_widgets(text: str) -> str:
             shutil.copy(f, dest)
     for cls, label, info in [
         ("BriefingWidgetProvider", "widget_briefing_label", "briefing_widget_info"),
-        ("BlindspotWidgetProvider", "widget_blindspot_label", "blindspot_widget_info"),
     ]:
         if cls not in text:
             text = text.replace("</application>", WIDGET_RECEIVER.format(cls=cls, label=label, info=info) + "    </application>", 1)

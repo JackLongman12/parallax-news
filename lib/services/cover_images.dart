@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/category.dart';
 import '../models/story.dart';
+import 'clustering.dart';
 import 'feed_parser.dart';
 import 'net.dart';
 import 'providers.dart';
@@ -103,7 +105,7 @@ class CoverImages {
   static String? quick(Story s) {
     final known = cached(s);
     if (known != null || !enabled) return known;
-    final pool = _pools[s.category] ?? _pools[Category.general];
+    final pool = variants[s.category.name] ?? variants['general'];
     if (pool == null || pool.isEmpty) return null;
     final start = s.id.hashCode.abs() % pool.length;
     for (var i = 0; i < pool.length; i++) {
@@ -114,6 +116,29 @@ class CoverImages {
       }
     }
     return null;
+  }
+
+  /// Curated extra photos per topic (assets/topics/variants.json): public
+  /// domain / CC0, chosen ahead of time so they are always on-topic.
+  static Map<String, List<String>> variants = {};
+
+  /// A curated photo for a topic; [seed] picks which one (variety).
+  static String? variantFor(Category c, int seed) {
+    final list = variants[c.name];
+    if (list == null || list.isEmpty) return null;
+    return list[seed.abs() % list.length];
+  }
+
+  static Future<void> loadVariants() async {
+    try {
+      final raw = jsonDecode(await rootBundle.loadString('assets/topics/variants.json')) as Map<String, dynamic>;
+      variants = raw.map((k, v) => MapEntry(
+          k,
+          (v as List)
+              .whereType<String>()
+              .where((u) => u.startsWith('https://upload.wikimedia.org/'))
+              .toList()));
+    } catch (_) {}
   }
 
   // ---- Topic photo pools (one request per topic, remembered for a week) ----
@@ -142,9 +167,7 @@ class CoverImages {
       });
       if (at != null && DateTime.now().difference(at) < const Duration(days: 7) && _pools.length >= warm.length) return;
     } catch (_) {}
-    if (!enabled) return;
-    await runPooled<void>([for (final c in {Category.general, ...warm}) () => _fillPool(c)], concurrency: 2);
-    _savePools();
+    // Live Commons pools are no longer filled: curated variants replace them.
   }
 
   static Future<void> _fillPool(Category c) async {
@@ -226,7 +249,8 @@ class CoverImages {
     final thumbs = <String>[];
     Future<String?> viaBing() async {
       try {
-        final results = await BingNews.search(s.title).timeout(const Duration(seconds: 6));
+        final all = await BingNews.search(s.title).timeout(const Duration(seconds: 6));
+        final results = all.where((r) => sameStory(s.title, r.title)).toList();
         for (final r in results) {
           if (r.imageUrl != null) thumbs.add(r.imageUrl!);
         }
@@ -244,7 +268,8 @@ class CoverImages {
         final hits = await BingNews.search('site:$domain ${s.title}').timeout(const Duration(seconds: 6));
         final own = hits.where((h) {
           final d = domainOf(h.url);
-          return d == domain || d.endsWith('.$domain'); // exact or real subdomain only
+          // Exact domain or a real subdomain only, and it must be the same story.
+          return (d == domain || d.endsWith('.$domain')) && sameStory(s.title, h.title);
         }).take(1).toList();
         if (own.isEmpty) return null;
         return _ogImage(own.first.url);
@@ -265,14 +290,15 @@ class CoverImages {
     for (final t in thumbs) {
       if (_claim(t, id)) return t;
     }
-    // 5. A relevant photo by the story's key words from Wikimedia Commons.
-    final kw = await commonsImage(s);
-    if (kw != null) return kw;
-    // 6. Last resort: a distinct photo from the topic's pool.
-    return quick(s) ?? topicImage(s.category, claimFor: id);
+    // 6. Last resort: a distinct curated photo for the topic.
+    return quick(s);
   }
 
   static final _domainRe = RegExp(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$');
+
+  /// True when two headlines are clearly about the same event.
+  static bool sameStory(String a, String b) =>
+      StoryClusterer.similarity(TextTokens.stemSet(a), TextTokens.stemSet(b)) >= 0.45;
 
   static final _caps = RegExp(r"\b[A-Z][a-zA-Z'’-]{2,}(?:\s+[A-Z][a-zA-Z'’-]{2,})*");
 
@@ -405,11 +431,14 @@ class CoverImages {
   /// A relevant photo by the story's own keywords: the file title must
   /// contain at least one of the story's key words, so no random matches.
   static Future<String?> commonsImage(Story s) async {
-    final keys = {
-      ..._properNouns(s.title).expand((p) => p.toLowerCase().split(RegExp(r'\s+'))),
-      ...TextTokens.tokens(s.title).where((w) => w.length >= 5),
-    }.where((w) => w.length >= 4).toSet();
-    bool relevant(String title) => keys.any(title.contains);
+    final names = _properNouns(s.title)
+        .expand((p) => p.toLowerCase().split(RegExp(r'\s+')))
+        .where((w) => w.length >= 4 && !TextTokens.isStopWord(w))
+        .toSet();
+    final words = TextTokens.tokens(s.title).where((w) => w.length >= 5).toSet();
+    // Relevant only if the file names a person/place/organisation from the
+    // headline, or shares at least two specific words with it.
+    bool relevant(String title) => names.any(title.contains) || words.where(title.contains).length >= 2;
     for (final q in imageQueries(s).where((q) => q != s.category.label).take(3)) {
       final img = await _commons(q, s.id, accept: relevant);
       if (img != null) return img;

@@ -38,12 +38,14 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final bias = BiasService();
     await bias.load();
+    await CoverImages.loadVariants();
     final classifier = TopicClassifier();
     final settings = FetchSettings();
     final repo = NewsRepository(bias: bias, classifier: classifier, settings: settings);
     final s = AppState._(prefs, bias, classifier, repo, settings);
     s._load();
     repo.onModelUpdated = s._scheduleModelSave;
+    repo.store = prefs;
     repo.onRatingsUpdated = s._scheduleRatingsSave;
     unawaited(bias.refreshRemote());
     unawaited(s.detectHomeCountry());
@@ -73,9 +75,9 @@ class AppState extends ChangeNotifier {
     settings
       ..useBing = p.getBool('useBing') ?? true
       ..useGdelt = p.getBool('useGdelt') ?? false
-      ..autoSources = p.getBool('autoSources') ?? true
+      ..autoSources = true
       ..discoverLocal = p.getBool('discoverLocal') ?? true
-      ..lite = p.getBool('lite') ?? false
+      ..lite = false
       ..maxLocalOutlets = (p.getBool('outletsMaxV2') ?? false) ? (p.getInt('maxLocalOutlets') ?? 25) : 25
       ..homeCountry = p.getString('homeCountry') ?? CountryDetector.fromDevice() ?? 'US';
     homeCountryAuto = p.getBool('homeCountryAuto') ?? true;
@@ -305,6 +307,43 @@ class AppState extends ChangeNotifier {
     _prefs.setString('briefDay', _today());
     final seen = {...?_prefs.getStringList('briefSeen'), ...picks.map((s) => s.title)}.toList();
     _prefs.setStringList('briefSeen', seen.length > 200 ? seen.sublist(seen.length - 200) : seen);
+  }
+
+  void resetReadingBalance() {
+    profile.readLean.updateAll((_, __) => 0);
+    _prefs.setString('profile', profile.toJsonString());
+    notifyListeners();
+  }
+
+  // ---- Idle preloading: use quiet moments to fetch what's likely next ----
+  Timer? _idleTimer;
+  int _idleGen = 0;
+
+  /// Call on every touch. After 4 s without one, preloading starts; any new
+  /// touch stops it after the current small task.
+  void touch() {
+    if (NewsRepository.offline) return;
+    _idleGen++;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: 4), _idleWork);
+  }
+
+  Future<void> _idleWork() async {
+    final gen = _idleGen;
+    final tasks = <Future<Object?> Function()>[
+      for (final s in snapshot.take(12)) () => CoverImages.forStory(s),
+      for (final c in followedTopics) () => repo.topic(c),
+      for (final p in followed) () => repo.place(p),
+      () => repo.dailyBrief(),
+      () => Markets.load(),
+      () => Markets.quotes(watchlist),
+    ];
+    for (final task in tasks) {
+      if (gen != _idleGen) return; // user is interacting again
+      try {
+        await task().timeout(const Duration(seconds: 12));
+      } catch (_) {}
+    }
   }
 
   // ---- One-time tips ----

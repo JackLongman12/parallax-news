@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/story.dart';
-import '../../services/markets.dart';
 import '../../services/summarizer.dart';
 import '../../state/app_state.dart';
 import '../nav.dart';
@@ -27,7 +26,6 @@ class DailyOverview extends StatefulWidget {
 class _DailyOverviewState extends State<DailyOverview> with WidgetsBindingObserver {
   bool _open = false;
   Future<List<Story>>? _brief;
-  Future<List<Quote>>? _markets;
   int _newCount = 0;
   Timer? _peek;
 
@@ -75,7 +73,6 @@ class _DailyOverviewState extends State<DailyOverview> with WidgetsBindingObserv
       _open = !_open;
       if (_open) {
         _brief ??= app.repo.dailyBrief();
-        _markets ??= Markets.load();
       }
     });
     if (_open) {
@@ -134,7 +131,7 @@ class _DailyOverviewState extends State<DailyOverview> with WidgetsBindingObserv
                     return const Padding(
                         padding: EdgeInsets.fromLTRB(16, 0, 16, 16), child: Text('Nothing to summarise yet. Pull to refresh.'));
                   }
-                  return _Body(picks: picks, markets: _markets);
+                  return _Body(picks: picks);
                 },
               ),
           ]),
@@ -145,9 +142,8 @@ class _DailyOverviewState extends State<DailyOverview> with WidgetsBindingObserv
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.picks, required this.markets});
+  const _Body({required this.picks});
   final List<Story> picks;
-  final Future<List<Quote>>? markets;
 
   @override
   Widget build(BuildContext context) {
@@ -157,27 +153,6 @@ class _Body extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 12, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (final s in picks) _Point(story: s),
-        FutureBuilder<List<Quote>>(
-          future: markets,
-          builder: (_, snap) {
-            final q = (snap.data ?? const <Quote>[])
-                .where((x) => const {'S&P 500', 'Nasdaq', 'Bitcoin', 'Crude Oil'}.contains(x.label))
-                .toList();
-            if (q.isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 4, right: 8),
-              child: Text.rich(TextSpan(children: [
-                const TextSpan(text: 'Markets: ', style: TextStyle(fontWeight: FontWeight.w800)),
-                for (var i = 0; i < q.length; i++)
-                  TextSpan(
-                    text:
-                        '${q[i].label} ${q[i].changePct >= 0 ? '+' : '-'}${q[i].changePct.abs().toStringAsFixed(1)}%${i < q.length - 1 ? ' · ' : ''}',
-                    style: TextStyle(color: q[i].changePct >= 0 ? const Color(0xFF16A34A) : Brand.red, fontWeight: FontWeight.w700),
-                  ),
-              ])),
-            );
-          },
-        ),
         const SizedBox(height: 8),
         Text('One top story from each area of the news, across $outlets outlets. Extracted from their own reporting.',
             style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),

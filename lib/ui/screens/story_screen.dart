@@ -8,9 +8,7 @@ import '../../models/bias.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
 import '../../services/summarizer.dart';
-import '../../services/text.dart';
-import '../../data/subtopics.dart';
-import 'feed_screens.dart';
+import 'insights.dart';
 import '../../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -29,8 +27,7 @@ class _StoryScreenState extends State<StoryScreen> {
   late final Future<List<Story>> _related = _app.repo.related(widget.story, _app.profile);
   late final Future<String?> _cover = CoverImages.forStory(widget.story);
   late final StorySummary _summary = Summarizer.summarize(widget.story);
-  late final List<SubPath> _deeper = matchingSubPaths(
-      {for (final a in widget.story.articles.take(6)) ...TextTokens.stemSet(a.title)});
+
 
   Story get story => widget.story;
 
@@ -101,12 +98,8 @@ class _StoryScreenState extends State<StoryScreen> {
                   ],
                   const SizedBox(height: 14),
                   SummaryCard(summary: _summary),
-                  if (_deeper.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    Text('Go deeper', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 6),
-                    SubPathChips(paths: _deeper),
-                  ],
+                  const SizedBox(height: 14),
+                  CoverageFacts(story: story),
                 ]),
               ),
             ),

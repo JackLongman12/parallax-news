@@ -90,32 +90,3 @@ class BriefingWidgetProvider : HomeWidgetProvider() {
         onUpdate(context, mgr, intArrayOf(id), HomeWidgetPlugin.getData(context))
     }
 }
-
-/** Blindspot: the top story one side of the spectrum is ignoring. */
-class BlindspotWidgetProvider : HomeWidgetProvider() {
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray, widgetData: SharedPreferences) {
-        val o = try { JSONObject(widgetData.getString("blindspot", "{}")) } catch (e: Exception) { JSONObject() }
-        for (id in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.widget_blindspot)
-            if (o.has("t")) {
-                views.setTextViewText(R.id.label, "BLINDSPOT · missed by the ${o.optString("side")}")
-                views.setTextViewText(R.id.title, o.optString("t"))
-                views.setTextViewText(R.id.meta, coverageLine(o))
-            } else {
-                views.setTextViewText(R.id.label, "BLINDSPOT")
-                views.setTextViewText(R.id.title, "No blindspots right now")
-                views.setTextViewText(R.id.meta, "Open the app to refresh")
-            }
-            val h = heightDp(appWidgetManager, id)
-            views.setViewVisibility(R.id.meta, if (h < 100) View.GONE else View.VISIBLE)
-            views.setViewVisibility(R.id.label, if (h < 70) View.GONE else View.VISIBLE)
-            views.setOnClickPendingIntent(R.id.root, launch(context, "blindspot"))
-            appWidgetManager.updateAppWidget(id, views)
-        }
-    }
-
-    override fun onAppWidgetOptionsChanged(context: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle) {
-        super.onAppWidgetOptionsChanged(context, mgr, id, newOptions)
-        onUpdate(context, mgr, intArrayOf(id), HomeWidgetPlugin.getData(context))
-    }
-}

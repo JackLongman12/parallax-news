@@ -208,7 +208,7 @@ class TopicTile extends StatefulWidget {
 }
 
 class _TopicTileState extends State<TopicTile> {
-  late final Future<String?> _img = CoverImages.topicImage(widget.category);
+  late final Future<String?> _img = Future.value(CoverImages.variantFor(widget.category, DateTime.now().day));
 
   @override
   Widget build(BuildContext context) {
@@ -476,7 +476,7 @@ class BriefingHeader extends StatelessWidget {
             icon: p.level == PlaceLevel.world ? Icons.public_rounded : (p.isLocalLevel ? Icons.holiday_village_rounded : Icons.flag_rounded),
             image: photo('place:${p.id}'),
             fetch: () => p.level == PlaceLevel.world
-                ? CoverImages.topicImage(Category.world)
+                ? Future.value(CoverImages.variantFor(Category.world, DateTime.now().day))
                 : CoverImages.placeImage(p.name, p.id),
           ),
           'p:${p.id}',
@@ -486,7 +486,7 @@ class BriefingHeader extends StatelessWidget {
       for (final c in app.followedTopics)
         (
           c.label,
-          _RingPhoto(icon: Brand.categoryIcon(c), image: photo('topic:${c.name}'), fetch: () => CoverImages.topicImage(c)),
+          _RingPhoto(icon: Brand.categoryIcon(c), image: photo('topic:${c.name}'), fetch: () => Future.value(CoverImages.variantFor(c, DateTime.now().day))),
           't:${c.name}',
           () => toggle('t:${c.name}'),
           () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TopicPage(category: c))),

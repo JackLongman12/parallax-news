@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'insights.dart';
 import 'sources_screen.dart';
 import 'story_list.dart';
 
@@ -263,6 +264,7 @@ class ExploreScreen extends StatelessWidget {
               builder: (_) => Scaffold(appBar: AppBar(title: const Text('Sources')), body: const SourcesScreen()))),
         ),
       ),
+      const ReadingBalanceTile(),
       section('Browse the world'),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),

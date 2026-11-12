@@ -8,7 +8,10 @@ import '../../models/category.dart';
 import '../../state/app_state.dart';
 import '../../services/provider_health.dart';
 import '../../services/updater.dart';
+import '../theme.dart';
 import '../update_flow.dart';
+import 'feed_editor.dart';
+import 'insights.dart';
 import '../widgets/common.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -24,6 +27,13 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(children: [
+        ListTile(
+          leading: const Icon(Icons.tune_rounded, color: Brand.purple),
+          title: const Text('Customize feed'),
+          subtitle: const Text('Topics to follow or mute, your places, hidden outlets'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => showFeedEditor(context),
+        ),
         ListTile(
           title: const Text('Appearance'),
           subtitle: Padding(
@@ -59,51 +69,18 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         SwitchListTile(
-          title: const Text('Lite mode'),
-          subtitle: const Text('For older phones & slow data: no images, fewer parallel requests and outlets'),
-          value: s.lite,
-          onChanged: (v) => app.updateSettings((x) => x.lite = v),
-        ),
-        SwitchListTile(
           title: const Text('Discover local outlets'),
-          subtitle: const Text('Find community papers, radio & TV for each place via Wikidata'),
+          subtitle: const Text('Find community papers, radio & TV for places you follow (via Wikidata)'),
           value: s.discoverLocal,
           onChanged: (v) => app.updateSettings((x) => x.discoverLocal = v),
         ),
-        ListTile(
-          title: const Text('Local outlets fetched per place'),
-          subtitle: Slider(
-            value: s.maxLocalOutlets.toDouble(),
-            min: 3,
-            max: 25,
-            divisions: 22,
-            label: '${s.maxLocalOutlets}',
-            onChanged: (v) => app.updateSettings((x) => x.maxLocalOutlets = v.round()),
-          ),
-        ),
         const Divider(),
-        SwitchListTile(
-          title: const Text('News sources: Auto (recommended)'),
-          subtitle: const Text('Uses Google + Bing, adds GDELT where it helps, and automatically '
-              'routes around any source that is slow or rate-limited'),
-          value: s.autoSources,
-          onChanged: (v) => app.updateSettings((x) => x.autoSources = v),
+        const ListTile(
+          title: Text('News sources'),
+          subtitle: Text('Chosen automatically: Google + Bing, plus GDELT where it helps. Slow or rate-limited sources are skipped.'),
         ),
-        if (!s.autoSources) ...[
-          SwitchListTile(
-            title: const Text('Use Bing News'),
-            subtitle: const Text('Second index for wider local coverage'),
-            value: s.useBing,
-            onChanged: (v) => app.updateSettings((x) => x.useBing = v),
-          ),
-          SwitchListTile(
-            title: const Text('Use GDELT'),
-            subtitle: const Text('Global multilingual index (slower, rate limited)'),
-            value: s.useGdelt,
-            onChanged: (v) => app.updateSettings((x) => x.useGdelt = v),
-          ),
-        ],
         const _SourceHealth(),
+        const ReadingBalanceTile(),
         ListTile(
           title: const Text('Clear image cache'),
           subtitle: const Text('Photos are cached on the phone (max 300, 7 days) so feeds load instantly'),

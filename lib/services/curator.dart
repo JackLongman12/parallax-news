@@ -36,6 +36,10 @@ class InterestProfile {
   /// Topic of the story read most recently (avoid serving more of the same right away).
   Category? lastRead;
 
+  /// Reading balance: the left / center / right mix of the outlets in the
+  /// stories you open (only stories with reliable ratings count).
+  final Map<String, double> readLean = {'left': 0, 'center': 0, 'right': 0};
+
   static int get _bucket => DateTime.now().hour ~/ 6;
   DateTime lastDecay = DateTime.now();
   int signals = 0;
@@ -72,6 +76,12 @@ class InterestProfile {
 
   void recordOpen(Story s) {
     _bump(s, 1.0);
+    final d = s.distribution;
+    if (d.isReliable) {
+      readLean['left'] = (readLean['left'] ?? 0) + d.share(Side.left);
+      readLean['center'] = (readLean['center'] ?? 0) + d.share(Side.center);
+      readLean['right'] = (readLean['right'] ?? 0) + d.share(Side.right);
+    }
     lastRead = s.category;
     final k = '${s.category.name}:$_bucket';
     hourly[k] = (hourly[k] ?? 0) + 1.0;
@@ -162,6 +172,7 @@ class InterestProfile {
         't': lastDecay.toIso8601String(),
         'n': signals,
         'hr': hourly,
+        'rl': readLean,
       });
 
   void loadJsonString(String s) {
@@ -181,6 +192,7 @@ class InterestProfile {
       lastDecay = DateTime.tryParse(j['t'] as String? ?? '') ?? DateTime.now();
       signals = (j['n'] as num?)?.toInt() ?? 0;
       (j['hr'] as Map<String, dynamic>? ?? {}).forEach((k, v) => hourly[k] = (v as num).toDouble());
+      (j['rl'] as Map<String, dynamic>? ?? {}).forEach((k, v) => readLean[k] = (v as num).toDouble());
     } catch (_) {}
   }
 
@@ -234,6 +246,7 @@ class Curator {
     // we slot in something new (every 2nd..7th story).
     final every = exploreEvery(profile);
     final picked = <Story>[];
+    var singles = 0;
     final catCount = <Category, int>{};
     final srcCount = <String, int>{};
     Side? lastSkew;
@@ -241,8 +254,12 @@ class Curator {
       var bestI = 0;
       var bestScore = double.negativeInfinity;
       final explore = picked.length % every == every - 1;
+      // At most ~1 in 5 stories may come from a single outlet (local news
+      // excepted): multi-outlet stories are what show real political contrast.
+      final singlesFull = singles >= 1 + picked.length ~/ 5;
       for (var i = 0; i < pool.length && i < 80; i++) {
         final s = pool[i];
+        if (singlesFull && s.uniqueSources.length == 1 && !s.hasLocal && pool.length > 5) continue;
         double adj;
         if (explore) {
           // Prefer topics with little interest so far, weighted by quality.
@@ -263,6 +280,7 @@ class Curator {
         }
       }
       final s = pool.removeAt(bestI);
+      if (s.uniqueSources.length == 1 && !s.hasLocal) singles++;
       picked.add(s);
       catCount[s.category] = (catCount[s.category] ?? 0) + 1;
       srcCount[s.lead.domain] = (srcCount[s.lead.domain] ?? 0) + 1;
