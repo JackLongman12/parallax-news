@@ -89,10 +89,21 @@ class Updater {
     final build = (json['build'] as num?)?.toInt() ?? 0;
     final android = json['android'];
     if (android is! Map) return null;
-    final url = android['url']?.toString() ?? '';
+    // Pick the APK built for this phone's CPU (64-bit vs 32-bit ARM).
+    var url = android['url']?.toString() ?? '';
+    var shaRaw = android['sha256'];
+    final abis = android['abis'];
+    if (abis is Map) {
+      final mine = Platform.version.contains('arm64') ? 'arm64' : (Platform.version.contains('_arm') ? 'arm' : 'arm64');
+      final pick = abis[mine];
+      if (pick is Map && pick['url'] is String) {
+        url = pick['url'] as String;
+        shaRaw = pick['sha256'];
+      }
+    }
     if (!_allowed(url)) throw StateError('APK host not allowed');
     // Checksum is mandatory: never install an unverified download.
-    final sha = android['sha256']?.toString();
+    final sha = shaRaw?.toString();
     if (sha == null || !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(sha)) return null;
     final mine = await currentBuild();
     if (build <= mine) return null;

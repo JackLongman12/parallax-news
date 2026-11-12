@@ -27,6 +27,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(children: [
+        const _InformLevel(),
         ListTile(
           leading: const Icon(Icons.tune_rounded, color: Brand.purple),
           title: const Text('Customize feed'),
@@ -173,6 +174,41 @@ class _SourceHealthState extends State<_SourceHealth> {
               SizedBox(width: 100, child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600))),
               Expanded(child: Text(s.status, style: Theme.of(context).textTheme.bodySmall)),
             ]),
+          ),
+      ]),
+    );
+  }
+}
+
+
+/// "How should we keep you informed?"
+class _InformLevel extends StatelessWidget {
+  const _InformLevel();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    const options = [
+      ('detailed', 'Fully up to date', 'Everything, including single-outlet and niche stories'),
+      ('aware', 'Aware', 'Stories covered by at least 2 outlets (recommended)'),
+      ('key', 'Key issues only', 'Major stories covered by 5+ outlets'),
+      ('off', 'Minimal', 'No briefing card; just the feed'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('How should we keep you informed?', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        for (final o in options)
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              onTap: () => app.setInformLevel(o.$1),
+              leading: Icon(app.informLevel == o.$1 ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                  color: app.informLevel == o.$1 ? Brand.purple : null),
+              title: Text(o.$2, style: const TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(o.$3),
+            ),
           ),
       ]),
     );

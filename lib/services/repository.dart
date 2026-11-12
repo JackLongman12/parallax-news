@@ -398,6 +398,69 @@ class NewsRepository {
         return _finish(articles, errors);
       });
 
+  /// Finds MORE outlets covering the same event as [s] (searches Google News
+  /// and Bing for the headline's key words, keeps only same-story matches).
+  /// Returns the new articles; the caller merges them into the story.
+  Future<List<Article>> expandCoverage(Story s) async {
+    if (offline) return const [];
+    final words = TextTokens.tokens(s.title).where((w) => w.length >= 4).take(7).toList();
+    if (words.length < 3) return const [];
+    final q = words.join(' ');
+    final ed = editionFor(settings.homeCountry) ?? Edition.us;
+    final errors = <String>[];
+    final found = await _run([
+      _gn(() => GoogleNews.search('$q when:3d', ed), q),
+      if (!ed.isEnglish) _gn(() => GoogleNews.search('$q when:3d', Edition.us), q),
+      () => BingNews.search(q),
+    ], errors);
+    final have = {for (final a in s.articles) a.url};
+    final domains = {for (final a in s.articles) a.domain};
+    final toks = TextTokens.stemSet(s.title);
+    final fresh = <Article>[];
+    for (final a in found) {
+      if (have.contains(a.url) || isJunk(a)) continue;
+      if (StoryClusterer.similarity(toks, TextTokens.stemSet(a.title)) < 0.34) continue;
+      if (domains.add(a.domain)) fresh.add(a);
+    }
+    bias.annotate(fresh);
+    return fresh;
+  }
+
+  /// News search for Explore.
+  Future<NewsBundle> search(String query, {bool force = false}) {
+    final q = query.trim();
+    return _memo('search:${q.toLowerCase()}', force, () async {
+      final errors = <String>[];
+      final ed = editionFor(settings.homeCountry) ?? Edition.us;
+      final articles = await _run([
+        _gn(() => GoogleNews.search('$q when:7d', ed), q),
+        () => BingNews.search(q),
+      ], errors);
+      return _finish(articles, errors);
+    });
+  }
+
+  /// Everything from a broad pool (world, your country, politics / world /
+  /// business, and what you follow), used by the Blindspot collections.
+  Future<List<Story>> broadPool({required List<Place> places, required List<Category> topics, bool force = false}) async {
+    final home = countryByCode(settings.homeCountry)?.place;
+    final topicSet = {Category.politics, Category.world, Category.business, ...topics};
+    final bundles = await runPooled<NewsBundle>([
+      () => place(Place.world, force: force),
+      if (home != null) () => place(home, force: force),
+      for (final p in places) () => place(p, force: force),
+      for (final t in topicSet) () => topic(t, force: force),
+    ], concurrency: 3);
+    final seen = <String>{};
+    final all = <Article>[];
+    for (final b in bundles) {
+      for (final a in b?.articles ?? const <Article>[]) {
+        if (seen.add(a.url)) all.add(a);
+      }
+    }
+    return _clusterAndLabel(all);
+  }
+
   /// Blindspot scan over a broad pool (not just your briefing): world, your
   /// country, politics / world / business news, plus everything you follow.
   Future<List<Story>> blindspotPool({

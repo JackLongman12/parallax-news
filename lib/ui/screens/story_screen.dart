@@ -35,6 +35,11 @@ class _StoryScreenState extends State<StoryScreen> {
   void initState() {
     super.initState();
     _app = context.read<AppState>();
+    // Find more outlets covering this event, so left/center/right coverage
+    // is as complete as possible.
+    _app.repo.expandCoverage(widget.story).then((more) {
+      if (more.isNotEmpty && mounted) setState(() => widget.story.articles.addAll(more));
+    });
   }
 
   @override
@@ -145,12 +150,12 @@ class _StoryScreenState extends State<StoryScreen> {
             const ColoredBox(color: Brand.purple),
             if (img == null) TopicPhoto(story.category, width: decodeWidth(context)),
             if (img != null)
-              NetImage(img, width: decodeWidth(context)),
+              NetImage(img, width: decodeWidth(context), fallback: TopicPhoto(story.category, width: decodeWidth(context))),
             if (img != null && CoverImages.needsCredit(img))
-              const Positioned(
+              Positioned(
                 right: 10,
                 bottom: 4,
-                child: Text('Photo: Wikimedia Commons', style: TextStyle(color: Colors.white70, fontSize: 9)),
+                child: Text('Photo: ${CoverImages.creditFor(img)}', style: const TextStyle(color: Colors.white70, fontSize: 9)),
               ),
             const DecoratedBox(
               decoration: BoxDecoration(

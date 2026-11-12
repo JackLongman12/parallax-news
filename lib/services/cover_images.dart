@@ -85,6 +85,14 @@ class CoverImages {
   /// Images from Wikimedia Commons need a credit line.
   static bool needsCredit(String url) => Uri.tryParse(url)?.host == 'upload.wikimedia.org';
 
+  static final Map<String, String> _credits = {};
+
+  /// Photographer / licence for a Wikimedia photo (as the licence requires).
+  static String creditFor(String url) => _credits[url] ?? 'Wikimedia Commons';
+
+  /// True for a real news photo (not a Wikimedia stand-in).
+  static bool isNewsPhoto(String? url) => url != null && !needsCredit(url);
+
   static Future<String?> forStory(Story s) {
     final direct = s.imageUrl;
     if (!enabled) return Future.value(direct);
@@ -132,12 +140,18 @@ class CoverImages {
   static Future<void> loadVariants() async {
     try {
       final raw = jsonDecode(await rootBundle.loadString('assets/topics/variants.json')) as Map<String, dynamic>;
-      variants = raw.map((k, v) => MapEntry(
-          k,
-          (v as List)
-              .whereType<String>()
-              .where((u) => u.startsWith('https://upload.wikimedia.org/'))
-              .toList()));
+      final out = <String, List<String>>{};
+      raw.forEach((k, v) {
+        final urls = <String>[];
+        for (final e in (v as List)) {
+          final u = e is Map ? e['u'] : e;
+          if (u is! String || !u.startsWith('https://upload.wikimedia.org/')) continue;
+          urls.add(u);
+          if (e is Map && e['c'] is String) _credits[u] = (e['c'] as String).replaceAll(RegExp(r'[\u0000-\u001F]'), '');
+        }
+        out[k] = urls;
+      });
+      variants = out;
     } catch (_) {}
   }
 

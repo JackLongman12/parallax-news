@@ -42,6 +42,9 @@ class BiasDistribution {
     return null;
   }
 
+  /// Covered by both sides in strength (each 30%+): compare how they frame it.
+  bool get divergent => rated >= 4 && share(Side.left) >= 0.3 && share(Side.right) >= 0.3;
+
   /// Weaker signal than a blindspot: reliably rated coverage where one side
   /// supplies 70%+ of it. Shown as "mostly one side", never as a blindspot.
   Side? get skewedTo {

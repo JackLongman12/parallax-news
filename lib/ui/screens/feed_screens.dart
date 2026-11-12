@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/subtopics.dart';
+import '../../models/bias.dart';
 import '../../models/category.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
@@ -98,8 +99,10 @@ class _ForYouScreenState extends State<ForYouScreen> {
           profile: app.profile,
           force: force,
         )) {
-          last = stories;
-          yield stories;
+          // "How should we keep you informed?": drop stories below the chosen depth.
+          final kept = stories.where((s) => s.hasLocal || s.uniqueSources.length >= app.minSources).toList();
+          last = kept;
+          yield kept;
         }
         if (last != null && last.isNotEmpty) {
           app.saveSnapshot(last);
@@ -420,22 +423,79 @@ class SubPathChips extends StatelessWidget {
   }
 }
 
-class BlindspotScreen extends StatelessWidget {
+/// Blindspot tab, now with collections of under-covered and contrasting stories.
+class BlindspotScreen extends StatefulWidget {
   const BlindspotScreen({super.key});
+
+  @override
+  State<BlindspotScreen> createState() => _BlindspotScreenState();
+}
+
+class _BlindspotScreenState extends State<BlindspotScreen> {
+  String _view = 'blindspot';
+
+  static const _views = [
+    ('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers.'),
+    ('underreported', 'Underreported', 'Stories few outlets cover, from reliable sources.'),
+    ('divergent', 'Divergent takes', 'Covered heavily by both left and right: compare how each frames it.'),
+    ('left', 'Popular with the left', 'Stories mostly covered by left-leaning outlets.'),
+    ('right', 'Popular with the right', 'Stories mostly covered by right-leaning outlets.'),
+  ];
+
+  bool _keep(Story s) {
+    final d = s.distribution;
+    switch (_view) {
+      case 'blindspot':
+        return d.blindspotFor != null;
+      case 'underreported':
+        final n = s.uniqueSources.length;
+        final good = s.uniqueSources
+            .where((a) => a.source?.factuality == Factuality.high || a.source?.factuality == Factuality.veryHigh)
+            .length;
+        return n >= 2 && n <= 5 && good >= 1;
+      case 'divergent':
+        return d.divergent;
+      case 'left':
+        return d.rated >= 3 && d.share(Side.left) >= 0.6;
+      case 'right':
+        return d.rated >= 3 && d.share(Side.right) >= 0.6;
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final info = _views.firstWhere((v) => v.$1 == _view);
     return StoryList(
       scrollToTop: TabReselect.tabs[4],
       jumpToTop: TabReselect.tops[4],
-      key: ValueKey('blind:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
-      loader: (force) => app.repo.blindspotPool(places: app.followed, topics: app.followedTopics, force: force),
-      emptyMessage: 'No one-sided stories right now. More outlets get rated as you browse, '
-          'so check back later or pull to refresh.',
-      header: const Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-        child: Text('Blindspots first: stories one side is barely covering. Then stories covered mostly by one side.'),
+      key: ValueKey('coll:$_view:${app.followed.length}:${app.followedTopics.length}:${app.settings.homeCountry}'),
+      loader: (force) async {
+        final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
+        final kept = all.where(_keep).toList()..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
+        return kept;
+      },
+      emptyMessage: 'Nothing in this collection right now. More outlets get rated as you browse, so check back later.',
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final v in _views)
+              ChoiceChip(
+                label: Text(v.$2),
+                selected: _view == v.$1,
+                showCheckmark: false,
+                selectedColor: Brand.purple,
+                labelStyle: TextStyle(color: _view == v.$1 ? Colors.white : null, fontWeight: FontWeight.w700),
+                onSelected: (_) => setState(() => _view = v.$1),
+              ),
+          ]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            child: Text(info.$3, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ]),
       ),
     );
   }
@@ -522,7 +582,7 @@ class BriefingHeader extends StatelessWidget {
           text: 'Long-press any story for options: more or less like it, follow or mute its topic, or hide an outlet. '
               'Tap the For You tab again to jump to the top; tap once more to refresh.',
         ),
-      if (selected == null) const DailyOverview(),
+      if (selected == null && app.informLevel != 'off') const DailyOverview(),
     ]);
   }
 }

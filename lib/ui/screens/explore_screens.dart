@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 import '../../data/geo.dart';
 import '../../models/place.dart';
 import '../../models/source.dart';
+import '../../services/curator.dart';
 import '../../services/places.dart';
+import '../../services/trending.dart';
 import '../../state/app_state.dart';
 import '../nav.dart';
 import '../theme.dart';
@@ -230,7 +232,7 @@ class ExploreScreen extends StatelessWidget {
         );
 
     return ReselectScroll(tab: 3, builder: (ctrl) => ListView(controller: ctrl, padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom), children: [
-      const PlaceSearchPanel(shrinkWrap: true),
+      const NewsSearchBar(),
       if (app.followed.isNotEmpty) ...[
         section('Your places'),
         Padding(
@@ -629,6 +631,103 @@ class _ChildrenTabState extends State<_ChildrenTab> {
           Expanded(child: ListView.builder(itemCount: list.length, itemBuilder: (_, i) => PlaceTile(place: list[i]))),
         ]);
       },
+    );
+  }
+}
+
+/// News search. Tapping the field shows what people are searching for right
+/// now (Google Trends for your country); submit or tap a trend to search.
+class NewsSearchBar extends StatefulWidget {
+  const NewsSearchBar({super.key});
+
+  @override
+  State<NewsSearchBar> createState() => _NewsSearchBarState();
+}
+
+class _NewsSearchBarState extends State<NewsSearchBar> {
+  final _focus = FocusNode();
+  final _ctrl = TextEditingController();
+  Future<List<Trend>>? _trends;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (_focus.hasFocus) _trends ??= Trending.load(context.read<AppState>().settings.homeCountry);
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _go(String q) {
+    final query = q.trim();
+    if (query.length < 2) return;
+    _focus.unfocus();
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SearchResultsPage(query: query)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextField(
+          focusNode: _focus,
+          controller: _ctrl,
+          textInputAction: TextInputAction.search,
+          onSubmitted: _go,
+          decoration: const InputDecoration(hintText: 'Search news, people, companies...', prefixIcon: Icon(Icons.search_rounded)),
+        ),
+        if (_focus.hasFocus)
+          FutureBuilder<List<Trend>>(
+            future: _trends,
+            builder: (context, snap) {
+              final t = snap.data ?? const <Trend>[];
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
+              }
+              if (t.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Trending searches now', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final x in t)
+                      ActionChip(
+                        avatar: const Icon(Icons.trending_up_rounded, size: 16),
+                        label: Text(x.traffic == null ? x.title : '${x.title} · ${x.traffic}'),
+                        onPressed: () => _go(x.title),
+                      ),
+                  ]),
+                ]),
+              );
+            },
+          ),
+      ]),
+    );
+  }
+}
+
+class SearchResultsPage extends StatelessWidget {
+  const SearchResultsPage({super.key, required this.query});
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    return Scaffold(
+      appBar: AppBar(title: Text(query)),
+      body: StoryList(
+        loader: (force) async => Curator.rank((await app.repo.search(query, force: force)).stories, app.profile, limit: 60),
+        emptyMessage: 'No recent news for "$query".',
+      ),
     );
   }
 }

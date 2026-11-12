@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import '../data/subtopics.dart';
+import 'cover_images.dart';
 import '../models/article.dart';
 import '../models/bias.dart';
 import '../models/category.dart';
@@ -221,7 +222,16 @@ class Curator {
       final dist = s.distribution;
       var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
       if (s.hasLocal) score += 1.0;
-      if (s.imageUrl != null) score += 0.2;
+      // Stories with a real photo from a news site rank higher; Wikimedia
+      // stand-ins slightly lower; no photo at all lower still.
+      final img = CoverImages.cached(s) ?? s.imageUrl;
+      if (CoverImages.isNewsPhoto(img)) {
+        score += 0.6;
+      } else if (img == null) {
+        score -= 0.8;
+      } else {
+        score -= 0.2;
+      }
       // Prefer stories several outlets cover: they show real left/center/right
       // contrast. Single-outlet items sink unless they are local news.
       if (sources == 1 && !s.hasLocal) score -= 1.8;

@@ -46,7 +46,7 @@ QUERIES = {
     "weather": ["storm clouds", "lightning", "snowstorm", "rainbow", "flood"],
 }
 
-OK_LICENCE = re.compile(r"^(public domain|pd|cc0)", re.I)
+OK_LICENCE = re.compile(r"^(public domain|pd|cc0|cc by(-sa)? [1-4]\.\d)", re.I)
 BAD_TITLE = re.compile(
     r"(map|logo|flag of|coat of arms|diagram|chart|seal|signature|icon|painting|poster|drawing|illustration|"
     r"engraving|LC-|\b1[0-9]\d\d\b|\(19\d\d\)|svg|scan|stamp|banknote of 19)", re.I)
@@ -80,19 +80,21 @@ def candidates(query: str):
         w, h = info.get("width", 0), info.get("height", 0)
         if not OK_LICENCE.match(lic) or not info.get("mime", "").startswith("image/jpeg"):
             continue
-        if w < 1200 or h < 600 or w < h * 1.2:  # large, landscape
+        if w < 1000 or h < 560 or w < h * 1.15:  # large, landscape
             continue
         if BAD_TITLE.search(p.get("title", "")):
             continue
         url = info.get("thumburl", "")
+        artist = re.sub(r"<[^>]+>", "", info.get("extmetadata", {}).get("Artist", {}).get("value", "")).strip()
+        artist = re.sub(r"\s+", " ", artist)[:60] or "Wikimedia Commons"
         if url.startswith("https://upload.wikimedia.org/"):
-            yield url, p.get("title", ""), lic
+            yield url, f"{artist} / {lic}", lic
 
 
 def main() -> None:
     out = {}
     if OUT.exists():
-        out = json.loads(OUT.read_text(encoding="utf-8"))
+        out = {k: v for k, v in json.loads(OUT.read_text(encoding="utf-8")).items() if v}
     for cat, queries in QUERIES.items():
         if len(out.get(cat, [])) >= PER_TOPIC:
             continue
@@ -100,11 +102,11 @@ def main() -> None:
         per_query = max(3, PER_TOPIC // len(queries) + 1)
         for q in queries:
             n = 0
-            for url, title, lic in candidates(q):
+            for url, credit, lic in candidates(q):
                 if url in seen:
                     continue
                 seen.add(url)
-                picked.append(url)
+                picked.append({"u": url, "c": credit})
                 n += 1
                 if n >= per_query or len(picked) >= PER_TOPIC:
                     break

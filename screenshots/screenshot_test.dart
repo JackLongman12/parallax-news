@@ -113,7 +113,7 @@ Future<void> _loadFonts() async {
   await roboto.load();
   // The app's own typeface, bundled in assets/fonts.
   final inter = FontLoader('Inter');
-  for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold', 'Black', 'Italic']) {
+  for (final w in ['Regular', 'Medium', 'Bold', 'ExtraBold', 'Black']) {
     final f = File('assets/fonts/Inter-$w.ttf');
     if (f.existsSync()) inter.addFont(Future.value(ByteData.view(f.readAsBytesSync().buffer)));
   }

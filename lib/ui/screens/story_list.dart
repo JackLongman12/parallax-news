@@ -287,9 +287,13 @@ class _StoryListState extends State<StoryList> {
     if (_error != null && _all.isEmpty) {
       return EmptyOrError(message: _error!, onRetry: () => _load(true));
     }
-    final count = _visible.clamp(0, _all.length);
+    // Thumbs-down hides a story right away (undo brings it back).
+    context.select<AppState, int>((a) => a.hiddenVersion);
+    final hidden = context.read<AppState>().hiddenStories;
+    final shown = hidden.isEmpty ? _all : _all.where((s) => !hidden.contains(s.id)).toList();
+    final count = _visible.clamp(0, shown.length);
     final hasHeader = widget.header != null;
-    final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == _all.length);
+    final showFooter = _loadingMore || _exhausted || (widget.onLoadMore == null && count == shown.length);
     if (_all.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _prefetch());
     final list = RefreshIndicator(
       key: _refreshKey,
@@ -314,7 +318,7 @@ class _StoryListState extends State<StoryList> {
                   }
                   i -= 1;
                 }
-                if (i < count) return StoryCard(story: _all[i]);
+                if (i < count) return StoryCard(key: ValueKey(shown[i].id), story: shown[i]);
                 if (_loadingMore) {
                   return const Padding(
                       padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));

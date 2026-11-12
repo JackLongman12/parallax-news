@@ -16,6 +16,7 @@ import '../../models/story.dart';
 import '../../services/cover_images.dart';
 import '../../services/net.dart';
 import '../../state/app_state.dart';
+import '../screens/sources_screen.dart';
 import '../screens/story_screen.dart';
 import '../theme.dart';
 
@@ -31,8 +32,11 @@ String timeAgo(DateTime? t) {
 /// Network image with a persistent disk cache (instant on later launches),
 /// a quick fade-in and silent failure.
 class NetImage extends StatelessWidget {
-  const NetImage(this.url, {super.key, this.width, this.fit = BoxFit.cover});
+  const NetImage(this.url, {super.key, this.width, this.fit = BoxFit.cover, this.fallback});
   final String url;
+
+  /// Shown if the image fails to load (so nothing is ever left blank).
+  final Widget? fallback;
   final int? width;
   final BoxFit fit;
 
@@ -45,7 +49,7 @@ class NetImage extends StatelessWidget {
         fadeInDuration: const Duration(milliseconds: 220),
         fadeOutDuration: Duration.zero,
         placeholder: (_, __) => const SizedBox.shrink(),
-        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        errorWidget: (_, __, ___) => fallback ?? const SizedBox.shrink(),
       );
 }
 
@@ -249,6 +253,26 @@ class _StoryCardState extends State<StoryCard> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryScreen(story: story)));
   }
 
+  void _up() {
+    final app = context.read<AppState>()..thumbsUp(story);
+    final m = ScaffoldMessenger.of(context);
+    m.hideCurrentSnackBar();
+    m.showSnackBar(SnackBar(
+      content: const Text('Got it: more like this'),
+      action: SnackBarAction(label: 'Undo', onPressed: () => app.undoThumbsUp(story)),
+    ));
+  }
+
+  void _down() {
+    final app = context.read<AppState>()..thumbsDown(story);
+    final m = ScaffoldMessenger.of(context);
+    m.hideCurrentSnackBar();
+    m.showSnackBar(SnackBar(
+      content: const Text('Hidden. You will see fewer stories like this'),
+      action: SnackBarAction(label: 'Undo', onPressed: () => app.undoThumbsDown(story)),
+    ));
+  }
+
   void _share() {
     context.read<AppState>().recordShare(story);
     SharePlus.instance.share(ShareParams(text: '${story.title}\n${story.lead.url}\n\nCompare coverage on Parallax News'));
@@ -363,7 +387,7 @@ class _StoryCardState extends State<StoryCard> {
                 return Stack(fit: StackFit.expand, children: [
                   if (img == null) TopicPhoto(story.category, width: decodeWidth(context)),
                   if (img != null)
-                    NetImage(img, width: decodeWidth(context)),
+                    NetImage(img, width: decodeWidth(context), fallback: TopicPhoto(story.category, width: decodeWidth(context))),
                   // Scrim: light at the top for the labels, heavy at the bottom for the text.
                   const DecoratedBox(
                     decoration: BoxDecoration(
@@ -392,10 +416,10 @@ class _StoryCardState extends State<StoryCard> {
                     ]),
                   ),
                   if (img != null && CoverImages.needsCredit(img))
-                    const Positioned(
+                    Positioned(
                       right: 14,
                       top: 44,
-                      child: Text('Photo: Wikimedia Commons', style: TextStyle(color: white70, fontSize: 9)),
+                      child: Text('Photo: ${CoverImages.creditFor(img)}', style: const TextStyle(color: white70, fontSize: 9)),
                     ),
                   Positioned(
                     left: 16,
@@ -425,6 +449,10 @@ class _StoryCardState extends State<StoryCard> {
                             style: const TextStyle(color: white70, fontSize: 12, fontWeight: FontWeight.w700),
                           ),
                         ),
+                        _RoundAction(icon: Icons.thumb_up_alt_outlined, tooltip: 'More like this', onTap: _up),
+                        const SizedBox(width: 6),
+                        _RoundAction(icon: Icons.thumb_down_alt_outlined, tooltip: 'Less like this', onTap: _down),
+                        const SizedBox(width: 6),
                         _RoundAction(icon: Icons.ios_share_rounded, tooltip: 'Share', onTap: _share),
                         const SizedBox(width: 6),
                         _RoundAction(icon: Icons.more_horiz_rounded, tooltip: 'More options', onTap: _menu),
@@ -576,7 +604,14 @@ class ArticleTile extends StatelessWidget {
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          Text(article.sourceName, style: const TextStyle(fontWeight: FontWeight.w600)),
+          // Tap the outlet for its bias, factuality and ownership.
+          GestureDetector(
+            onTap: s == null
+                ? null
+                : () => showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => SourceSheet(source: s)),
+            child: Text(article.sourceName,
+                style: const TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+          ),
           if (s != null) BiasChip(source: s),
           if (article.isLocal) const Tag('Local', color: Brand.purple),
           if (s?.stateAffiliated ?? false) const Tag('State-affiliated', color: Colors.deepOrange),

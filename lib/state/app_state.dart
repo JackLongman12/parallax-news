@@ -346,6 +346,48 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ---- Thumbs up / down on stories (with undo) ----
+  final Set<String> hiddenStories = {};
+  int hiddenVersion = 0;
+
+  void thumbsUp(Story s) {
+    profile.moreLikeThis(s);
+    _saveProfileSoon();
+  }
+
+  void undoThumbsUp(Story s) {
+    profile.lessLikeThis(s); // exact reverse of the +4 signal
+    _saveProfileSoon();
+  }
+
+  void thumbsDown(Story s) {
+    profile.lessLikeThis(s);
+    hiddenStories.add(s.id);
+    hiddenVersion++;
+    _saveProfileSoon();
+    notifyListeners();
+  }
+
+  void undoThumbsDown(Story s) {
+    profile.moreLikeThis(s);
+    hiddenStories.remove(s.id);
+    hiddenVersion++;
+    _saveProfileSoon();
+    notifyListeners();
+  }
+
+  // ---- How should we keep you informed? ----
+  /// 'detailed' (everything), 'aware' (2+ outlets), 'key' (5+ outlets,
+  /// major stories only), 'off' (no briefing / The Last 24).
+  String get informLevel => _prefs.getString('informLevel') ?? 'aware';
+
+  void setInformLevel(String v) {
+    _prefs.setString('informLevel', v);
+    notifyListeners();
+  }
+
+  int get minSources => switch (informLevel) { 'detailed' => 1, 'key' => 5, _ => 2 };
+
   // ---- One-time tips ----
   bool tipSeen(String id) => (_prefs.getStringList('tipsSeen') ?? const []).contains(id);
 

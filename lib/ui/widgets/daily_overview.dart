@@ -11,7 +11,7 @@ import '../nav.dart';
 import '../screens/story_screen.dart';
 import '../theme.dart';
 
-/// "Today in brief": a purple button, collapsed by default.
+/// "The Last 24": a purple button, collapsed by default.
 ///  * Tap to open: the most widely covered story from each area of the news.
 ///  * Closes itself when you switch tabs or leave the app.
 ///  * Shows a "New" badge only when 5+ new top stories appeared since you last
@@ -105,7 +105,7 @@ class _DailyOverviewState extends State<DailyOverview> with WidgetsBindingObserv
                   Icon(Icons.today_rounded, color: _open ? Brand.purple : Colors.white),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text('Today in brief',
+                    child: Text('The Last 24',
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _open ? null : Colors.white)),
                   ),
                   if (badge && !_open)
