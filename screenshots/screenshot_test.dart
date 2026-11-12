@@ -219,6 +219,7 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     CoverImages.enabled = false;
+    AppState.debounceSaves = false;
     await _loadFonts();
   });
 

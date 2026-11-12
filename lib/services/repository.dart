@@ -21,7 +21,7 @@ class FetchSettings {
   bool useBing = true;
   bool useGdelt = false;
   bool discoverLocal = true;
-  int maxLocalOutlets = 10;
+  int maxLocalOutlets = 25;
   /// Lower concurrency + fewer outlets for weak phones / metered data.
   bool lite = false;
   String homeCountry = 'US';

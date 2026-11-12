@@ -68,9 +68,14 @@ class AppState extends ChangeNotifier {
       ..useGdelt = p.getBool('useGdelt') ?? false
       ..discoverLocal = p.getBool('discoverLocal') ?? true
       ..lite = p.getBool('lite') ?? false
-      ..maxLocalOutlets = p.getInt('maxLocalOutlets') ?? 10
+      ..maxLocalOutlets = (p.getBool('outletsMaxV2') ?? false) ? (p.getInt('maxLocalOutlets') ?? 25) : 25
       ..homeCountry = p.getString('homeCountry') ?? 'US';
     autoUpdate = p.getBool('autoUpdate') ?? true;
+    // One-time migration: local outlets now default to the maximum.
+    if (!(p.getBool('outletsMaxV2') ?? false)) {
+      p.setBool('outletsMaxV2', true);
+      p.setInt('maxLocalOutlets', 25);
+    }
     try {
       final disc = jsonDecode(p.getString('discovered') ?? '[]') as List;
       bias.addDiscovered(disc.whereType<Map<String, dynamic>>().map(SourceInfo.fromJson));
@@ -143,7 +148,14 @@ class AppState extends ChangeNotifier {
 
   // ---- Engagement signals (all on-device) ----
   Timer? _saveProfileTimer;
+  /// Tests set this to false to avoid timers outliving a widget test.
+  static bool debounceSaves = true;
+
   void _saveProfileSoon() {
+    if (!debounceSaves) {
+      _prefs.setString('profile', profile.toJsonString());
+      return;
+    }
     _saveProfileTimer?.cancel();
     _saveProfileTimer = Timer(const Duration(seconds: 3), () => _prefs.setString('profile', profile.toJsonString()));
   }
