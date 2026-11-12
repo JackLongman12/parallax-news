@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category.dart';
 import '../models/story.dart';
 import 'clustering.dart';
+import 'crawler_feed.dart';
 import 'feed_parser.dart';
 import 'net.dart';
 import 'providers.dart';
@@ -236,6 +237,16 @@ class CoverImages {
   }
 
   static Future<String?> _ogImage(String url) async {
+    // The Worker reads the page at the edge and caches the answer for a day,
+    // so phones skip downloading article HTML. Sites that block it fall back
+    // to a direct fetch.
+    if (CrawlerFeed.workerUrl.startsWith('https://')) {
+      try {
+        final j = await Net.getJson('${CrawlerFeed.workerUrl}/og?url=${Uri.encodeQueryComponent(url)}', useCache: false);
+        final img = j is Map ? j['image'] : null;
+        if (img is String && img.startsWith('https://') && isSafeWebUrl(img) && !looksGeneric(img)) return img;
+      } catch (_) {}
+    }
     try {
       final html = await Net.getText(url, useCache: false, headBytes: 96 * 1024, timeout: const Duration(seconds: 6));
       return extractMetaImage(html, Uri.parse(url));

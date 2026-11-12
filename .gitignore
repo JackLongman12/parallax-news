@@ -21,3 +21,6 @@ secrets/
 
 # crawler local output
 crawler/out/
+
+worker/.wrangler/
+worker/node_modules/

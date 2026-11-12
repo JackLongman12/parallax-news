@@ -91,7 +91,8 @@ jobs:
             --build-name="0.1.${RUN}" \
             --build-number="${RUN}" \
             --dart-define=UPDATE_MANIFEST_URL="${BASE}/latest.json" \
-            --dart-define=CATALOG_URL="${BASE}/sources.json"
+            --dart-define=CATALOG_URL="${BASE}/sources.json" \
+            --dart-define=FEED_WORKER_URL="https://parallax-news.lp-reports.workers.dev"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "dist/parallax-news-0.1.${RUN}.apk"
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "dist/parallax-news-0.1.${RUN}-arm32.apk"
