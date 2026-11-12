@@ -44,7 +44,7 @@ jobs:
           rm -f test/widget_test.dart
           if [ -f pubspec.lock ]; then flutter pub get --enforce-lockfile; else flutter pub get; fi
           python3 tool/prepare_android.py
-          sudo apt-get install -y -qq python3-pil > /dev/null
+          sudo apt-get update -qq > /dev/null && sudo apt-get install -y -qq python3-pil > /dev/null
           python3 tool/recolor_icon.py
 
       - name: Analyze
