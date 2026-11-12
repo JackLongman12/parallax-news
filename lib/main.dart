@@ -1,0 +1,102 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'state/app_state.dart';
+import 'ui/screens/explore_screens.dart';
+import 'ui/screens/feed_screens.dart';
+import 'ui/screens/settings_screen.dart';
+import 'ui/screens/sources_screen.dart';
+import 'ui/update_flow.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final state = await AppState.create();
+  runApp(ChangeNotifierProvider.value(value: state, child: const ParallaxApp()));
+}
+
+class ParallaxApp extends StatelessWidget {
+  const ParallaxApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const seed = Color(0xFF3B4CCA);
+    return MaterialApp(
+      title: 'Parallax News',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.light),
+      darkTheme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.dark),
+      home: const HomeShell(),
+    );
+  }
+}
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int _tab = 0;
+  final _built = <int>{0};
+
+  static const _titles = ['For You', 'Topics', 'Explore', 'Blindspot', 'Sources'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.read<AppState>().autoUpdate) checkForUpdate(context);
+    });
+  }
+
+  Widget _page(int i) {
+    switch (i) {
+      case 0:
+        return const ForYouScreen();
+      case 1:
+        return const TopicsScreen();
+      case 2:
+        return const ExploreScreen();
+      case 3:
+        return const BlindspotScreen();
+      default:
+        return const SourcesScreen();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_titles[_tab]),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
+          ),
+        ],
+      ),
+      // Tabs are built lazily on first visit, then kept alive.
+      body: IndexedStack(
+        index: _tab,
+        children: [for (var i = 0; i < 5; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() {
+          _tab = i;
+          _built.add(i);
+        }),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome), label: 'For You'),
+          NavigationDestination(icon: Icon(Icons.category_outlined), selectedIcon: Icon(Icons.category), label: 'Topics'),
+          NavigationDestination(icon: Icon(Icons.public_outlined), selectedIcon: Icon(Icons.public), label: 'Explore'),
+          NavigationDestination(icon: Icon(Icons.visibility_off_outlined), selectedIcon: Icon(Icons.visibility_off), label: 'Blindspot'),
+          NavigationDestination(icon: Icon(Icons.newspaper_outlined), selectedIcon: Icon(Icons.newspaper), label: 'Sources'),
+        ],
+      ),
+    );
+  }
+}

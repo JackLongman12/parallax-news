@@ -1,0 +1,110 @@
+name: Android build & release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RELEASES_REPO: ${{ github.repository_owner }}/parallax-news-releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android project
+        run: |
+          flutter create --platforms=android --org com.parallaxnews --project-name parallax_news .
+          rm -f test/widget_test.dart
+          flutter pub get
+          python3 tool/prepare_android.py
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      - name: Install signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 secret is missing (see tool/make_keystore.py)"; exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+
+      - name: Build APK
+        run: |
+          BASE="https://github.com/${RELEASES_REPO}/releases/latest/download"
+          flutter build apk --release \
+            --build-name=0.1.${{ github.run_number }} \
+            --build-number=${{ github.run_number }} \
+            --dart-define=UPDATE_MANIFEST_URL=${BASE}/latest.json \
+            --dart-define=CATALOG_URL=${BASE}/sources.json
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/parallax-news-0.1.${{ github.run_number }}.apk
+
+      - name: Write update manifest
+        env:
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          n = os.environ["GITHUB_RUN_NUMBER"]
+          repo = os.environ["RELEASES_REPO"]
+          apk = f"dist/parallax-news-0.1.{n}.apk"
+          sha = hashlib.sha256(open(apk, "rb").read()).hexdigest()
+          manifest = {
+              "version": f"0.1.{n}",
+              "build": int(n),
+              "notes": (os.environ.get("NOTES") or "")[:500],
+              "android": {
+                  "url": f"https://github.com/{repo}/releases/download/v0.1.{n}/parallax-news-0.1.{n}.apk",
+                  "sha256": sha,
+              },
+          }
+          json.dump(manifest, open("dist/latest.json", "w"), indent=2)
+          print(json.dumps(manifest, indent=2))
+          PY
+          cp assets/sources.json dist/sources.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parallax-news-android
+          path: dist/
+          retention-days: 14
+
+      - name: Publish to releases repo (enables auto-update)
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::RELEASES_TOKEN not set - skipping publish; auto-update will not see this build."
+            exit 0
+          fi
+          TAG="v0.1.${{ github.run_number }}"
+          gh release create "$TAG" dist/*.apk dist/latest.json dist/sources.json \
+            --repo "$RELEASES_REPO" --title "Parallax News $TAG" \
+            --notes "Automated test build from ${GITHUB_SHA::7}" --latest
