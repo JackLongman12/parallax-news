@@ -105,7 +105,9 @@ class PlaceService {
   static Future<List<Map<String, dynamic>>> _query(String sparql) async {
     final url = '$_sparql?format=json&query=${Uri.encodeQueryComponent(sparql)}';
     final json = await Net.getJson(url, headers: {'Accept': 'application/sparql-results+json'});
-    final rows = (json is Map ? json['results']?['bindings'] : null) as List? ?? const [];
+    if (json is! Map) return const [];
+    final results = json['results'];
+    final rows = (results is Map ? results['bindings'] : null) as List? ?? const [];
     return rows.whereType<Map<String, dynamic>>().toList();
   }
 
