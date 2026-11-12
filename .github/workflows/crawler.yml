@@ -1,0 +1,44 @@
+name: News crawler
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write   # upload the feed to the "feed" release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Restore crawler cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p crawler/out
+          gh release download feed -p state.json.gz -D crawler/out --repo "$GITHUB_REPOSITORY" || true
+
+      - name: Crawl
+        run: python3 crawler/crawl.py
+
+      - name: Publish feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A separate, non-"latest" release so app updates are unaffected.
+          gh release view feed --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create feed --repo "$GITHUB_REPOSITORY" --title "Crawler feed (auto)" \
+              --notes "Updated automatically every ~30 minutes. Not an app release." --prerelease --latest=false
+          gh release upload feed crawler/out/feed.json.gz crawler/out/state.json.gz --clobber --repo "$GITHUB_REPOSITORY"

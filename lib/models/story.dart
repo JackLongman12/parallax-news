@@ -30,13 +30,15 @@ class BiasDistribution {
   /// Only claim a left/center/right split when enough of the coverage is
   /// actually rated. Otherwise the story is shown as "Lean unknown" so a
   /// single rated outlet can't paint the whole story with a political colour.
-  bool get isReliable => rated >= 2 && ratedShare >= 0.5;
+  /// With 3+ rated outlets the split is meaningful however many unrated
+  /// outlets also cover it (big stories pull in many small unrated sites).
+  bool get isReliable => rated >= 3 || (rated >= 2 && ratedShare >= 0.5);
 
   /// The side that is under-covering this story, if it is a blindspot:
-  /// 3+ rated outlets, at least half the coverage rated, and one side has
-  /// <=20% of it while the other has >=60%.
+  /// 3+ rated outlets (and at least a quarter of coverage rated, or 6+
+  /// rated), with one side at <=20% while the other has >=60%.
   Side? get blindspotFor {
-    if (rated < 3 || ratedShare < 0.5) return null;
+    if (rated < 3 || (ratedShare < 0.25 && rated < 6)) return null;
     if (share(Side.left) <= 0.2 && share(Side.right) >= 0.6) return Side.left;
     if (share(Side.right) <= 0.2 && share(Side.left) >= 0.6) return Side.right;
     return null;

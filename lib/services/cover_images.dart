@@ -116,6 +116,10 @@ class CoverImages {
   static String? quick(Story s) {
     final known = cached(s);
     if (known != null || !enabled) return known;
+    // Sports / entertainment / gaming photos show specific things (a basketball
+    // game is wrong for a football story), so those use the neutral bundled
+    // topic photo instead of a random stock one.
+    if (const {Category.sports, Category.entertainment, Category.gaming}.contains(s.category)) return null;
     final pool = variants[s.category.name] ?? variants['general'];
     if (pool == null || pool.isEmpty) return null;
     final start = s.id.hashCode.abs() % pool.length;

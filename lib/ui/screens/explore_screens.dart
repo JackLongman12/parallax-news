@@ -179,7 +179,12 @@ Future<Place?> showPlacePicker(BuildContext context) => showModalBottomSheet<Pla
       ),
     );
 
-/// Clean country badge (ISO code in a rounded square) instead of emoji flags.
+/// Flag image for a country (public-domain flags from flagcdn.com, cached).
+String flagUrl(String cc, {int width = 160}) => 'https://flagcdn.com/w$width/${cc.toLowerCase()}.png';
+
+bool _validCc(String? cc) => cc != null && RegExp(r'^[A-Za-z]{2}$').hasMatch(cc);
+
+/// Country badge: the real flag, falling back to the country code.
 class CountryBadge extends StatelessWidget {
   const CountryBadge(this.code, {super.key, this.size = 30, this.inverted = false});
   final String? code;
@@ -190,15 +195,24 @@ class CountryBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = inverted ? Brand.purple : Colors.white;
     final bg = inverted ? Colors.white : Brand.purple;
-    return Container(
-      width: size * 1.35,
+    final text = Container(
+      width: size * 1.45,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(size * 0.28)),
-      child: code == null || code!.length != 2
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(size * 0.22)),
+      child: !_validCc(code)
           ? Icon(Icons.public_rounded, color: fg, size: size * 0.62)
           : Text(code!.toUpperCase(),
               style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: size * 0.42, letterSpacing: 0.5)),
+    );
+    if (!_validCc(code)) return text;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.22),
+      child: SizedBox(
+        width: size * 1.45,
+        height: size,
+        child: NetImage(flagUrl(code!), width: 160, fallback: text),
+      ),
     );
   }
 }
@@ -441,21 +455,33 @@ class _CountryGridScreenState extends State<CountryGridScreen> {
               return Material(
                 color: Brand.purple.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => openPlace(context, c.place),
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      CountryBadge(c.code, size: 30),
-                      const SizedBox(height: 4),
-                      Text(c.name,
+                  child: Stack(fit: StackFit.expand, children: [
+                    // The flag as a backdrop, with a scrim so the name stays readable.
+                    NetImage(flagUrl(c.code, width: 320), width: 320),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x22000000), Color(0xCC000000)],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 6,
+                      right: 6,
+                      bottom: 8,
+                      child: Text(c.name,
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ]),
                 ),
               );
             },

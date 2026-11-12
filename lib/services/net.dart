@@ -38,6 +38,27 @@ class Net {
     /// instead of failing — used to grab <head> metadata from article pages.
     int? headBytes,
   }) async {
+    if (useCache) {
+      final hit = _cache[url];
+      if (hit != null && DateTime.now().difference(hit.at) < _ttl) return hit.body;
+    }
+    final bytes = await getBytes(url, headers: headers, timeout: timeout, headBytes: headBytes);
+    final body = utf8.decode(bytes, allowMalformed: true);
+    if (useCache) {
+      if (_cache.length > 200) _cache.clear();
+      _cache[url] = _CacheEntry(body, DateTime.now());
+    }
+    return body;
+  }
+
+  /// Raw bytes with the same safety checks (public hosts only, checked
+  /// redirects, size cap, timeouts). Never cached.
+  static Future<List<int>> getBytes(
+    String url, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 10),
+    int? headBytes,
+  }) async {
     final parsed = Uri.tryParse(url);
     if (parsed == null || !(parsed.scheme == 'https' || parsed.scheme == 'http')) {
       throw NetException('Refusing non-http URL');
@@ -46,10 +67,6 @@ class Net {
     final uri = parsed.scheme == 'http' ? parsed.replace(scheme: 'https') : parsed;
     if (!isPublicHost(uri.host) || !await _resolvesPublic(uri.host)) {
       throw NetException('Refusing private/local address');
-    }
-    if (useCache) {
-      final hit = _cache[url];
-      if (hit != null && DateTime.now().difference(hit.at) < _ttl) return hit.body;
     }
     // Follow redirects by hand so every hop is checked against [isPublicHost].
     var current = uri;
@@ -92,12 +109,7 @@ class Net {
       if (headBytes != null && bytes.length >= headBytes) break;
       if (bytes.length > maxBytes) throw NetException('Response too large from ${uri.host}');
     }
-    final body = utf8.decode(bytes, allowMalformed: true);
-    if (useCache) {
-      if (_cache.length > 200) _cache.clear();
-      _cache[url] = _CacheEntry(body, DateTime.now());
-    }
-    return body;
+    return bytes;
   }
 
   static Future<dynamic> getJson(String url, {Map<String, String>? headers, bool useCache = true}) async {

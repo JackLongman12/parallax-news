@@ -213,7 +213,8 @@ class _MarketsScreenState extends State<MarketsScreen> {
       loader: (force) async {
         if (force) setState(() => _reload(app));
         final bundles = await Future.wait([app.repo.topic(Category.finance, force: force), app.repo.topic(Category.business, force: force)]);
-        return Curator.rank([...bundles[0].stories, ...bundles[1].stories], app.profile, limit: 80);
+        final crawl = await app.repo.withCrawler([...bundles[0].stories, ...bundles[1].stories], category: Category.finance, force: force);
+        return Curator.rank(crawl, app.profile, limit: 80);
       },
     );
   }

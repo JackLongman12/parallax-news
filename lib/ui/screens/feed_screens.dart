@@ -389,7 +389,10 @@ class _TopicPageState extends State<TopicPage> {
               final bundle = path == null
                   ? await app.repo.topic(category, force: force)
                   : await app.repo.subtopic(path, force: force);
-              return Curator.rank(bundle.stories, app.profile, limit: 80);
+              final stories = path == null
+                  ? await app.repo.withCrawler(bundle.stories, category: category, force: force)
+                  : bundle.stories;
+              return Curator.rank(stories, app.profile, limit: 80);
             },
           ),
         ),

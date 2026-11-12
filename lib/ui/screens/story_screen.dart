@@ -256,7 +256,7 @@ class SummaryCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.bolt_rounded, size: 18, color: Brand.purple),
+          const Icon(Icons.notes_rounded, size: 18, color: Brand.purple),
           const SizedBox(width: 6),
           Text('TL;DR', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
         ]),

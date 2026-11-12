@@ -1,0 +1,8 @@
+# Separate worker so the account's existing worker(s) are never touched.
+name = "parallax-news"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+[vars]
+FEED_URL = "https://github.com/JackLongman12/parallax-news/releases/download/feed/feed.json.gz"

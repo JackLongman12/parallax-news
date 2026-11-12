@@ -15,6 +15,7 @@ import '../models/story.dart';
 import 'bias_service.dart';
 import 'classifier.dart';
 import 'clustering.dart';
+import 'crawler_feed.dart';
 import 'curator.dart';
 import 'net.dart';
 import 'places.dart';
@@ -354,7 +355,7 @@ class NewsRepository {
         if (home != null) () => place(home, force: force),
         for (final t in briefTopics) () => topic(t, force: force),
       ], concurrency: settings.lite ? 2 : 4);
-      final all = <Story>[for (final b in bundles) ...?b?.stories];
+      final all = merge(await crawlerStories(force: force), <Story>[for (final b in bundles) ...?b?.stories]);
       final best = <Category, Story>{};
       for (final s in all) {
         final cur = best[s.category];
@@ -380,6 +381,58 @@ class NewsRepository {
         ], errors);
         return _finish(articles, errors);
       });
+
+  // ---- Crawler stories (many outlets per story) -------------------------
+  final Set<String> _annotatedCrawl = {};
+
+  /// Crawler stories, rated with the local catalog. Memory only.
+  Future<List<Story>> crawlerStories({bool force = false}) async {
+    if (offline) return const [];
+    final list = await CrawlerFeed.load(force: force).timeout(const Duration(seconds: 15), onTimeout: () => const []);
+    final fresh = list.where((s) => _annotatedCrawl.add(s.id)).toList();
+    if (fresh.isNotEmpty) {
+      final arts = [for (final s in fresh) ...s.articles];
+      arts.removeWhere(isJunk);
+      bias.annotate(arts);
+    }
+    return list;
+  }
+
+  /// Merges on-device stories into crawler stories: if they share any
+  /// article link they are the same story (outlets are combined), otherwise
+  /// the device story is added. Crawler stories usually carry far more outlets.
+  static List<Story> merge(List<Story> base, List<Story> extra) {
+    final byUrl = <String, Story>{};
+    for (final s in base) {
+      for (final a in s.articles) {
+        byUrl[a.url] = s;
+      }
+    }
+    final out = [...base];
+    for (final s in extra) {
+      Story? hit;
+      for (final a in s.articles) {
+        hit = byUrl[a.url];
+        if (hit != null) break;
+      }
+      if (hit == null) {
+        out.add(s);
+        continue;
+      }
+      final domains = {for (final a in hit.articles) a.domain};
+      for (final a in s.articles) {
+        if (domains.add(a.domain)) hit.articles.add(a);
+      }
+    }
+    return out;
+  }
+
+  /// [device] stories plus crawler stories (optionally of one topic).
+  Future<List<Story>> withCrawler(List<Story> device, {Category? category, bool force = false}) async {
+    final crawl = await crawlerStories(force: force);
+    final pick = category == null ? crawl : crawl.where((s) => s.category == category).toList();
+    return merge(pick, device);
+  }
 
   /// Focused feed for a subtopic or niche (general -> subtopic -> niche).
   Future<NewsBundle> subtopic(SubPath sp, {bool force = false}) =>
@@ -458,7 +511,7 @@ class NewsRepository {
         if (seen.add(a.url)) all.add(a);
       }
     }
-    return _clusterAndLabel(all);
+    return merge(await crawlerStories(force: force), _clusterAndLabel(all));
   }
 
   /// Blindspot scan over a broad pool (not just your briefing): world, your
@@ -514,7 +567,12 @@ class NewsRepository {
       } catch (_) {}
     }
 
-    List<Story> ranked() => Curator.rank(_clusterAndLabel(collected), profile);
+    var crawl = const <Story>[];
+    List<Story> ranked() => Curator.rank(merge(crawl, _clusterAndLabel(collected)), profile);
+
+    // Our crawler's pre-built stories (dozens of outlets each) arrive first.
+    crawl = await crawlerStories(force: force);
+    if (crawl.isNotEmpty) yield Curator.rank(crawl, profile);
 
     // Stage 1: yield as each of World + first 3 topics arrives (fastest first).
     final stage1 = <Future<NewsBundle>>[
