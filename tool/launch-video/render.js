@@ -53,7 +53,8 @@ async function launch(beats) {
   page.on('console', (m) => { if (!/404/.test(m.text())) console.log('[page]', m.text()); });
   page.on('pageerror', (e) => console.log('[page error]', e.message));
   await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-  await page.goto('http://127.0.0.1:8765/index.html' + (arg('flat') ? '?flat' : '') + (arg('debug') ? '#debug' : ''), { waitUntil: 'load' });
+  const q = arg('short') ? '?short' : arg('flat') ? '?flat' : '';
+  await page.goto('http://127.0.0.1:8765/index.html' + q + (arg('debug') ? '#debug' : ''), { waitUntil: 'load' });
   const end = await page.evaluate(async (d) => {
     await Promise.all(['400', '600', '700', '800', '900'].map((w) => document.fonts.load(`${w} 100px Inter`)));
     // a 1px element that changes every frame, so the compositor always has a new frame to hand over
@@ -89,8 +90,14 @@ async function shoot(t, k, opts) {
     }
   } else {
     const fps = parseFloat(arg('fps', '30'));
+    // --edl a:b,c:d,... (film seconds): render only those stretches, back to back
+    const film = [];
+    if (arg('edl')) for (const [a, b] of arg('edl').split(',').map((s) => s.split(':').map(Number)))
+      for (let f = Math.round(a * fps); f < Math.round(b * fps); f++) film.push(f / fps);
+    const total = film.length ? film.length / fps : end + 0.5;
     const from = parseFloat(arg('from', '0'));
-    const to = Math.min(parseFloat(arg('to', String(end + 0.5))), end + 0.5);
+    const to = Math.min(parseFloat(arg('to', String(total))), total);
+    const i0 = Math.round(from * fps);
     const out = path.join(ROOT, arg('out', 'video.mp4'));
     const restartEvery = parseInt(arg('restart-every', '300'), 10);
     const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
@@ -99,7 +106,7 @@ async function shoot(t, k, opts) {
     const t0 = Date.now();
     let relaunches = 0;
     for (let i = 0; i < n; i++) {
-      const t = from + i / fps;
+      const t = film.length ? film[i0 + i] : from + i / fps;
       // a fresh browser every few seconds of footage keeps it from bogging down
       if (i > 0 && i % restartEvery === 0) { kill(); await launch(beats); }
       let buf;

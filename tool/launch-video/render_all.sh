@@ -4,8 +4,8 @@
 #   ./render_all.sh flat --flat 1   -> flat_000.mp4 ... (flat cut)
 cd "$(dirname "$0")"
 NAME=${1:-part}; shift
-END=125.43
-for s in $(seq 0 10 120); do
+END=${END:-125.43}   # output length in seconds
+for s in $(seq 0 10 $(python -c "import math; print(int(math.ceil($END / 10) * 10 - 10))")); do
   e=$(python -c "print(min($s+10, $END))")
   out=$(printf "%s_%03d.mp4" "$NAME" $s)
   if [ -f "$out.ok" ]; then continue; fi

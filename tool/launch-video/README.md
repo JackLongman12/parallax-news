@@ -6,6 +6,9 @@ A 2-minute launch film rendered from HTML, synced to "So Good" by LEVEL NINE at 
 - `index.html` and `app.js` hold the whole film. It is one 3D world the camera flies through, and every scene change lands on a bar. `frame(t)` draws the frame at time `t`, so rendering is fully deterministic.
 - `render.js` drives headless Edge frame by frame and pipes the frames to ffmpeg. If a frame capture hangs, it kills Edge, relaunches it and captures that frame again. It also starts a fresh Edge every 5 seconds of footage.
 - `index.html?flat` is the flat cut. It uses solid colour scenes with flat wipes, and has no glow, gloss, grain or stars. Its camera track is mostly locked-off shots with hard cuts on the beat, plus one distinct move per scene. Render it with `--flat 1` (for example `./render_all.sh flat --flat 1`).
+- `index.html?short` is the 1-minute cut. It has the flat look with bolder camera moves. `edl.py` lists the bars of the full film it keeps, and the music is cut on the same bar lines, so picture and song stay locked. To build it:
+  - `python edl.py audio song_short.wav` writes the cut music.
+  - ``END=67.583 ./render_all.sh short --short 1 --edl "$(python -c 'import edl; print(edl.edl_arg())')"`` renders the picture.
 - `render_all.sh` renders the film in 10-second chunks. It skips chunks that are already done, so you can re-run it after a failure.
 
 ## Rebuild

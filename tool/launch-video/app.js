@@ -9,7 +9,9 @@ const T = (k) => BAR0 + k * 4 * BEAT;   // start of bar k
 const BT = (n) => BAR0 + n * BEAT;      // beat n
 let END = 0;
 // Flat cut (index.html?flat): solid colour scenes, no glow/gloss/grain/stars, its own camera.
-const FLAT = /[?&]flat\b/.test(location.search);
+const FLAT = /[?&](flat|short)\b/.test(location.search);
+// 1-minute cut (index.html?short): flat look, its own bolder camera; edl.py picks the bars shown.
+const SHORT = /[?&]short\b/.test(location.search);
 
 // ---------- math ----------
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -263,6 +265,7 @@ function monotone(ts, ys) {
 let C = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
 function camAt(t) {
   const c = CAMF(t);
+  if (SHORT) { c.z -= kick(t) * 28; return c; }   // zoom punch on every beat
   if (FLAT) return c;   // locked off: no handheld drift, no beat push
   // Handheld drift + a small dolly push on every beat.
   c.x += Math.sin(t * 0.37) * 10 + Math.sin(t * 0.91) * 4;
@@ -851,7 +854,8 @@ function build() {
   key(T(46), { z: Z8 + 40, ry: -3 });
   key(T(48), { z: Z8 - 80, ry: 3 });
   FLASHES.push([T(44), 0.65]);
-  if (FLAT) flatCamera();
+  if (SHORT) shortCamera();
+  else if (FLAT) flatCamera();
   buildCamera();
 }
 
@@ -1037,6 +1041,87 @@ function flatCamera() {
   cut(T(44), { x: 0, y: -380, z: Z8 + 420, rx: 28, ry: 0, rz: R2 });
   k(T(45), { y: 0, z: Z8 + 140, rx: 0 });
   k(T(48), { z: Z8 + 60 });
+}
+
+/* Camera for the 1-minute cut. Only the bars listed in edl.py are shown, so
+   each kept stretch gets its own bold move, and a key placed just before a
+   stretch makes it open mid-move. Times are film times (bars of the song). */
+function shortCamera() {
+  const k = fkey, F = 1 / 60, R = 360, R2 = 720, B = BEAT;
+  const cut = (t, v) => { const tc = Math.ceil(t / F - 1e-6) * F; k(tc - F + 0.002, {}); k(tc - 0.002, v); };
+  const Z1 = -4000, X3 = 1400, Z3 = -8000, Z4 = -12000, Z5 = -16000, ZE = -19000, Z6 = -21000, Z7 = -22600, Z8 = -24000;
+
+  // [0,1) logo: spiral push-in
+  k(0, { x: 160, y: -260, z: 1150, rx: 18, ry: 24, rz: -28 });
+  k(T(1), { x: 0, y: -60, z: 520, rx: 0, ry: 0, rz: 0 });
+  // [7,10) swing onto the wordmark, crash zoom with a barrel roll into the drop
+  k(T(7) - 0.3, { x: -260, y: 0, z: 720, ry: -24, rz: 10 });
+  k(T(7), { x: -160, z: 600, ry: -14, rz: 6 });
+  k(T(7.5), { x: 0, z: 320, ry: 0, rz: 0 });
+  k(T(8) - 0.04, { z: -3350, rz: R });
+  // title: orbit sweep while it builds; headlines: pull back from below, then orbit
+  k(T(8) + 0.6, { z: Z1 + 150, ry: -18 });
+  k(T(9), { z: Z1 + 60, ry: 14 });
+  k(T(9) + 0.6, { y: 60, z: Z1 + 420, rx: -8, ry: 0 });
+  k(T(10), { y: 0, z: Z1 + 320, rx: 0, ry: -16 });
+  // [11,12) high angle craning down onto the lean bar
+  k(T(11) - 0.25, { x: 0, y: -300, z: Z1 + 520, rx: 42, ry: 0 });
+  k(T(11), { y: -220, z: Z1 + 440, rx: 34 });
+  k(T(12), { y: 110, z: Z1 + 220, rx: 6 });
+  // [13,15) feed: big orbit right to left with a push in
+  k(T(13) - 0.3, { x: 320, y: 0, z: Z1 + 520, rx: 0, ry: 48 });
+  k(T(13), { x: 240, z: Z1 + 440, ry: 38 });
+  k(T(15), { x: 60, z: Z1 + 250, ry: -22 });
+  // [19,23) story page: low angle that cranes up while orbiting, then swings to the second phone
+  k(T(19) - 0.3, { x: X3, y: 300, z: Z3 + 120, rx: -30, ry: -12 });
+  k(T(19), { y: 240, z: Z3 + 180, rx: -24, ry: -6 });
+  k(T(21), { y: -60, z: Z3 + 300, rx: 10, ry: 16 });
+  k(T(22), { x: X3 + 40, y: 0, z: Z3 + 380, rx: 0, ry: -8 });
+  k(T(23), { x: X3 + 160, y: 20, z: Z3 + 460, ry: -24 });
+  // [24,25) blindspots: rolls upright while pushing in
+  k(T(24) - 0.2, { x: 0, y: -40, z: Z4 + 720, rx: 0, ry: 0, rz: R - 40 });
+  k(T(24), { z: Z4 + 620, rz: R - 32 });
+  k(T(25), { y: 0, z: Z4 + 40, rz: R - 6 });
+  // [26,28) whips in from the right, then orbits across the tiles
+  k(T(26) - 0.3, { x: 520, y: 100, z: Z4 + 320, ry: -42, rz: R });
+  k(T(26), { x: 440, y: 80, z: Z4 + 270, ry: -32 });
+  k(T(26) + 1.2, { x: 120, y: 40, z: Z4 + 140, ry: -6 });
+  k(T(28), { x: -60, y: 60, z: Z4 + 20, rx: -6, ry: 14 });
+  // [33,36) world: from below, rising to face the globe; gates: a quarter roll per beat
+  k(T(33) - 0.3, { x: 0, y: 200, z: Z5 + 500, rx: -40, ry: 0 });
+  k(T(33), { y: 160, z: Z5 + 420, rx: -32 });
+  k(T(34), { y: 0, z: Z5 - 40, rx: 0 });
+  const zAt = (t) => Z5 - 40 - (600 * (t - T(34))) / B;
+  for (let i = 0; i < 4; i++) {
+    const a = T(34) + B * i;
+    if (i) k(a, { z: zAt(a), rz: R + 90 * i });
+    k(a + 0.28, { z: zAt(a + 0.28), rz: R + 90 * (i + 1) });
+  }
+  k(T(35), { z: zAt(T(35)), rz: R2 });
+  k(T(35) + B * 2, { x: 0, z: ZE + 260, ry: 0 });
+  k(T(36), { x: -120, z: ZE + 140, ry: -14 });
+  // [37,39) local outlets: orbit right to left
+  k(T(37) - 0.3, { x: 320, y: 0, z: ZE + 420, ry: 36 });
+  k(T(37), { x: 270, z: ZE + 380, ry: 30 });
+  k(T(39), { x: -40, z: ZE + 160, ry: -14 });
+  // [40,42) values: every word lands on a hard angle and settles
+  [[{ x: 0, y: 0, z: Z6 + 300, rx: 0, ry: 26, rz: R2 - 18 }, { z: Z6 + 120, ry: 6, rz: R2 - 4 }],
+    [{ y: 160, z: Z6 + 220, rx: -30, ry: -22, rz: R2 }, { y: 60, z: Z6 + 90, rx: -12, ry: -8 }],
+    [{ y: -150, z: Z6 + 220, rx: 28, ry: 24, rz: R2 }, { y: -50, z: Z6 + 90, rx: 10, ry: 9 }],
+    [{ y: 0, z: Z6 + 320, rx: 0, ry: 0, rz: R2 + 22 }, { z: Z6 + 60, rz: R2 + 5 }]].forEach(([from, to], i) => {
+    const a = T(40) + B * 2 * i;
+    if (i) cut(a, from); else k(a - 0.1, from);   // the first word opens the stretch, so no cut needed
+    k(a + 0.5, to);
+    k(a + B * 2 - 0.03, { z: to.z - 30 });
+  });
+  // [43,48) open source: slow arc on the breakdown; finale: spinning crane down to eye level
+  k(T(43) - 0.3, { x: -280, y: 0, z: Z7 + 720, rx: 0, ry: -26, rz: R2 + 6 });
+  k(T(43), { x: -230, z: Z7 + 650, ry: -20, rz: R2 + 5 });
+  k(T(44) - 0.1, { x: 0, z: Z7 + 260, ry: 4, rz: R2 });
+  cut(T(44), { x: 0, y: -700, z: Z8 + 700, rx: 48, ry: 0, rz: R2 - 20 });
+  k(T(45), { y: 0, z: Z8 + 160, rx: 0, rz: R2 });
+  k(T(46.5), { x: -40, z: Z8 + 100, ry: -6 });
+  k(T(48), { x: 40, z: Z8 + 20, ry: 6 });
 }
 
 // ---------- per-frame ----------
