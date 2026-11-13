@@ -101,6 +101,16 @@ def _num(v):
         return None
 
 
+def _prev(item, price):
+    """Close before the latest session. Before the open CNBC's
+    previous_day_closing already equals the last price, while "change" still
+    holds the latest session's move (what Yahoo shows then too)."""
+    ch = _num(item.get("change"))
+    if price is not None and ch is not None:
+        return round(price - ch, 6)
+    return _num(item.get("previous_day_closing"))
+
+
 def _cnbc_json(url):
     try:
         req = urllib.request.Request(url, headers={"User-Agent": UA})
@@ -125,7 +135,8 @@ def cnbc_charts(symbols):
         return out
     for item in quotes:
         ysym = want.get(item.get("symbol"))
-        price, prev = _num(item.get("last")), _num(item.get("previous_day_closing"))
+        price = _num(item.get("last"))
+        prev = _prev(item, price)
         if not ysym or item.get("code") != 0 or price is None or not prev:
             continue
         try:
@@ -163,6 +174,63 @@ def cnbc_charts(symbols):
     return out
 
 
+# Large US companies: when Yahoo's screeners are blocked, top movers are the
+# biggest moves among these (Yahoo's screeners also skip small caps).
+UNIVERSE = ("AAPL MSFT NVDA AMZN GOOGL META TSLA AVGO BRK.B JPM LLY V UNH XOM MA JNJ PG HD COST ABBV "
+            "MRK CVX KO PEP ADBE WMT BAC CRM NFLX AMD TMO ORCL LIN MCD ACN CSCO ABT INTC WFC DIS QCOM "
+            "INTU TXN DHR VZ AMGN IBM PFE CMCSA NKE UBER PM NOW GE CAT SPGI HON UNP GS RTX BA AMAT LOW "
+            "T BKNG ISRG ELV PLD SBUX MS BLK DE MDT GILD LMT ADP SYK MU PLTR PYPL SNOW SHOP COIN ABNB "
+            "PANW CRWD MRVL LRCX KLAC F GM SOFI RIVN SMCI ARM DELL HOOD MSTR C SCHW").split()
+
+
+def _screen(rows):
+    return {"finance": {"result": [{"quotes": rows}]}}
+
+
+def cnbc_movers():
+    """Yahoo-shaped day_gainers / day_losers / most_actives from CNBC quotes."""
+    q = _cnbc_json("https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols="
+                   + urllib.parse.quote("|".join(UNIVERSE), safe="")
+                   + "&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1")
+    try:
+        quotes = q["FormattedQuoteResult"]["FormattedQuote"]
+    except (KeyError, TypeError):
+        return {}
+    rows = []
+    for it in quotes:
+        price, vol = _num(it.get("last")), _num(it.get("volume"))
+        prev = _prev(it, price)
+        if it.get("code") != 0 or price is None or not prev:
+            continue
+        rows.append({"symbol": it["symbol"].replace(".", "-"), "shortName": it.get("name"),
+                     "regularMarketPrice": price, "regularMarketPreviousClose": prev,
+                     "regularMarketChangePercent": round((price - prev) / prev * 100, 4),
+                     "regularMarketVolume": int(vol or 0), "currency": it.get("currencyCode") or "USD"})
+    if len(rows) < 20:
+        return {}
+    pct = sorted(rows, key=lambda r: r["regularMarketChangePercent"])
+    return {
+        "day_gainers": _screen([r for r in reversed(pct) if r["regularMarketChangePercent"] > 0][:10]),
+        "day_losers": _screen([r for r in pct if r["regularMarketChangePercent"] < 0][:10]),
+        "most_actives": _screen(sorted(rows, key=lambda r: -r["regularMarketVolume"])[:10]),
+    }
+
+
+def backup_trending():
+    """Most-talked-about tickers (StockTwits, then ApeWisdom), Yahoo-shaped."""
+    syms = []
+    j = _cnbc_json("https://api.stocktwits.com/api/2/trending/symbols.json")
+    for s in (j or {}).get("symbols", []):
+        t = s.get("symbol", "")
+        if s.get("instrument_class") != "CRYPTO" and t.replace(".", "").isalpha() and len(t) <= 5:
+            syms.append(t.replace(".", "-"))
+    if len(syms) < 5:
+        j = _cnbc_json("https://apewisdom.io/api/v1.0/filter/all-stocks/page/1")
+        syms = [r["ticker"] for r in (j or {}).get("results", []) if r.get("ticker", "").isalpha()]
+    syms = list(dict.fromkeys(syms))[:12]
+    return {"finance": {"result": [{"quotes": [{"symbol": s} for s in syms]}]}} if len(syms) >= 5 else None
+
+
 def chart_path(sym):
     # Same encoding as Dart's Uri.encodeComponent for these symbols.
     return "/v8/finance/chart/" + urllib.parse.quote(sym, safe="") + "?range=1d&interval=5m"
@@ -187,6 +255,9 @@ def main():
     out = {}
     trending_path = "/v1/finance/trending/US?count=12"
     tr = get(trending_path)
+    if not tr:
+        tr = backup_trending()
+        print(f"markets: trending from backup: {bool(tr)}")
     trending = []
     if tr:
         out[trending_path] = tr
@@ -194,9 +265,15 @@ def main():
             trending = [q["symbol"] for q in tr["finance"]["result"][0]["quotes"]][:8]
         except (KeyError, IndexError, TypeError):
             pass
+    backup_screens = None
     for s in SCREENS:
         p = f"/v1/finance/screener/predefined/saved?scrIds={s}&count=10"
         j = get(p)
+        if not j:
+            if backup_screens is None:
+                backup_screens = cnbc_movers()
+                print(f"markets: movers from CNBC backup: {bool(backup_screens)}")
+            j = backup_screens.get(s)
         if j:
             out[p] = j
         time.sleep(0.3)

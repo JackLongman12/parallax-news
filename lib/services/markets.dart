@@ -247,7 +247,96 @@ class Markets {
       return await _live(path);
     } catch (_) {
       if (s != null) return s; // older snapshot beats an empty screen
+      // Yahoo is blocking this phone: build the chart from CNBC instead.
+      final backup = await _cnbcChart(path);
+      if (backup != null) return backup;
       rethrow;
+    }
+  }
+
+  // ---- CNBC backup (public quote service, no key) ----
+  static const _cnbcSymbol = {
+    '^GSPC': '.SPX', '^DJI': '.DJI', '^IXIC': '.IXIC', '^RUT': '.RUT', '^VIX': '.VIX',
+    'GC=F': '@GC.1', 'CL=F': '@CL.1', 'BTC-USD': 'BTC.CM=', 'EURUSD=X': 'EUR=',
+    '^TNX': 'US10Y', '^FTSE': '.FTSE', '^N225': '.N225', 'ETH-USD': 'ETH.CM=',
+  };
+  static const _cnbcRange = {
+    '1d': '1D', '5d': '5D', '1mo': '1M', '6mo': '6M', 'ytd': 'YTD', '1y': '1Y', '5y': '5Y', 'max': 'ALL',
+  };
+  static double? _n(dynamic v) => v == null ? null : double.tryParse('$v'.replaceAll(',', '').replaceAll('%', ''));
+  static double? _pos(dynamic v) { final d = _n(v); return d != null && d > 0 ? d : null; } // CNBC sends 0.00 before the open
+
+  /// A Yahoo-shaped chart answer for a /v8/finance/chart/... path, from CNBC.
+  static Future<dynamic> _cnbcChart(String path) async {
+    final m = RegExp(r'^/v8/finance/chart/([^?]+)\?range=(\w+)').firstMatch(path);
+    if (m == null) return null;
+    final sym = Uri.decodeComponent(m[1]!);
+    final range = _cnbcRange[m[2]!];
+    if (range == null || !isValidSymbol(sym)) return null;
+    final c = _cnbcSymbol[sym] ?? (RegExp(r'^[A-Z.]{1,6}$').hasMatch(sym) ? sym : null);
+    if (c == null) return null;
+    try {
+      final enc = Uri.encodeQueryComponent(c);
+      final results = await Future.wait([
+        Net.getJson('https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=$enc'
+            '&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1', useCache: false),
+        Net.getJson('https://ts-api.cnbc.com/harmony/app/charts/$range.json?symbol=$enc', useCache: false).catchError((_) => null),
+      ]);
+      final list = ((results[0] as Map?)?['FormattedQuoteResult'] as Map?)?['FormattedQuote'];
+      final q = list is List && list.isNotEmpty && list.first is Map ? list.first as Map : null;
+      final price = _n(q?['last']);
+      // Before the open CNBC's previous_day_closing already equals the last
+      // price; "change" still holds the latest session's move.
+      final ch = _n(q?['change']);
+      var prev = price != null && ch != null ? price - ch : _n(q?['previous_day_closing']);
+      if (q == null || q['code'] != 0 || price == null || prev == null || prev == 0) return null;
+      final times = <int>[], closes = <double>[];
+      final bars = ((results[1] as Map?)?['barData'] as Map?)?['priceBars'];
+      if (bars is List) {
+        final step = range == '1D' ? 5 : 1; // 1-minute bars -> 5-minute, like Yahoo
+        for (var i = 0; i < bars.length; i += step) {
+          final b = bars[i];
+          final close = b is Map ? _n(b['close']) : null;
+          final t = b is Map ? b['tradeTimeinMills'] : null;
+          if (close != null && t is num) {
+            times.add(t.toInt() ~/ 1000);
+            closes.add(close);
+          }
+        }
+      }
+      // Longer ranges are measured from the start of the range, like Yahoo.
+      if (range != '1D' && closes.isNotEmpty) prev = closes.first;
+      final vol = _n(q['volume']);
+      return {
+        'chart': {
+          'result': [
+            {
+              'meta': {
+                'symbol': sym,
+                'regularMarketPrice': price,
+                'chartPreviousClose': prev,
+                'longName': q['name'],
+                'shortName': q['shortName'],
+                'currency': q['currencyCode'],
+                'regularMarketDayHigh': _pos(q['high']),
+                'regularMarketDayLow': _pos(q['low']),
+                'regularMarketVolume': vol?.toInt(),
+                'fiftyTwoWeekHigh': _n(q['yrhiprice']),
+                'fiftyTwoWeekLow': _n(q['yrloprice']),
+                'fullExchangeName': q['exchange'],
+              },
+              'timestamp': times,
+              'indicators': {
+                'quote': [
+                  {'close': closes, 'open': [_pos(q['open'])]}
+                ]
+              },
+            }
+          ]
+        }
+      };
+    } catch (_) {
+      return null;
     }
   }
 
