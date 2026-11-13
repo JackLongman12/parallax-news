@@ -383,7 +383,7 @@ class AppState extends ChangeNotifier {
 
   // ---- How should we keep you informed? ----
   /// 'detailed' (everything), 'aware' (2+ outlets), 'key' (5+ outlets,
-  /// major stories only), 'off' (no briefing / The Last 24).
+  /// major stories only), 'off' (no briefing / Catch up).
   String get informLevel => _prefs.getString('informLevel') ?? 'aware';
 
   void setInformLevel(String v) {

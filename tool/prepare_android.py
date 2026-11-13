@@ -81,6 +81,13 @@ def main() -> None:
 
     text = re.sub(r'android:label="[^"]*"', 'android:label="Parallax News"', text, count=1)
 
+    # One task only. With Flutter's default "singleTop", tapping "Open" in
+    # the installer after an update (or a home-screen widget) starts a second
+    # copy, so Recents shows Parallax twice.
+    text = text.replace('android:launchMode="singleTop"', 'android:launchMode="singleTask"')
+    if 'android:launchMode="singleTask"' not in text:
+        sys.exit("MainActivity launchMode not found in AndroidManifest.xml")
+
     # Never allow plain-HTTP traffic; all providers are HTTPS.
     if "usesCleartextTraffic" not in text:
         text = text.replace("<application", '<application\n        android:usesCleartextTraffic="false"', 1)
