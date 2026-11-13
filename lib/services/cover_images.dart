@@ -322,8 +322,46 @@ class CoverImages {
     for (final t in thumbs) {
       if (_claim(t, id)) return t;
     }
-    // 6. Last resort: a distinct curated photo for the topic.
+    // 5. A news photo of the same subject: Bing News on the headline's key
+    //    words (names, places), read from those articles' own pages.
+    final related = await _related(s);
+    if (related != null) return related;
+    // 6. Wikimedia Commons, by the people / places named in the headline.
+    final commons = await commonsImage(s);
+    if (commons != null) return commons;
+    // 7. Last resort: a distinct curated photo for the topic.
     return quick(s);
+  }
+
+  static Future<String?> _related(Story s) async {
+    final q = keywordsFor(s);
+    if (q.trim().isEmpty) return null;
+    try {
+      final mine = TextTokens.tokens(s.title).where((w) => w.length >= 4).toSet();
+      final names = _properNouns(s.title).map((p) => p.toLowerCase()).toSet();
+      final hits = (await BingNews.search(q).timeout(const Duration(seconds: 6))).where((h) {
+        final t = h.title.toLowerCase();
+        return names.any(t.contains) || TextTokens.tokens(h.title).where(mine.contains).length >= 2;
+      }).take(4).toList();
+      final best = await _firstClaimed([for (final h in hits.take(2)) _ogImage(h.url)], s.id);
+      if (best != null) return best;
+      for (final h in hits) {
+        final img = h.imageUrl;
+        if (img != null && _claim(img, s.id)) return img;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// A real photo for a topic tile: today's most-covered story in that
+  /// topic from the crawler feed, else the curated topic photo.
+  static String? liveFor(Category c, int seed) {
+    final pool = [
+      for (final s in CrawlerFeed.stories)
+        if (s.category == c && isNewsPhoto(cached(s)) && !looksGeneric(cached(s)!)) cached(s)!,
+    ];
+    if (pool.isNotEmpty) return pool[seed.abs() % (pool.length < 3 ? pool.length : 3)];
+    return variantFor(c, seed);
   }
 
   static final _domainRe = RegExp(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$');

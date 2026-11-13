@@ -220,8 +220,8 @@ class BiasBar extends StatelessWidget {
       if (n > 0) segments.add(Expanded(flex: n, child: Container(color: c)));
     }
 
-    if (!dist.isReliable) {
-      // Not enough rated outlets: neutral bar, no political colour at all.
+    if (dist.rated == 0) {
+      // No rated outlets: neutral bar, no political colour at all.
       seg(1, Bias.unrated.color);
     } else {
       seg(dist.left, Side.left.color);
@@ -235,15 +235,32 @@ class BiasBar extends StatelessWidget {
       child: SizedBox(height: height, child: Row(children: segments)),
     );
     if (!showLabels) return bar;
-    if (!dist.isReliable) {
+    if (dist.rated == 0) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         bar,
         const SizedBox(height: 6),
         Text('Lean unknown', style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).hintColor)),
-        Text(
-          'Only ${dist.rated} of ${dist.total} outlets covering this are rated, '
-          'so no left/right split is shown. Tap an outlet to see or set its rating.',
-          style: Theme.of(context).textTheme.bodySmall,
+        Text('None of the outlets covering this are rated yet.', style: Theme.of(context).textTheme.bodySmall),
+      ]);
+    }
+    if (!dist.isReliable) {
+      // Thin data: show counts and say so plainly.
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        bar,
+        const SizedBox(height: 6),
+        Row(children: [
+          Text('Left ${dist.left}', style: TextStyle(color: Side.left.color, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text('Center ${dist.center}', style: TextStyle(color: Side.center.color, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text('Right ${dist.right}', style: TextStyle(color: Side.right.color, fontWeight: FontWeight.w600)),
+        ]),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+              'Early read: based on just ${dist.rated} rated outlet${dist.rated == 1 ? '' : 's'}'
+              '${dist.unrated > 0 ? ' (${dist.unrated} more unrated)' : ''}.',
+              style: Theme.of(context).textTheme.bodySmall),
         ),
       ]);
     }
@@ -614,7 +631,10 @@ class _StoryCardState extends State<StoryCard> {
   }
 
   static String _split(BiasDistribution d) {
-    if (!d.isReliable) return 'Lean unknown';
+    if (d.rated == 0) return 'Lean unknown';
+    // Few rated outlets: show counts, not percentages ("50%" of 2 outlets
+    // would sound more certain than it is).
+    if (!d.isReliable) return 'L ${d.left} · C ${d.center} · R ${d.right}';
     String p(Side s) => '${(d.share(s) * 100).round()}%';
     return 'L ${p(Side.left)} · C ${p(Side.center)} · R ${p(Side.right)}';
   }

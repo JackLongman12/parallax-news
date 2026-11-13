@@ -30,6 +30,7 @@ class CrawlerFeed {
   static DateTime? builtAt;
   static DateTime? get loadedAt => _stories == null ? null : _at;
   static int get count => _stories?.length ?? 0;
+  static List<Story> get stories => _stories ?? const [];
   static String get via => _via;
   static String? lastError;
 

@@ -270,17 +270,33 @@ class ExploreScreen extends StatelessWidget {
         ),
       ],
       section('Sources & ratings'),
+      // Same size and style as the "Browse the world" tiles.
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _Tile(
-          icon: Icons.newspaper_rounded,
-          title: 'Source directory',
-          subtitle: 'Every outlet, its lean, owner and factuality',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => Scaffold(appBar: AppBar(title: const Text('Sources')), body: const SourcesScreen()))),
+        child: GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.3,
+          children: [
+            _Tile(
+              icon: Icons.newspaper_rounded,
+              title: 'Source directory',
+              subtitle: 'Lean, owner, factuality',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(appBar: AppBar(title: const Text('Sources')), body: const SourcesScreen()))),
+            ),
+            _Tile(
+              icon: Icons.balance_rounded,
+              title: 'Reading balance',
+              subtitle: 'Your left / center / right mix',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ReadingBalanceScreen())),
+            ),
+          ],
         ),
       ),
-      const ReadingBalanceTile(),
       section('Browse the world'),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
