@@ -122,7 +122,11 @@ class Brand {
         shape: const StadiumBorder(side: BorderSide.none),
         side: BorderSide.none,
         backgroundColor: dark ? const Color(0xFF1C1B20) : const Color(0xFFECE9F3),
-        labelStyle: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+        // Explicit colour: without one, chip labels fell back to white and
+        // were unreadable on the light chip background.
+        labelStyle: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: dark ? Colors.white : const Color(0xFF1B1530)),
+        secondaryLabelStyle: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: dark ? Colors.white : const Color(0xFF1B1530)),
+        checkmarkColor: dark ? Colors.white : Brand.purple,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
