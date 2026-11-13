@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'crawler_feed.dart';
 import 'provider_health.dart';
 import 'net.dart';
 
@@ -166,8 +169,54 @@ class Markets {
     return History(times, vals, prevClose: meta is Map ? _d(meta['chartPreviousClose']) : null);
   }
 
-  static Future<dynamic> _get(String path) =>
-      ProviderHealth.instance.run('yahoo', () => Net.getJson('$_host$path', useCache: false));
+  // Yahoo rate-limits bursts (the Markets tab alone needs ~25 calls), so:
+  // at most 3 requests at a time, identical requests share one fetch, answers
+  // are reused for 45 s, and a failed call retries on Yahoo's second server,
+  // then via our Cloudflare worker (if it has the /y route).
+  static final _inflight = <String, Future<dynamic>>{};
+  static final _cache = <String, (DateTime, dynamic)>{};
+  static int _active = 0;
+  static final _waiters = <Completer<void>>[];
+
+  static Future<dynamic> _get(String path) {
+    final hit = _cache[path];
+    if (hit != null && DateTime.now().difference(hit.$1) < const Duration(seconds: 45)) return Future.value(hit.$2);
+    return _inflight[path] ??= _fetch(path).whenComplete(() => _inflight.remove(path));
+  }
+
+  static Future<dynamic> _fetch(String path) async {
+    while (_active >= 3) {
+      final w = Completer<void>();
+      _waiters.add(w);
+      await w.future;
+    }
+    _active++;
+    try {
+      final json = await ProviderHealth.instance.run('yahoo', () => _tryHosts(path));
+      if (_cache.length > 150) _cache.clear();
+      _cache[path] = (DateTime.now(), json);
+      return json;
+    } finally {
+      _active--;
+      if (_waiters.isNotEmpty) _waiters.removeAt(0).complete();
+    }
+  }
+
+  static Future<dynamic> _tryHosts(String path) async {
+    Object? first;
+    for (final h in [
+      _host,
+      'https://query2.finance.yahoo.com',
+      if (CrawlerFeed.workerUrl.startsWith('https://')) '${CrawlerFeed.workerUrl}/y',
+    ]) {
+      try {
+        return await Net.getJson('$h$path', useCache: false);
+      } catch (e) {
+        first ??= e;
+      }
+    }
+    throw first!;
+  }
 
   /// Live quote incl. today's intraday line (one request).
   static Future<Quote?> quote(String symbol, {String? label}) async {

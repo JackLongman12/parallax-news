@@ -3,6 +3,8 @@
 //   GET /feed          -> latest crawler feed (JSON), cached at the edge
 //   GET /og?url=...    -> { image } : preview image of an article page,
 //                         cached for a day, so phones don't fetch pages
+//   GET /y/<path>      -> Yahoo Finance JSON (chart, trending, screener,
+//                         search only), cached 60 s and shared by all users
 //   GET /health        -> "ok"
 //   cron (every 5 min) -> starts the GitHub crawler, because GitHub's own
 //                         schedule is often delayed or skipped. Needs the
@@ -117,6 +119,35 @@ async function og(request, env, ctx) {
   return res;
 }
 
+const YAHOO_PATHS = [
+  /^\/v8\/finance\/chart\/[^/]{1,32}$/,
+  /^\/v1\/finance\/trending\/[A-Z]{2}$/,
+  /^\/v1\/finance\/screener\/predefined\/saved$/,
+  /^\/v1\/finance\/search$/,
+];
+
+async function yahoo(request, ctx) {
+  const url = new URL(request.url);
+  const path = url.pathname.slice(2); // drop "/y"
+  if (!YAHOO_PATHS.some((re) => re.test(path)) || url.search.length > 300) {
+    return json({ error: "not allowed" }, 400);
+  }
+  const target = "https://query1.finance.yahoo.com" + path + url.search;
+  const cache = caches.default;
+  const key = new Request("https://parallax-cache/y" + path + url.search);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const r = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
+  if (!r.ok) return json({ error: "upstream " + r.status }, r.status === 429 ? 429 : 502, 15);
+  const body = await r.text();
+  if (body.length > 2_000_000) return json({ error: "too large" }, 502);
+  const res = new Response(body, {
+    headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60", ...CORS },
+  });
+  ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -124,6 +155,7 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === "/feed") return feed(request, env, ctx);
     if (path === "/og") return og(request, env, ctx);
+    if (path.startsWith("/y/")) return yahoo(request, ctx);
     if (path === "/health") return new Response("ok", { headers: CORS });
     return json({ error: "not found" }, 404);
   },

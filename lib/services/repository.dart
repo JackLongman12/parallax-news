@@ -398,6 +398,23 @@ class NewsRepository {
     return list;
   }
 
+  /// The crawler is the main source once its feed is loaded and recent. The
+  /// phone then only fetches what the crawler is thin on: cities / regions,
+  /// countries without a Google News edition, and sparse topics. Fewer
+  /// requests on the phone, so feeds fill faster and use less data.
+  static bool crawlIsMain(List<Story> crawl) {
+    final built = CrawlerFeed.builtAt;
+    return crawl.length >= 100 && (built == null || DateTime.now().difference(built) < const Duration(minutes: 45));
+  }
+
+  static bool _crawlThinOn(List<Story> crawl, Category t) => crawl.where((s) => s.category == t).length < 15;
+
+  static bool _crawlThinOnPlace(Place p) {
+    if (p.level == PlaceLevel.world || p.level == PlaceLevel.continent) return false;
+    if (p.level == PlaceLevel.country) return editionFor(p.countryCode) == null;
+    return true;
+  }
+
   /// Merges on-device stories into crawler stories: if they share any
   /// article link they are the same story (outlets are combined), otherwise
   /// the device story is added. Crawler stories usually carry far more outlets.
@@ -532,11 +549,15 @@ class NewsRepository {
   Future<List<Story>> broadPool({required List<Place> places, required List<Category> topics, bool force = false}) async {
     final home = countryByCode(settings.homeCountry)?.place;
     final topicSet = {Category.politics, Category.world, Category.business, ...topics};
+    final crawl = await crawlerStories(force: force);
+    final main = crawlIsMain(crawl);
     final bundles = await runPooled<NewsBundle>([
-      () => place(Place.world, force: force),
-      if (home != null) () => place(home, force: force),
-      for (final p in places) () => place(p, force: force),
-      for (final t in topicSet) () => topic(t, force: force),
+      if (!main) () => place(Place.world, force: force),
+      if (home != null && (!main || _crawlThinOnPlace(home))) () => place(home, force: force),
+      for (final p in places)
+        if (!main || _crawlThinOnPlace(p)) () => place(p, force: force),
+      for (final t in topicSet)
+        if (!main || _crawlThinOn(crawl, t)) () => topic(t, force: force),
     ], concurrency: 3);
     final seen = <String>{};
     final all = <Article>[];
@@ -545,7 +566,7 @@ class NewsRepository {
         if (seen.add(a.url)) all.add(a);
       }
     }
-    return merge(await crawlerStories(force: force), _clusterAndLabel(all));
+    return merge(crawl, _clusterAndLabel(all));
   }
 
   /// Blindspot scan over a broad pool (not just your briefing): world, your
@@ -607,28 +628,35 @@ class NewsRepository {
     // Our crawler's pre-built stories (dozens of outlets each) arrive first.
     crawl = await crawlerStories(force: force);
     if (crawl.isNotEmpty) yield Curator.rank(crawl, profile);
+    final main = crawlIsMain(crawl);
+    bool needTopic(Category t) => !main || _crawlThinOn(crawl, t);
 
     // Stage 1: yield as each of World + first 3 topics arrives (fastest first).
     final stage1 = <Future<NewsBundle>>[
-      place(Place.world, force: force),
-      for (final t in topics.take(3)) topic(t, force: force),
+      if (!main) place(Place.world, force: force),
+      for (final t in topics.take(3))
+        if (needTopic(t)) topic(t, force: force),
     ];
-    final arrivals = StreamController<void>();
-    var pending = stage1.length;
-    for (final f in stage1) {
-      add(f).whenComplete(() {
-        arrivals.add(null);
-        if (--pending == 0) arrivals.close();
-      });
-    }
-    await for (final _ in arrivals.stream) {
-      if (collected.isNotEmpty) yield ranked();
+    if (stage1.isNotEmpty) {
+      final arrivals = StreamController<void>();
+      var pending = stage1.length;
+      for (final f in stage1) {
+        add(f).whenComplete(() {
+          arrivals.add(null);
+          if (--pending == 0) arrivals.close();
+        });
+      }
+      await for (final _ in arrivals.stream) {
+        if (collected.isNotEmpty) yield ranked();
+      }
     }
     for (final p in places) {
+      if (main && !_crawlThinOnPlace(p)) continue;
       await add(place(p, force: force));
       yield ranked();
     }
     for (final t in topics.skip(3)) {
+      if (!needTopic(t)) continue;
       await add(topic(t, force: force));
       yield ranked();
     }
