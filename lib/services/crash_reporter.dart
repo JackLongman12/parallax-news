@@ -57,7 +57,7 @@ class CrashReporter {
     if (error is SocketException || error is TimeoutException || error is HttpException || error is http.ClientException) {
       return;
     }
-    final text = '${error.runtimeType}: $error'.trim();
+    final text = scrub('${error.runtimeType}: $error'.trim());
     final key = text.length > 200 ? text.substring(0, 200) : text;
     if (_sent.length >= 5 || !_sent.add(key)) return;
     final body = {
@@ -69,6 +69,13 @@ class CrashReporter {
     };
     unawaited(_send(body).then((ok) => ok ? null : _queue(body)));
   }
+
+  /// Removes query strings (search terms), e-mail addresses and long
+  /// digit runs from error text before it leaves the phone.
+  static String scrub(String s) => s
+      .replaceAll(RegExp(r'\?[^\s\)\]\}"]*'), '?…')
+      .replaceAll(RegExp(r'[\w.+-]+@[\w-]+\.[\w.]+'), '<email>')
+      .replaceAll(RegExp(r'\d{6,}'), '<n>');
 
   static Future<bool> _send(Map<String, Object?> body) async {
     try {

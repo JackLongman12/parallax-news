@@ -22,8 +22,6 @@ To show news, the app downloads public data directly from the services below. Li
 - **Outlet and place data:** Wikidata.
 - **The crawler feed and app updates:** GitHub, and our Cloudflare Worker.
 
-Our crawler runs on GitHub's servers, not on your phone. It may also use official news APIs (The Guardian, The New York Times, NewsData.io, GNews, NewsAPI), and it never sends them anything about you.
-
 ## Crash reports
 
 When the app crashes, it sends a crash report to our Cloudflare Worker. The report contains:

@@ -1,3 +1,5 @@
+# Weekly PRs for outdated GitHub Actions and Dart packages (security fixes
+# included). Each PR runs the normal build, so nothing merges untested.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -8,3 +10,4 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5

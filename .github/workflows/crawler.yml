@@ -34,15 +34,7 @@ jobs:
       - name: Note start time
         run: echo "CRAWL_START=$(date +%s)" >> "$GITHUB_ENV"
 
-      # Official API keys (all optional; see crawler/apis.py). Each source
-      # turns on when its secret is set.
       - name: Crawl
-        env:
-          GUARDIAN_KEY: ${{ secrets.GUARDIAN_KEY }}
-          NYT_KEY: ${{ secrets.NYT_KEY }}
-          NEWSDATA_KEY: ${{ secrets.NEWSDATA_KEY }}
-          GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
-          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
         run: python3 crawler/crawl.py
 
       - name: Publish feed

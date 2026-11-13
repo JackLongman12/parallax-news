@@ -19,11 +19,9 @@ WORKER = "https://parallax-news.lp-reports.workers.dev"
 
 def main():
     token = (ROOT / "secrets/worker_admin_token.txt").read_text().strip()
-    q = {"token": token}
-    if len(sys.argv) > 1:
-        q["id"] = sys.argv[1]
+    q = {"id": sys.argv[1]} if len(sys.argv) > 1 else {}
     req = urllib.request.Request(f"{WORKER}/crashes?{urllib.parse.urlencode(q)}",
-                                 headers={"User-Agent": "parallax-crash-reader/1.0"})
+                                 headers={"User-Agent": "parallax-crash-reader/1.0", "Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=20) as r:
         data = json.load(r)
     if "id" in q:

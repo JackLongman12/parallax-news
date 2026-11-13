@@ -18,10 +18,12 @@ from __future__ import annotations
 import gzip
 import hashlib
 import html
+import ipaddress
 import json
 import math
 import pathlib
 import re
+import socket
 import sys
 import time
 import urllib.parse
@@ -29,9 +31,6 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from email.utils import parsedate_to_datetime
-
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import apis  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "crawler/out"
@@ -93,12 +92,41 @@ def feed_list(catalog):
 
 
 # --------------------------------------------------------------- fetching ---
+def public_host(url):
+    """False for localhost, private, link-local and metadata addresses."""
+    try:
+        host = urllib.parse.urlparse(url).hostname or ""
+        if not host or host == "localhost" or host.endswith((".local", ".internal")):
+            return False
+        for info in socket.getaddrinfo(host, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+class _PublicRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow redirects only to public http(s) addresses."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith(("https://", "http://")) or not public_host(newurl):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_PublicRedirects)
+
+
 def fetch(url, limit=4 * 1024 * 1024, timeout=12):
     if not url.startswith("https://") and not url.startswith("http://"):
         return None
+    if not public_host(url):
+        return None
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _OPENER.open(req, timeout=timeout) as r:
             data = r.read(limit)
             if r.headers.get("Content-Encoding") == "gzip":
                 data = gzip.decompress(data)
@@ -421,12 +449,6 @@ def main():
     with ThreadPoolExecutor(WORKERS) as ex:
         results = list(ex.map(fetch_feed, feeds))
     raw = [a for r in results for a in r]
-    try:
-        api_items = apis.fetch_all(state)
-        raw.extend(api_items)
-        print(f"news APIs: {apis.STATS or 'no keys set'} -> {len(api_items)} items", flush=True)
-    except Exception as e:  # noqa: BLE001 - APIs are extras; never break the crawl
-        print(f"news APIs failed: {e}", flush=True)
     print(f"fetched {len(feeds)} feeds -> {len(raw)} items in {time.time() - t0:.0f}s", flush=True)
 
     seen, articles = set(), []
@@ -452,7 +474,7 @@ def main():
                 c["a"].append(a)
     print(f"expanded {len(top)} stories in {time.time() - t0:.0f}s", flush=True)
 
-    clusters = [c for c in clusters if len(outlets(c)) >= 2 or any(x["v"] in ("rss", "api") for x in c["a"])]
+    clusters = [c for c in clusters if len(outlets(c)) >= 2 or any(x["v"] == "rss" for x in c["a"])]
     clusters.sort(key=lambda c: -(math.log2(1 + len(outlets(c))) * 2 + max((a["p"] or 0) for a in c["a"]) / 86400))
     clusters = clusters[:700]
 

@@ -6,7 +6,7 @@
 //   GET  /og?url=...   -> { image } : preview image of an article page,
 //                         cached for a day, so phones don't fetch pages
 //   POST /crash        -> anonymous crash report from the app (see crash())
-//   GET  /crashes?token=ADMIN_TOKEN[&id=...] -> grouped crash reports
+//   GET  /crashes[?id=...] (Authorization: Bearer ADMIN_TOKEN) -> crash reports
 //   GET  /health       -> JSON status; HTTP 503 if the feed is older than
 //                         30 min (point an uptime monitor at it)
 //   cron (every 5 min) -> copies a new feed from GitHub into KV, and if the
@@ -69,20 +69,32 @@ async function feed(request, env, ctx) {
   const hit = await cache.match(key);
   if (hit) return hit;
   let res = null;
+  let kv = null;
   // 1. The copy in KV (refreshed by the cron).
   if (env.STORE) {
     try {
-      const { value, metadata } = await env.STORE.getWithMetadata("feed:gz", { type: "stream" });
-      if (value) res = feedResponse(value, metadata?.seen ? Math.round(Date.now() / 1000 - metadata.seen) : null);
+      kv = await env.STORE.getWithMetadata("feed:gz", { type: "stream" });
+    } catch {
+      kv = null;
+    }
+  }
+  const age = kv?.metadata?.seen ? Math.round(Date.now() / 1000 - kv.metadata.seen) : null;
+  if (kv?.value && age !== null && age < STALE_RESTART) {
+    res = feedResponse(kv.value, age);
+  } else {
+    // 2. KV copy missing or stale (e.g. KV writes failing): GitHub directly,
+    //    and only if GitHub fails too, the old KV copy.
+    try {
+      const r = await fetch(env.FEED_URL || GITHUB_FEED, { redirect: "follow", cf: { cacheTtl: FEED_TTL } });
+      if (r.ok) {
+        if (kv?.value) await kv.value.cancel();
+        res = feedResponse(r.body, null);
+      }
     } catch {
       res = null;
     }
-  }
-  // 2. GitHub directly (first run, or KV unavailable).
-  if (!res) {
-    const r = await fetch(env.FEED_URL || GITHUB_FEED, { redirect: "follow", cf: { cacheTtl: FEED_TTL } });
-    if (!r.ok) return json({ error: "feed unavailable" }, 502, 30);
-    res = feedResponse(r.body, null);
+    if (!res && kv?.value) res = feedResponse(kv.value, age);
+    if (!res) return json({ error: "feed unavailable" }, 502, 30);
   }
   ctx.waitUntil(cache.put(key, res.clone()));
   return res;
@@ -218,6 +230,13 @@ async function crash(request, env, ctx) {
   if (n >= 20) return json({ ok: true, dropped: true }, 200, 0);
   ctx.waitUntil(cache.put(rk, new Response(String(n + 1), { headers: { "Cache-Control": "max-age=86400" } })));
 
+  // Cap new crash writes per hour (per Cloudflare location) so a flood of
+  // reports can't use up the free plan's 1,000 daily KV writes that the
+  // feed copy also needs.
+  const hk = new Request(`https://parallax-cache/crash-hour/${new Date().toISOString().slice(0, 13)}`);
+  const writes = Number((await (await cache.match(hk))?.text()) || 0);
+  if (writes >= 25) return json({ ok: true, dropped: true }, 200, 0);
+
   const frames = stack.split("\n").filter((l) => l.trim()).slice(0, 5).join("\n");
   const fp = await sha(err.split("\n")[0].replace(/\d+/g, "#") + "\n" + frames);
   const key = `crash:${fp}`;
@@ -238,6 +257,7 @@ async function crash(request, env, ctx) {
     error: err,
     stack,
   };
+  ctx.waitUntil(cache.put(hk, new Response(String(writes + 1), { headers: { "Cache-Control": "max-age=3600" } })));
   await env.STORE.put(key, JSON.stringify(rec), {
     expirationTtl: CRASH_TTL,
     metadata: { last: now, count: rec.count, version, error: err.slice(0, 160) },
@@ -245,9 +265,18 @@ async function crash(request, env, ctx) {
   return json({ ok: true, id: fp }, 200, 0);
 }
 
+function sameSecret(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function crashes(request, env) {
   const url = new URL(request.url);
-  if (!env.ADMIN_TOKEN || url.searchParams.get("token") !== env.ADMIN_TOKEN) return json({ error: "forbidden" }, 403, 0);
+  // Token in a header, not the URL (URLs end up in logs).
+  const auth = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!env.ADMIN_TOKEN || !sameSecret(auth, env.ADMIN_TOKEN)) return json({ error: "forbidden" }, 403, 0);
   const id = url.searchParams.get("id");
   if (id) return json((await env.STORE.get(`crash:${id}`, { type: "json" })) || { error: "not found" }, 200, 0);
   const list = await env.STORE.list({ prefix: "crash:", limit: 1000 });

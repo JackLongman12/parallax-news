@@ -36,22 +36,12 @@ The admin token is in `secrets/worker_admin_token.txt`, which git ignores. Relea
 flutter symbolize -i trace.txt -d app.android-arm64.symbols
 ```
 
-## Optional: official news API keys (free)
+## Crawler watchdog
 
-Each key turns on one more source in the crawler. Add one with `gh secret set NAME`.
-
-| Secret | Sign up | Free limit |
-|---|---|---|
-| `GUARDIAN_KEY` | open-platform.theguardian.com | 5,000 per day |
-| `NYT_KEY` | developer.nytimes.com (Times Newswire) | 500 per day |
-| `NEWSDATA_KEY` | newsdata.io | 200 credits per day |
-| `GNEWS_KEY` | gnews.io | 100 per day |
-| `NEWSAPI_KEY` | newsapi.org | 100 per day |
-
-**Crawler watchdog:** add the `GH_TOKEN` secret to the Worker so its cron can restart a stalled crawler. Use a fine-grained token with Actions read/write on this repo only, then run:
+The Worker's `GH_TOKEN` secret (set) lets its cron restart a stalled crawler. It is a fine-grained token with Actions read/write on this repo only, valid for one year. To replace it when it expires, create a new one the same way, then from the `worker` folder in PowerShell run:
 
 ```
-cd worker && npx wrangler secret put GH_TOKEN
+npx.cmd wrangler secret put GH_TOKEN
 ```
 
 ## Before telling people about it

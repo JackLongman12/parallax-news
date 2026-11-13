@@ -2,7 +2,7 @@
 
 ![Parallax News](docs/img/feature_graphic.png)
 
-**Every side of every story, from the world to your street.** Open-source, bias-aware news for Android. No account, no tracking, no server.
+**Every side of every story, from the world to your street.** Open-source, bias-aware news for Android. No account, no ads, no tracking.
 
 ## Features
 
@@ -10,7 +10,7 @@
 - **Left / center / right coverage** for every story, plus **blindspots** (stories one side ignores), with factuality, ownership and state-affiliation labels.
 - **20 topics**, including Tech, AI, Science, Space, Sports, Gaming, Business and Climate, backed by about 390 seed outlets.
 - **On-device curated daily feed:** a self-training topic classifier plus interest learning plus diversity ranking. It runs on low-end phones.
-- **Home-screen widgets** for the Daily Briefing and Blindspot.
+- **Home-screen widget** for the daily briefing.
 - **Auto-update:** checks at startup, downloads, and verifies the SHA-256 before installing.
 
 ## Build
