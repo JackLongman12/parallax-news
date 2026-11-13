@@ -11,6 +11,7 @@ Standard library only.
 """
 
 import gzip
+import http.cookiejar
 import json
 import os
 import time
@@ -37,6 +38,30 @@ META_KEYS = {
 
 
 FAILS = 0
+ERRORS = {}
+JAR = http.cookiejar.CookieJar()
+OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(JAR))
+CRUMB = None
+
+
+def session():
+    """Yahoo answers servers in data centres only with a session cookie and a
+    matching "crumb" (the same handshake yfinance and browsers do)."""
+    global CRUMB
+    for url in ("https://fc.yahoo.com", "https://finance.yahoo.com/"):
+        try:
+            OPENER.open(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=10).read(1000)
+        except Exception:  # noqa: BLE001 - fc.yahoo.com answers 404 but sets the cookie
+            pass
+    for host in (HOST2, HOST):
+        try:
+            req = urllib.request.Request(host + "/v1/test/getcrumb", headers={"User-Agent": UA})
+            c = OPENER.open(req, timeout=10).read(200).decode().strip()
+            if c and "<" not in c and len(c) < 40:
+                CRUMB = c
+                return
+        except Exception as e:  # noqa: BLE001
+            ERRORS[f"crumb {getattr(e, 'code', type(e).__name__)}"] = ERRORS.get(f"crumb {getattr(e, 'code', type(e).__name__)}", 0) + 1
 
 
 def get(path):
@@ -45,14 +70,17 @@ def get(path):
     global FAILS
     if FAILS >= 6:
         return None
+    full = path + (("&" if "?" in path else "?") + "crumb=" + urllib.parse.quote(CRUMB) if CRUMB else "")
     for host in (HOST, HOST2):
         try:
-            req = urllib.request.Request(host + path, headers={"User-Agent": UA, "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=10) as r:
+            req = urllib.request.Request(host + full, headers={"User-Agent": UA, "Accept": "application/json"})
+            with OPENER.open(req, timeout=10) as r:
                 FAILS = 0
                 return json.loads(r.read(3_000_000))
         except Exception as e:  # noqa: BLE001 - any failure: next host
-            time.sleep(1 if getattr(e, "code", None) == 429 else 0.2)
+            k = str(getattr(e, "code", type(e).__name__))
+            ERRORS[k] = ERRORS.get(k, 0) + 1
+            time.sleep(1 if k == "429" else 0.2)
     FAILS += 1
     return None
 
@@ -77,6 +105,7 @@ def trim_chart(j):
 
 def main():
     t0 = time.time()
+    session()
     out = {}
     trending_path = "/v1/finance/trending/US?count=12"
     tr = get(trending_path)
@@ -104,7 +133,8 @@ def main():
     data = json.dumps({"v": 1, "at": int(time.time()), "r": out}, separators=(",", ":")).encode()
     with gzip.open(OUT, "wb") as f:
         f.write(data)
-    print(f"markets: {len(out)} answers ({len(syms)} symbols), {len(data) // 1024} KB, {time.time() - t0:.0f}s")
+    print(f"markets: {len(out)} answers ({len(syms)} symbols), {len(data) // 1024} KB, {time.time() - t0:.0f}s,"
+          f" crumb={'yes' if CRUMB else 'no'}, errors={ERRORS}")
 
 
 if __name__ == "__main__":
