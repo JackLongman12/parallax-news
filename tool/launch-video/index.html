@@ -63,6 +63,21 @@ canvas.layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080p
 .tile b { font-size: 34px; font-weight: 900; letter-spacing: -0.03em; position: relative; }
 .tile small { font-size: 18px; opacity: .8; position: relative; margin-top: 6px; }
 .gate-label { font-weight: 900; font-size: 64px; letter-spacing: -0.03em; white-space: nowrap; }
+
+/* Flat cut (index.html?flat): solid colours, no glow, gloss or texture.
+   Scene colours come from --fg / --acc / --pill-bg / --pill-fg / --dot set per scene. */
+body.flat { --fg: #fff; --acc: #a78bfa; --pill-bg: #fff; --pill-fg: #0b0613; --dot: #7c3aed; }
+body.flat .big { text-shadow: none; color: var(--fg); }
+body.flat .grad { filter: none; }
+body.flat .grad .word { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--acc); }
+body.flat .sub { text-shadow: none; color: var(--fg); }
+body.flat .phone { background: #0b0613; box-shadow: 18px 18px 0 var(--acc); }
+body.flat .phone .gloss { display: none; }
+body.flat .glass { background: var(--pill-bg); color: var(--pill-fg); box-shadow: none; }
+body.flat .glass::before { display: none; }
+body.flat .card h3 { color: var(--pill-fg); }
+body.flat .dot { background: var(--dot); box-shadow: none; }
+body.flat .bar { box-shadow: none; }
 </style>
 </head>
 <body>

@@ -8,6 +8,8 @@ let D = null, BAR0 = 0.2066, BEAT = 0.64962;
 const T = (k) => BAR0 + k * 4 * BEAT;   // start of bar k
 const BT = (n) => BAR0 + n * BEAT;      // beat n
 let END = 0;
+// Flat cut (index.html?flat): solid colour scenes, no glow/gloss/grain/stars, its own camera.
+const FLAT = /[?&]flat\b/.test(location.search);
 
 // ---------- math ----------
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -146,7 +148,7 @@ function swirlSVG(seed, size, color, width) {
 }
 function eyeOffSVG(S) {
   const k = S / 100;
-  return SVG(S * 1.4, S, `<g fill="none" stroke="#fff" stroke-width="${7 * k}" stroke-linecap="round" stroke-linejoin="round">
+  return SVG(S * 1.4, S, `<g fill="none" stroke="${FLAT ? '#0b0613' : '#fff'}" stroke-width="${7 * k}" stroke-linecap="round" stroke-linejoin="round">
     <path d="M${-55 * k} 0 Q 0 ${-48 * k} ${55 * k} 0 Q 0 ${48 * k} ${-55 * k} 0Z"/><circle r="${16 * k}"/>
     <path d="M${-48 * k} ${-38 * k} L${48 * k} ${38 * k}" stroke="#e5375a" stroke-width="${9 * k}"/></g>`);
 }
@@ -158,7 +160,7 @@ function logoSVG(S0) {
     <circle cx="${-dx}" r="${r}" fill="#3f63f5"/><circle cx="${dx}" r="${r}" fill="#e5375a"/>
     <circle cx="${dx}" r="${r}" fill="#7c3aed" clip-path="url(#cl${id})"/>
     <circle cx="${-dx}" r="${r}" fill="none" stroke="#fff" stroke-width="${S * 0.035}"/><circle cx="${dx}" r="${r}" fill="none" stroke="#fff" stroke-width="${S * 0.035}"/>
-    <ellipse cx="${-dx * 0.2}" cy="${-r * 0.55}" rx="${r * 1.1}" ry="${r * 0.32}" fill="url(#gl${id})"/>`);
+    ${FLAT ? '' : `<ellipse cx="${-dx * 0.2}" cy="${-r * 0.55}" rx="${r * 1.1}" ry="${r * 0.32}" fill="url(#gl${id})"/>`}`);
 }
 
 // ---------- building blocks ----------
@@ -174,6 +176,12 @@ function revealSpans(e, t, start, step, dur = 0.55, from = 'up') {
   const spans = e.spans || (e.spans = [...e.el.querySelectorAll('.word')]);
   spans.forEach((sp, i) => {
     const s0 = Array.isArray(start) ? start[i] : start + i * step;
+    if (FLAT) {
+      const q = E.outQuint(prog(t, s0, s0 + dur * 0.8));
+      sp.style.opacity = clamp(q * 3).toFixed(3);
+      sp.style.transform = `translateY(${((1 - q) * 0.5).toFixed(3)}em)`;
+      return;
+    }
     const p = E.outExpo(prog(t, s0, s0 + dur));
     const o = clamp(p * 1.4);
     const dy = from === 'up' ? (1 - p) * 70 : 0, sc = lerp(1.6, 1, p);
@@ -188,10 +196,12 @@ function phoneEl(img) {
 const SIDE = { left: ['LEFT', 'var(--left)'], center: ['CENTER', '#8f6cf0'], right: ['RIGHT', 'var(--right)'] };
 function cardEl(side, head, src) {
   const [label, col] = SIDE[side];
-  return el(`<div class="glass card"><span class="tag" style="background:${col};box-shadow:0 0 24px ${col}">${label}</span><h3>${head}</h3><div class="src">${src}</div></div>`);
+  return el(`<div class="glass card"><span class="tag" style="background:${col}${FLAT ? '' : ';box-shadow:0 0 24px ' + col}">${label}</span><h3>${head}</h3><div class="src">${src}</div></div>`);
 }
 function pillEl(text, lineLen = 0, lineSide = 'right') {
-  const line = lineLen
+  const line = lineLen && FLAT
+    ? `<div style="position:absolute;top:50%;${lineSide}:${-lineLen}px;width:${lineLen}px;height:4px;margin-top:-2px;background:var(--fg)"><div style="position:absolute;${lineSide}:-9px;top:-7px;width:18px;height:18px;border-radius:50%;background:var(--fg)"></div></div>`
+    : lineLen
     ? `<div style="position:absolute;top:50%;${lineSide}:${-lineLen}px;width:${lineLen}px;height:3px;margin-top:-1.5px;background:linear-gradient(${lineSide === 'right' ? '90deg' : '270deg'},rgba(255,255,255,.9),rgba(184,245,58,.9));box-shadow:0 0 12px rgba(184,245,58,.8)"><div style="position:absolute;${lineSide}:-8px;top:-6.5px;width:16px;height:16px;border-radius:50%;background:#b8f53a;box-shadow:0 0 18px #b8f53a"></div></div>`
     : '';
   return el(`<div class="glass pill" style="overflow:visible"><span class="dot"></span>${text}${line}</div>`);
@@ -199,10 +209,10 @@ function pillEl(text, lineLen = 0, lineSide = 'right') {
 function leanBarEl(w, parts) {
   return el(`<div style="width:${w}px"><div class="bar">${parts.map(([f, c]) => `<div style="width:${f * 100}%;background:${c}"></div>`).join('')}</div>
     <div style="display:flex;justify-content:space-between;margin-top:18px;font-weight:800;font-size:34px">
-    <span style="color:#7d97ff">Left 40%</span><span style="color:#cdbdff">Center 20%</span><span style="color:#ff6f8c">Right 40%</span></div></div>`);
+    <span style="color:${FLAT ? 'var(--fg)' : '#7d97ff'}">Left 40%</span><span style="color:${FLAT ? 'var(--fg)' : '#cdbdff'}">Center 20%</span><span style="color:${FLAT ? 'var(--fg)' : '#ff6f8c'}">Right 40%</span></div></div>`);
 }
 function tileEl(title, sub, bg, w = 300, h = 210) {
-  return el(`<div class="glass tile" style="width:${w}px;height:${h}px;background:${bg}"><b>${title}</b><small>${sub}</small>
+  return el(`<div class="glass tile" style="width:${w}px;height:${h}px;background:${bg};color:#fff"><b>${title}</b><small>${sub}</small>
     <div class="bar" style="height:8px;margin-top:12px;position:relative;box-shadow:none"><div style="width:62%;background:#3f63f5"></div><div style="width:28%;background:#b39bff"></div><div style="width:10%;background:#e5375a"></div></div></div>`);
 }
 function canvasEl(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; c.style.width = w + 'px'; c.style.height = h + 'px'; return c; }
@@ -217,7 +227,8 @@ function fadeOut(e, t, a, dur = 0.5) { e.o *= 1 - E.inOutCubic(prog(t, a, a + du
 
 // ---------- camera ----------
 const KEYS = []; // [t, {x,y,z,rx,ry,rz}]
-function key(t, v) { KEYS.push([t, v]); }
+function key(t, v) { if (!FLAT) KEYS.push([t, v]); }
+function fkey(t, v) { KEYS.push([t, v]); }
 let CAMF = null;
 function buildCamera() {
   KEYS.sort((a, b) => a[0] - b[0]);
@@ -252,6 +263,7 @@ function monotone(ts, ys) {
 let C = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
 function camAt(t) {
   const c = CAMF(t);
+  if (FLAT) return c;   // locked off: no handheld drift, no beat push
   // Handheld drift + a small dolly push on every beat.
   c.x += Math.sin(t * 0.37) * 10 + Math.sin(t * 0.91) * 4;
   c.y += Math.sin(t * 0.53) * 7;
@@ -301,6 +313,7 @@ function theme(t) {
   return [mix(a0, a1, f), mix(b0, b1, f)];
 }
 function drawBG(t) {
+  if (FLAT) return drawFlatBG(t);
   const [c1, c2] = theme(t), k = kick(t);
   const cx = W / 2 + C.ry * 14 + Math.sin(t * 0.2) * 40, cy = H * 0.46 - C.rx * 14;
   const g = bg.createRadialGradient(cx, cy, 40, cx, cy, 1400);
@@ -334,6 +347,11 @@ const FLASHES = []; // [time, strength]
 let prevCam = null;
 function drawFX(t) {
   fx.clearRect(0, 0, W, H);
+  if (FLAT) {
+    const bl = Math.max(1 - prog(t, 0, 0.35), E.inOutSine(prog(t, END - 2.2, END)));
+    if (bl > 0) { fx.fillStyle = `rgba(0,0,0,${bl})`; fx.fillRect(0, 0, W, H); }
+    return;
+  }
   // warp streaks when the camera flies fast
   const c0 = camAt(t - 1 / 60), v = Math.hypot(C.z - c0.z, (C.x - c0.x) * 1.5) * 60 + Math.abs(C.ry - c0.ry) * 60 * 60;
   const sv = clamp((v - 900) / 2600);
@@ -411,7 +429,8 @@ function dottedArc(x, y, z, pts, a, b, color = '#ffffff') {
 function build() {
   // ===== stars along the whole flight path =====
   const rs = rng(3);
-  for (let i = 0; i < 170; i++) {
+  if (FLAT) flatScenes();
+  for (let i = 0; i < (FLAT ? 0 : 170); i++) {
     let x = (rs() - 0.5) * 5200, y = (rs() - 0.5) * 2900;
     if (Math.abs(x) < 700 && Math.abs(y) < 420) x += x < 0 ? -700 : 700;
     const z = 700 - rs() * 26000, col = ['#ffffff', '#ffffff', '#c9b6ff', '#a26bff', '#b8f53a', '#ffe14d'][Math.floor(rs() * 6)];
@@ -646,9 +665,9 @@ function build() {
     x: 430, y: 60, z: Z4, ry: -12, t0: T(26) - 0.1, t1: T(32) + 0.4,
     upd(t, e) { const p = E.outExpo(prog(t, T(26), T(26) + 1.2)); e.y = lerp(1100, e.b.y, p); e.rx = lerp(35, 0, p); e.o = clamp(p * 3); e.ry = e.b.ry + Math.sin(t * 0.7) * 5; },
   });
-  [['Blindspots', 'One side barely covers it', 'linear-gradient(160deg,#9b5cff,#4a1aa8)', -330, 160, 380, 230],
-    ['Underreported', 'Few outlets, reliable sources', 'linear-gradient(160deg,#2a2433,#0b0812)', -660, 430, 300, 200],
-    ['Divergent takes', 'Both sides, different framing', 'linear-gradient(160deg,#5b33b0,#26104f)', -320, 430, 300, 200]].forEach(([ti, su, bgc, x, y, w, h], i) => {
+  [['Blindspots', 'One side barely covers it', FLAT ? '#7c3aed' : 'linear-gradient(160deg,#9b5cff,#4a1aa8)', -330, 160, 380, 230],
+    ['Underreported', 'Few outlets, reliable sources', FLAT ? '#0b0613' : 'linear-gradient(160deg,#2a2433,#0b0812)', -660, 430, 300, 200],
+    ['Divergent takes', 'Both sides, different framing', FLAT ? '#4c1d95' : 'linear-gradient(160deg,#5b33b0,#26104f)', -320, 430, 300, 200]].forEach(([ti, su, bgc, x, y, w, h], i) => {
     const a = T(27) + i * BEAT;
     add(tileEl(ti, su, bgc, w, h), {
       x, y, z: Z4 + 80, t0: a - 0.05, t1: T(32) + 0.4,
@@ -665,7 +684,7 @@ function build() {
     x: -480, y: -300, z: Z4, t0: T(29) + 0.3, t1: T(32) + 0.4,
     upd(t, e) { revealSpans(e, t, T(29) + BEAT, BEAT / 3); },
   });
-  [[-1050, -350, 61, T(29)], [1050, 380, 62, T(30)], [-1000, 420, 63, T(31)], [1000, -380, 64, T(31) + BEAT * 2]].forEach(([x, y, seed, a]) =>
+  [[FLAT ? -1320 : -1050, FLAT ? -440 : -350, 61, T(29)], [1050, 380, 62, T(30)], [-1000, 420, 63, T(31)], [1000, -380, 64, T(31) + BEAT * 2]].forEach(([x, y, seed, a]) =>
     add(el(clusterSVG(seed, 520, ['purple', 'target', 'violet', 'yellow'])), {
       x, y, z: Z4 - 300, t0: a - 0.05, t1: 1e9,
       upd(t, e) { const p = prog(t, a, a + 0.7); e.s = lerp(0.1, 1, E.outBack(p)) * (1 + kick(t) * 0.07); e.o = clamp(p * 3); e.rz = (t - a) * 10; },
@@ -683,14 +702,14 @@ function build() {
   const globe = canvasEl(1000, 1000);
   add(globe, {
     z: Z5, t0: T(31.4), t1: T(34) + 1.5,
-    upd(t, e) { drawGlobe(globe.getContext('2d'), t); e.o = smooth(T(31.4), T(32), t); e.s = 1 + kick(t) * 0.03; },
+    upd(t, e) { drawGlobe(globe.getContext('2d'), t); e.o = smooth(T(31.4), T(32), t); e.s = (FLAT ? 0.86 : 1) + kick(t) * 0.03; },
   });
   add(wordsEl('From the world', 'big', 120), {
-    y: -405, z: Z5, t0: T(32) - 0.05, t1: T(34) + 0.6,
+    y: FLAT ? -428 : -405, z: Z5, t0: T(32) - 0.05, t1: T(34) + 0.6,
     upd(t, e) { revealSpans(e, t, T(32), BEAT / 2); fadeOut(e, t, T(34), 0.4); },
   });
   add(wordsEl('to your street.', 'big grad', 120), {
-    y: 410, z: Z5, t0: T(33) - 0.05, t1: T(34) + 0.6,
+    y: FLAT ? 432 : 410, z: Z5, t0: T(33) - 0.05, t1: T(34) + 0.6,
     upd(t, e) { revealSpans(e, t, T(33), BEAT / 2); fadeOut(e, t, T(34), 0.4); },
   });
   const gates = [['Europe', -16700], ['United Kingdom', -17300], ['London', -17900], ['Hackney', -18500]];
@@ -741,13 +760,13 @@ function build() {
 
   // ===== S6 values (z = -21000) =====
   const Z6 = -21000;
-  add(el(clusterSVG(81, 1500, ['target', 'purple', 'violet'])), {
+  if (!FLAT) add(el(clusterSVG(81, 1500, ['target', 'purple', 'violet'])), {
     z: Z6 - 700, t0: T(39.5), t1: T(42) + 1,
     upd(t, e) { e.o = 0.55 * smooth(T(39.6), T(40), t); e.rz = t * 6; e.s = 1 + kick(t) * 0.05; fadeOut(e, t, T(42), 0.8); },
   });
   ['No account.', 'No ads.', 'No tracking.', 'No paywall.'].forEach((w, i) => {
     const a = T(40) + BEAT * 2 * i, b = a + BEAT * 2;
-    add(el(`<div class="big" style="font-size:230px">${w}<div style="height:16px;border-radius:9px;margin-top:10px;background:#b8f53a;box-shadow:0 0 30px #b8f53a"></div></div>`), {
+    add(el(`<div class="big" style="font-size:230px">${w}<div style="height:16px;border-radius:9px;margin-top:10px;${FLAT ? 'background:var(--fg)' : 'background:#b8f53a;box-shadow:0 0 30px #b8f53a'}"></div></div>`), {
       z: Z6, t0: a - 0.05, t1: i === 3 ? T(42) + 0.6 : b + 0.4,
       upd(t, e) {
         const p = E.outExpo(prog(t, a, a + 0.45));
@@ -787,13 +806,13 @@ function build() {
   const eq = canvasEl(2000, 440);
   add(eq, {
     y: 250, z: Z8 - 350, t0: T(43.8), t1: 1e9,
-    upd(t, e) { drawEQ(eq.getContext('2d'), t, E.outCubic(prog(t, T(44), T(44) + 1.2))); e.o = 0.6; },
+    upd(t, e) { drawEQ(eq.getContext('2d'), t, E.outCubic(prog(t, T(44), T(44) + 1.2))); e.o = FLAT ? 1 : 0.6; },
   });
-  add(el(`<div style="width:1500px;height:700px;border-radius:50%;background:radial-gradient(closest-side,rgba(10,2,26,.75),rgba(10,2,26,0))"></div>`), {
+  if (!FLAT) add(el(`<div style="width:1500px;height:700px;border-radius:50%;background:radial-gradient(closest-side,rgba(10,2,26,.75),rgba(10,2,26,0))"></div>`), {
     y: 60, z: Z8 - 60, t0: T(44), t1: 1e9,
     upd(t, e) { e.o = smooth(T(44), T(45), t); },
   });
-  add(el(`<div style="width:5200px;height:6px;border-radius:3px;background:#fff;box-shadow:0 0 18px #fff,0 0 50px #a26bff,0 0 120px #7c3aed"></div>`), {
+  add(el(`<div style="width:5200px;height:6px;border-radius:3px;background:#fff;${FLAT ? '' : 'box-shadow:0 0 18px #fff,0 0 50px #a26bff,0 0 120px #7c3aed'}"></div>`), {
     y: 470, z: Z8 - 300, t0: T(44), t1: 1e9,
     upd(t, e) { const p = E.outExpo(prog(t, T(44), T(44) + 1.2)); e.el.style.transform = ''; e.s = 1; e.el.style.clipPath = `inset(0 ${((1 - p) * 50).toFixed(1)}% 0 ${((1 - p) * 50).toFixed(1)}%)`; e.o = p > 0 ? 1 : 0; },
   });
@@ -809,7 +828,9 @@ function build() {
     y: 30, z: Z8, t0: T(45) - 0.05, t1: 1e9,
     upd(t, e) { revealSpans(e, t, T(45), BEAT / 3); },
   });
-  add(el(`<div style="display:inline-flex;align-items:center;gap:18px;padding:22px 46px;border-radius:99px;background:linear-gradient(180deg,#ffffff,#e6dcff);color:#4b16b8;font-weight:900;font-size:46px;white-space:nowrap;box-shadow:0 0 0 2px #fff inset,0 0 60px rgba(184,245,58,.55),0 20px 60px rgba(0,0,0,.5)">Free on GitHub<span style="width:16px;height:16px;border-radius:50%;background:#b8f53a;box-shadow:0 0 16px #b8f53a"></span></div>`), {
+  add(el(FLAT
+    ? `<div style="display:inline-flex;align-items:center;gap:18px;padding:22px 46px;border-radius:99px;background:#b8f53a;color:#0b0613;font-weight:900;font-size:46px;white-space:nowrap">Free on GitHub<span style="width:16px;height:16px;border-radius:50%;background:#0b0613"></span></div>`
+    : `<div style="display:inline-flex;align-items:center;gap:18px;padding:22px 46px;border-radius:99px;background:linear-gradient(180deg,#ffffff,#e6dcff);color:#4b16b8;font-weight:900;font-size:46px;white-space:nowrap;box-shadow:0 0 0 2px #fff inset,0 0 60px rgba(184,245,58,.55),0 20px 60px rgba(0,0,0,.5)">Free on GitHub<span style="width:16px;height:16px;border-radius:50%;background:#b8f53a;box-shadow:0 0 16px #b8f53a"></span></div>`), {
     y: 160, z: Z8 + 20, t0: T(46) - 0.05, t1: 1e9,
     upd(t, e) { popIn(e, t, T(46), 0.7, 0.3); e.s *= 1 + kick(t) * 0.025; },
   });
@@ -830,6 +851,7 @@ function build() {
   key(T(46), { z: Z8 + 40, ry: -3 });
   key(T(48), { z: Z8 - 80, ry: 3 });
   FLASHES.push([T(44), 0.65]);
+  if (FLAT) flatCamera();
   buildCamera();
 }
 
@@ -837,13 +859,15 @@ function drawGlobe(ctx, t) {
   const S = 1000, R = 380;
   ctx.clearRect(0, 0, S, S);
   ctx.save(); ctx.translate(S / 2, S / 2);
-  const g = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R * 1.3);
-  g.addColorStop(0, 'rgba(124,58,237,0.45)'); g.addColorStop(0.75, 'rgba(90,30,200,0.18)'); g.addColorStop(1, 'rgba(124,58,237,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 1.3, 0, 6.283); ctx.fill();
+  if (!FLAT) {
+    const g = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R * 1.3);
+    g.addColorStop(0, 'rgba(124,58,237,0.45)'); g.addColorStop(0.75, 'rgba(90,30,200,0.18)'); g.addColorStop(1, 'rgba(124,58,237,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 1.3, 0, 6.283); ctx.fill();
+  }
   const sph = ctx.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.1, 0, 0, R);
   sph.addColorStop(0, '#5b2bc4'); sph.addColorStop(0.6, '#2a0f63'); sph.addColorStop(1, '#12052e');
-  ctx.fillStyle = sph; ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.283); ctx.fill();
-  ctx.strokeStyle = 'rgba(200,170,255,0.8)'; ctx.lineWidth = 3; ctx.shadowColor = '#a26bff'; ctx.shadowBlur = 30;
+  ctx.fillStyle = FLAT ? '#0b0613' : sph; ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = FLAT ? '#ffffff' : 'rgba(200,170,255,0.8)'; ctx.lineWidth = FLAT ? 6 : 3; ctx.shadowColor = '#a26bff'; ctx.shadowBlur = FLAT ? 0 : 30;
   ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.283); ctx.stroke(); ctx.shadowBlur = 0;
   const rot = t * 0.45, tilt = 0.38, k = kick(t);
   for (let lat = -84; lat <= 84; lat += 4.5) {
@@ -866,7 +890,7 @@ function drawGlobe(ctx, t) {
   ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.ellipse(0, 0, R * 1.32, R * 0.3, 0, 0, 6.283); ctx.stroke();
   const a = t * 1.6;
-  ctx.fillStyle = '#b8f53a'; ctx.shadowColor = '#b8f53a'; ctx.shadowBlur = 24;
+  ctx.fillStyle = '#b8f53a'; ctx.shadowColor = '#b8f53a'; ctx.shadowBlur = FLAT ? 0 : 24;
   ctx.beginPath(); ctx.arc(Math.cos(a) * R * 1.32, Math.sin(a) * R * 0.3, 11, 0, 6.283); ctx.fill();
   ctx.restore();
 }
@@ -874,7 +898,7 @@ function drawEQ(ctx, t, amp) {
   const Wd = 2000, Hd = 620;
   ctx.clearRect(0, 0, Wd, Hd);
   const cols = 30, cw = 50, gap = 16, bh = 16, bgap = 6, x0 = (Wd - cols * (cw + gap)) / 2;
-  ctx.shadowColor = 'rgba(162,107,255,0.95)'; ctx.shadowBlur = 22;
+  ctx.shadowColor = 'rgba(162,107,255,0.95)'; ctx.shadowBlur = FLAT ? 0 : 22;
   for (let c = 0; c < cols; c++) {
     const b = (Math.abs(c - (cols - 1) / 2) / ((cols - 1) / 2)) * 7;           // bass in the middle
     let lvl = bandAt(7 - b, t) * 0.75 + energyAt(t) * 0.35 + kick(t) * 0.25 * (1 - b / 9);
@@ -882,11 +906,137 @@ function drawEQ(ctx, t, amp) {
     const n = Math.floor(clamp(lvl * amp) * (Hd / (bh + bgap)));
     for (let i = 0; i < n; i++) {
       const y = Hd - (i + 1) * (bh + bgap);
-      ctx.fillStyle = i === n - 1 ? '#ffffff' : `rgba(255,255,255,${0.55 + 0.45 * (i / n)})`;
+      ctx.fillStyle = FLAT ? '#5b21b6' : i === n - 1 ? '#ffffff' : `rgba(255,255,255,${0.55 + 0.45 * (i / n)})`;
       ctx.fillRect(x0 + c * (cw + gap), y, cw, bh);
     }
   }
   ctx.shadowBlur = 0;
+}
+
+// ---------- flat cut ----------
+// Each scene: [start, background, text, accent text, pill bg, pill text, dot, wipe]
+const FSC = [];
+function flatScenes() {
+  const K = '#0b0613', PU = '#7c3aed', WH = '#ffffff', PA = '#f4f1fa', YE = '#ffe14d', LI = '#b8f53a';
+  FSC.push(
+    [0, K, WH, '#a78bfa', WH, K, PU, 'none'],
+    [T(8), PU, WH, YE, WH, K, PU, 'iris'],
+    [T(12), PA, K, PU, K, WH, LI, 'left'],
+    [T(16) + 0.9, K, WH, LI, WH, K, PU, 'right'],
+    [T(24), YE, K, PU, K, WH, LI, 'iris'],
+    [T(31.4), PU, WH, LI, WH, K, PU, 'up'],
+    [T(35) + BEAT * 2, PA, K, PU, K, WH, LI, 'down'],
+    [T(40), LI, K, PU, K, WH, LI, 'left'],
+    [T(42), K, WH, YE, WH, K, PU, 'iris'],
+    [T(44), PU, WH, LI, WH, K, PU, 'iris'],
+  );
+}
+let FCUR = -1;
+function drawFlatBG(t) {
+  let i = 0;
+  while (i < FSC.length - 1 && FSC[i + 1][0] <= t) i++;
+  const s = FSC[i], prev = FSC[Math.max(0, i - 1)];
+  if (i !== FCUR) {
+    FCUR = i;
+    const st = document.body.style;
+    ['--fg', '--acc', '--pill-bg', '--pill-fg', '--dot'].forEach((v, j) => st.setProperty(v, s[2 + j]));
+  }
+  const p = s[7] === 'none' ? 1 : E.outQuint(prog(t, s[0], s[0] + 0.6));
+  bg.fillStyle = p < 1 ? prev[1] : s[1];
+  bg.fillRect(0, 0, W, H);
+  if (p >= 1) return;
+  bg.fillStyle = s[1];
+  bg.beginPath();
+  const sl = 360;
+  if (s[7] === 'iris') bg.arc(W / 2, H / 2, p * 1120, 0, 6.283);
+  else if (s[7] === 'left') { const x = p * (W + sl); bg.moveTo(0, 0); bg.lineTo(x, 0); bg.lineTo(x - sl, H); bg.lineTo(0, H); }
+  else if (s[7] === 'right') { const x = W - p * (W + sl); bg.moveTo(W, 0); bg.lineTo(x + sl, 0); bg.lineTo(x, H); bg.lineTo(W, H); }
+  else if (s[7] === 'up') bg.rect(0, H - p * H, W, p * H);
+  else bg.rect(0, 0, W, p * H);
+  bg.fill();
+}
+/* Camera for the flat cut: mostly locked-off shots, hard cuts on the beat,
+   and one distinct move per scene (dutch settle, barrel roll, low angle,
+   truck, high angle, orbit, crane, stepped roll, overhead tilt, crane down). */
+function flatCamera() {
+  const k = fkey, F = 1 / 60, R = 360, R2 = 720;
+  // hard cut on the first video frame at or after t
+  const cut = (t, v) => { const tc = Math.ceil(t / F - 1e-6) * F; k(tc - F + 0.002, {}); k(tc - 0.002, v); };
+  const Z1 = -4000, X3 = 1400, Z3 = -8000, Z4 = -12000, Z5 = -16000, ZE = -19000, Z6 = -21000, Z7 = -22600, Z8 = -24000;
+
+  // S0 intro: opens on a low dutch angle that rights itself, holds, then
+  // crash-zooms through the ring tunnel with a full barrel roll.
+  k(0, { x: -140, y: 160, z: 760, rx: -12, ry: -16, rz: -12 });
+  k(T(2), { x: 0, y: 0, z: 560, rx: 0, ry: 0, rz: 0 });
+  k(T(6), { z: 480 });
+  k(T(7), { z: 330 });
+  k(T(8) - 0.04, { z: -3350, rz: R });
+
+  // S1: low-angle hero on the title, then a lateral truck across the three headlines
+  k(T(8) + 0.9, { x: 0, y: 60, z: Z1 + 120, rx: -9, ry: 0 });
+  k(T(9), { y: 30, rx: -6 });
+  k(T(9) + 0.5, { x: -300, y: 0, z: Z1 + 380, rx: 0, ry: 8 });
+  k(T(11) - 0.05, { x: 300, ry: -8 });
+  // hard cut to a high angle as the cards drop into the lean bar
+  cut(T(11), { x: 0, y: 140, z: Z1 + 260, rx: 14, ry: 0 });
+  k(T(12) - 0.1, { y: 170, z: Z1 + 200, rx: 18 });
+  // feed: one slow continuous orbit around the phones
+  cut(T(12), { x: 120, y: 0, z: Z1 + 330, rx: 0, ry: 26 });
+  k(T(16), { x: 140, z: Z1 + 260, ry: -14 });
+  // fast dolly across to the story scene
+  k(T(16) + 0.9, { x: 200, z: Z1 + 200, ry: -20 });
+  k(T(16) + 1.6, { x: X3, y: 0, z: Z3 + 900, rx: 0, ry: 0 });
+
+  // S3: locked-off title, drop to a low angle as the phone rises, slow crane up over the callouts
+  k(T(17.6), { z: Z3 + 860 });
+  k(T(18) + 0.4, { y: 80, z: Z3 + 260, rx: -8 });
+  k(T(22) - 0.1, { y: -100, z: Z3 + 200, rx: 8 });
+  // hard cut to a side angle for the second phone
+  cut(T(22), { x: X3 + 120, y: 0, z: Z3 + 380, rx: 0, ry: -26 });
+  k(T(23.6), { x: X3 + 160, ry: -12 });
+
+  // S4 blindspots: hard cut onto a dutch tilt that straightens when the phone arrives
+  cut(T(24), { x: 0, y: 0, z: Z4 + 60, rx: 0, ry: 0, rz: R - 8 });
+  k(T(26), { z: Z4, rz: R - 5 });
+  k(T(26) + 0.9, { z: Z4 - 10, rz: R });
+  k(T(29), { x: -20, z: Z4 - 40, ry: 0 });
+  k(T(31), { x: 60, z: Z4 - 160, ry: 10 });
+
+  // S5 world: overhead angle on the globe that tilts down to face it
+  cut(T(31.4), { x: 0, y: 0, z: Z5, rx: 60, ry: 0, rz: R });
+  k(T(32), { z: Z5 + 160, rx: 0 });
+  k(T(34), { z: Z5 - 40 });
+  // gates: a quarter roll snapped onto every beat
+  const B = BEAT, zAt = (t) => Z5 - 40 - (600 * (t - T(34))) / B;
+  for (let i = 0; i < 4; i++) {
+    const a = T(34) + B * i;
+    if (i) k(a, { z: zAt(a), rz: R + 90 * i });
+    k(a + 0.28, { z: zAt(a + 0.28), rz: R + 90 * (i + 1) });
+  }
+  k(T(35), { z: zAt(T(35)), rz: R2 });
+  // explore: locked off
+  k(T(35) + B * 2, { x: 0, z: ZE + 200 });
+  k(T(36), { z: ZE + 60 });
+  k(T(39.5), { z: ZE - 30 });
+
+  // S6 values: a new angle hard-cut on every word
+  [{ x: 0, y: 0, z: Z6 + 120, rx: 0, ry: 0, rz: R2 },
+    { x: 0, y: 120, z: Z6 + 80, rx: -16, ry: 14, rz: R2 },
+    { x: 0, y: -100, z: Z6 + 80, rx: 16, ry: -14, rz: R2 },
+    { x: 0, y: 0, z: Z6 + 60, rx: 0, ry: 0, rz: R2 - 6 }].forEach((v, i) => {
+    const a = T(40) + B * 2 * i;
+    cut(a, v);
+    k(a + B * 2 - 0.05, { z: v.z - 40 });
+  });
+
+  // S7 open source: slow push, nothing else
+  cut(T(42), { x: 0, y: 0, z: Z7 + 520, rx: 0, ry: 0, rz: R2 });
+  k(T(43.8), { z: Z7 + 160 });
+
+  // S8 finale: cranes down from a high angle to eye level
+  cut(T(44), { x: 0, y: -380, z: Z8 + 420, rx: 28, ry: 0, rz: R2 });
+  k(T(45), { y: 0, z: Z8 + 140, rx: 0 });
+  k(T(48), { z: Z8 + 60 });
 }
 
 // ---------- per-frame ----------
@@ -902,7 +1052,8 @@ function frame(t) {
     let o = e.o;
     // fog in the distance, fade out when very close / behind the camera
     o *= 1 - smooth(-3200, -6800, dz);
-    if (e.near) o *= 1 - smooth(P * 0.55, P * 0.9, dz);
+    // the flat cut pops things out as the camera passes them instead of ghosting them
+    if (e.near) o *= FLAT ? (dz > P * 0.7 ? 0 : 1) : 1 - smooth(P * 0.55, P * 0.9, dz);
     if (o < 0.004 || dz > P * 0.95) { if (e.vis) { e.el.style.display = 'none'; e.vis = false; } continue; }
     if (!e.vis) { e.el.style.display = ''; e.vis = true; }
     e.el.style.opacity = o.toFixed(3);
@@ -914,6 +1065,7 @@ function frame(t) {
 
 async function setup(data) {
   D = data; BAR0 = data.bars[0]; BEAT = data.beat;
+  if (FLAT) document.body.classList.add('flat');
   END = T(48);
   prerender();
   build();

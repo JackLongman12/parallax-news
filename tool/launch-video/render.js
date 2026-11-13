@@ -53,7 +53,7 @@ async function launch(beats) {
   page.on('console', (m) => { if (!/404/.test(m.text())) console.log('[page]', m.text()); });
   page.on('pageerror', (e) => console.log('[page error]', e.message));
   await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-  await page.goto('http://127.0.0.1:8765/index.html' + (arg('debug') ? '#debug' : ''), { waitUntil: 'load' });
+  await page.goto('http://127.0.0.1:8765/index.html' + (arg('flat') ? '?flat' : '') + (arg('debug') ? '#debug' : ''), { waitUntil: 'load' });
   const end = await page.evaluate(async (d) => {
     await Promise.all(['400', '600', '700', '800', '900'].map((w) => document.fonts.load(`${w} 100px Inter`)));
     // a 1px element that changes every frame, so the compositor always has a new frame to hand over
@@ -80,11 +80,12 @@ async function shoot(t, k, opts) {
   if (arg('eval')) { console.log(JSON.stringify(await live.page.evaluate((src) => (0, eval)(src), arg('eval')))); }
   const stills = arg('stills');
   if (stills) {
-    fs.mkdirSync(path.join(ROOT, 'stills'), { recursive: true });
+    const dir = path.join(ROOT, arg('stilldir', 'stills'));
+    fs.mkdirSync(dir, { recursive: true });
     for (const s of stills.split(',')) {
       const t = parseFloat(s);
       const buf = await shoot(t, 0, { type: 'jpeg', quality: 88 });
-      fs.writeFileSync(path.join(ROOT, 'stills', `${t.toFixed(2)}.jpg`), buf);
+      fs.writeFileSync(path.join(dir, `${t.toFixed(2)}.jpg`), buf);
     }
   } else {
     const fps = parseFloat(arg('fps', '30'));
