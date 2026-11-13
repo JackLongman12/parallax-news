@@ -7,13 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:provider/provider.dart';
 
+import 'services/crash_reporter.dart';
 import 'services/home_widgets.dart';
 import 'state/app_state.dart';
 import 'ui/screens/explore_screens.dart';
 import 'ui/screens/feed_editor.dart';
 import 'ui/screens/feed_screens.dart';
-import 'ui/screens/info_pages.dart';
-import 'ui/screens/markets_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
 import 'ui/nav.dart';
@@ -27,6 +26,7 @@ Future<void> main() async {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(['Inter typeface'], await rootBundle.loadString('assets/fonts/Inter-LICENSE.txt'));
   });
+  await CrashReporter.init();
   AppState.onCacheTrim = () => ImageCacheStore.trim();
   final state = await AppState.create();
   runApp(ChangeNotifierProvider.value(value: state, child: const ParallaxApp()));
@@ -84,7 +84,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _tab = widget.initialTab;
   late final _built = <int>{widget.initialTab};
 
-  static const _titles = ['For You', 'Topics', 'Markets', 'Explore', 'Blindspot'];
+  static const _titles = ['For You', 'Topics', 'Explore', 'Blindspot'];
 
   @override
   void initState() {
@@ -101,7 +101,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// Android usually *resumes* the app rather than restarting it, so check on
   /// every return to the app too (at most every 2 minutes).
   void _maybeCheckUpdate() {
-    if (!mounted || !selfUpdates || !context.read<AppState>().autoUpdate) return;
+    if (!mounted || !context.read<AppState>().autoUpdate) return;
     if (DateTime.now().difference(_lastUpdateCheck) < const Duration(minutes: 2)) return;
     _lastUpdateCheck = DateTime.now();
     checkForUpdate(context);
@@ -147,8 +147,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       case 1:
         return const TopicsScreen();
       case 2:
-        return const MarketsScreen();
-      case 3:
         return const ExploreScreen();
       default:
         return const BlindspotScreen();
@@ -174,11 +172,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         onPointerDown: (_) => context.read<AppState>().touch(),
         child: IndexedStack(
         index: _tab,
-        children: [for (var i = 0; i < 5; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+        children: [for (var i = 0; i < 4; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
       ),
       ),
       // Thumb-reach shortcuts above the bottom bar.
-      floatingActionButton: _tab == 3
+      floatingActionButton: _tab == 2
           ? FloatingActionButton.extended(
               heroTag: 'searchPlaces',
               icon: const Icon(Icons.search_rounded),
@@ -188,14 +186,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 if (p != null && context.mounted) openPlace(context, p);
               },
             )
-          : (_tab == 2
-              ? FloatingActionButton.extended(
-                  heroTag: 'addStock',
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add stock'),
-                  onPressed: () => showSymbolSearch(context),
-                )
-              : null),
+          : null,
       // Floating, translucent bottom bar; content scrolls underneath it.
       extendBody: true,
       bottomNavigationBar: ParallaxBottomBar(
@@ -203,7 +194,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         items: const [
           BarItem(Icons.home_outlined, Icons.home_rounded, 'For You'),
           BarItem(Icons.grid_view_outlined, Icons.grid_view_rounded, 'Topics'),
-          BarItem(Icons.show_chart_rounded, Icons.insights_rounded, 'Markets'),
           BarItem(Icons.explore_outlined, Icons.explore_rounded, 'Explore'),
           BarItem(Icons.visibility_off_outlined, Icons.visibility_off_rounded, 'Blindspot'),
         ],

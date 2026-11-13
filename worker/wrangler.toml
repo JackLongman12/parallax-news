@@ -10,3 +10,8 @@ crons = ["*/5 * * * *"]
 
 [vars]
 FEED_URL = "https://github.com/JackLongman12/parallax-news/releases/download/feed/feed.json.gz"
+
+# Last good feed copy + crash reports (see src/index.js).
+[[kv_namespaces]]
+binding = "STORE"
+id = "bb34e79f98224cfbb8e40b853638730f"

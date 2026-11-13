@@ -92,22 +92,12 @@ jobs:
             --build-number="${RUN}" \
             --dart-define=UPDATE_MANIFEST_URL="${BASE}/latest.json" \
             --dart-define=CATALOG_URL="${BASE}/sources.json" \
-            --dart-define=FEED_WORKER_URL="https://parallax-news.lp-reports.workers.dev" \
-            --dart-define=CHANNEL=github
+            --dart-define=FEED_WORKER_URL="https://parallax-news.lp-reports.workers.dev"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "dist/parallax-news-1.0.${RUN}.apk"
-          # Google Play build: App Bundle, no built-in updater (Play updates
-          # it) and no install-packages permission. Same signing key, which
-          # serves as the Play upload key.
-          CHANNEL=play python3 tool/prepare_android.py
-          flutter build appbundle --release \
-            --obfuscate --split-debug-info=build/symbols-play \
-            --build-name="1.0.${RUN}" \
-            --build-number="${RUN}" \
-            --dart-define=CATALOG_URL="${BASE}/sources.json" \
-            --dart-define=FEED_WORKER_URL="https://parallax-news.lp-reports.workers.dev" \
-            --dart-define=CHANNEL=play
-          cp build/app/outputs/bundle/release/app-release.aab "dist/parallax-news-1.0.${RUN}-play.aab"
+          # Debug symbols, to turn obfuscated crash-report stack traces back
+          # into readable ones: flutter symbolize -i trace.txt -d app.android-arm64.symbols
+          (cd build/symbols && zip -q "../../dist/symbols-1.0.${RUN}.zip" *)
           ls -la dist
 
       # Never leave the signing key on disk for later (third-party) post steps.
@@ -179,8 +169,8 @@ jobs:
           RUN: ${{ github.run_number }}
         run: |
           TAG="v1.0.${RUN}"
-          gh release create "$TAG" dist/*.apk dist/*.aab dist/latest.json dist/sources.json dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/*.apk dist/*.zip dist/latest.json dist/sources.json dist/SHA256SUMS.txt \
             --repo "$RELEASES_REPO" --title "Parallax News $TAG" \
             --notes "$(python3 -c "import json;print(json.load(open('dist/latest.json'))['notes'])")
 
-          Install the .apk on your phone (the .aab is for Google Play). Build ${GITHUB_SHA::7}." --latest
+          Install: download the .apk below. Build ${GITHUB_SHA::7}." --latest

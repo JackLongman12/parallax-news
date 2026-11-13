@@ -13,7 +13,6 @@ import 'package:parallax_news/services/classifier.dart';
 import 'package:parallax_news/services/clustering.dart';
 import 'package:parallax_news/services/country_detect.dart';
 import 'package:parallax_news/services/cover_images.dart';
-import 'package:parallax_news/services/markets.dart';
 import 'package:parallax_news/services/curator.dart';
 import 'package:parallax_news/services/feed_parser.dart';
 import 'package:parallax_news/services/net.dart';
@@ -246,7 +245,7 @@ void main() {
     });
   });
 
-  group('Home country & markets', () {
+  group('Home country', () {
     test('country from network trace and locale', () {
       expect(CountryDetector.parseTrace('fl=1\nip=1.2.3.4\nloc=DE\ntls=TLSv1.3\n'), 'DE');
       expect(CountryDetector.parseTrace('loc=XX\n'), isNull);
@@ -257,18 +256,6 @@ void main() {
       expect(CountryDetector.fromLocale('en'), isNull);
     });
 
-    test('Yahoo chart JSON parses to a quote with % change', () {
-      final q = Markets.parseChart('S&P 500', {
-        'chart': {
-          'result': [
-            {'meta': {'regularMarketPrice': 5050.0, 'chartPreviousClose': 5000.0}}
-          ]
-        }
-      })!;
-      expect(q.changePct, closeTo(1.0, 1e-9));
-      expect(Markets.parseChart('x', {'chart': {'result': []}}), isNull);
-      expect(Markets.parseChart('x', 'nonsense'), isNull);
-    });
   });
 
   group('Unique covers', () {

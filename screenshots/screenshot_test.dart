@@ -19,7 +19,6 @@ import 'package:parallax_news/models/source.dart';
 import 'package:parallax_news/models/story.dart';
 import 'package:parallax_news/services/cover_images.dart';
 import 'package:parallax_news/services/crawler_feed.dart';
-import 'package:parallax_news/services/markets.dart';
 import 'package:parallax_news/services/repository.dart';
 import 'package:parallax_news/state/app_state.dart';
 import 'package:parallax_news/ui/screens/feed_screens.dart';
@@ -233,7 +232,6 @@ void main() {
     CoverImages.enabled = false;
     AppState.debounceSaves = false;
     NewsRepository.offline = true;
-    Markets.enabled = false;
     CrawlerFeed.enabled = false;
     NetImage.enabled = false;
     await _loadFonts();
@@ -284,14 +282,14 @@ void main() {
 
   testWidgets('blindspot', (tester) async {
     await setup(tester, phone);
-    await tester.pumpWidget(_app(state, _feedShell(4, stories)));
+    await tester.pumpWidget(_app(state, _feedShell(3, stories)));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/04_blindspot.png'));
   });
 
   testWidgets('explore', (tester) async {
     await setup(tester, phone);
-    await tester.pumpWidget(_app(state, const HomeShell(initialTab: 3, pageOverride: _noOverride)));
+    await tester.pumpWidget(_app(state, const HomeShell(initialTab: 2, pageOverride: _noOverride)));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/05_explore.png'));
   });
@@ -310,9 +308,9 @@ void main() {
     ('promo_2', 'Know who is\ntelling it', 'Bias, factuality, ownership and state affiliation for every outlet.',
         () => StoryScreen(story: stories.first), Brand.black),
     ('promo_3', 'From the world\nto your street', 'Continents, countries, states, cities and neighbourhood papers.',
-        () => const HomeShell(initialTab: 3, pageOverride: _noOverride), Brand.purple),
+        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), Brand.purple),
     ('promo_4', 'Break out of\nyour bubble', 'Blindspots reveal stories one side is ignoring.',
-        () => _feedShell(4, stories), Brand.black),
+        () => _feedShell(3, stories), Brand.black),
   ];
 
   for (final p in promos) {

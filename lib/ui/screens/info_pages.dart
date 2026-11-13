@@ -4,16 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/updater.dart';
 import '../theme.dart';
 
-/// Where this build is distributed: 'github' (self-updating APK), 'play' or
-/// 'fdroid' (the store updates the app, so the built-in updater is off).
-const channel = String.fromEnvironment('CHANNEL', defaultValue: 'github');
-bool get selfUpdates => channel == 'github';
-
 const repoUrl = 'https://github.com/JackLongman12/parallax-news';
-
-/// Short line shown under market data.
-const marketDisclaimer = 'Not financial advice. Prices may be delayed. Data: Yahoo Finance, CNBC, Finnhub and '
-    'StockTwits.';
 
 class InfoSection {
   const InfoSection(this.heading, this.body);
@@ -54,18 +45,21 @@ const privacyPage = InfoPage(
       'collects anything about you. Last updated November 2026.',
   sections: [
     InfoSection('What stays on your phone',
-        'Your followed places and topics, watchlist, reading history, thumbs up/down, and the interest model '
+        'Your followed places and topics, reading history, thumbs up/down, and the interest model '
             'the app learns from what you open. None of it is uploaded. Uninstalling the app or using '
             '"Reset" in Settings deletes it.'),
     InfoSection('Services the app contacts',
-        'To show news and prices the app downloads public data directly from these services. Like any website, '
-            'they see your IP address and the request (for example, a search term or a ticker), under their own '
+        'To show news the app downloads public data directly from these services. Like any website, '
+            'they see your IP address and the request (for example, a search term), under their own '
             'privacy policies:\n'
             '- News: Google News, Bing News, GDELT, publisher RSS feeds, and article pages for preview images.\n'
             '- Outlet and place data: Wikidata and OpenStreetMap Nominatim.\n'
-            '- Markets: Yahoo Finance and CNBC.\n'
-            '- Our crawler feed, market snapshot and updates: GitHub, and our Cloudflare Worker, which stores '
-            'nothing about you.'),
+            '- Our crawler feed and app updates: GitHub, and our Cloudflare Worker.'),
+    InfoSection('Crash reports',
+        'If the app crashes it sends a crash report to our Cloudflare Worker: the error message, where in '
+            'the code it happened, the app version and the Android version. It never includes your reading '
+            'history, places, location or anything that identifies you, and the Worker does not store IP '
+            'addresses. Reports are kept for 30 days. You can turn this off in Settings.'),
     InfoSection('Location',
         'Only used if you tap "Near me", and only after Android asks your permission. The app requests your '
             'approximate location, rounds it to about 1 km, and sends that to OpenStreetMap to find your town. '
@@ -104,27 +98,13 @@ const ratingsPage = InfoPage(
   ],
 );
 
-const marketsPage = InfoPage(
-  title: 'About market data',
-  intro: 'Market data in Parallax News is for information only and is not financial, investment or trading advice.',
-  sections: [
-    InfoSection('Sources',
-        'Prices and charts come from Yahoo Finance. When Yahoo is unavailable they come from CNBC, and from '
-            'Finnhub for US stocks and crypto. Top movers can be built from the 100 largest US companies and '
-            'trending tickers from StockTwits.'),
-    InfoSection('Delays and accuracy',
-        'Quotes can be delayed by 15 minutes or more and may be refreshed only every few minutes. Always check '
-            'with your broker before making any decision.'),
-  ],
-);
-
 /// Opens a pre-filled GitHub issue (app version only; nothing personal).
 Future<void> reportProblem(BuildContext context) async {
   final v = await Updater.currentVersion();
   final uri = Uri.parse('$repoUrl/issues/new').replace(queryParameters: {
     'title': 'Problem: ',
     'body': 'What happened:\n\n\nWhat you expected:\n\n\nSteps to reproduce:\n\n\n'
-        '---\nApp version: $v ($channel)',
+        '---\nApp version: $v',
   });
   final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!ok && context.mounted) {

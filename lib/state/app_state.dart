@@ -13,7 +13,6 @@ import '../models/story.dart';
 import '../services/bias_service.dart';
 import '../services/country_detect.dart';
 import '../services/cover_images.dart';
-import '../services/markets.dart';
 import '../services/classifier.dart';
 import '../services/curator.dart';
 import '../services/repository.dart';
@@ -289,19 +288,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- Markets watchlist ----
-  List<String> get watchlist => _prefs.getStringList('watchlist') ?? Markets.defaultWatchlist;
-
-  bool watches(String symbol) => watchlist.contains(symbol);
-
-  void toggleWatch(String symbol) {
-    if (!Markets.isValidSymbol(symbol)) return;
-    final w = [...watchlist];
-    if (!w.remove(symbol)) w.add(symbol);
-    _prefs.setStringList('watchlist', w);
-    notifyListeners();
-  }
-
   // ---- Today in brief: what has been read ----
   String _today() {
     final n = DateTime.now();
@@ -349,8 +335,6 @@ class AppState extends ChangeNotifier {
       for (final c in followedTopics) () => repo.topic(c),
       for (final p in followed) () => repo.place(p),
       () => repo.dailyBrief(),
-      () => Markets.load(),
-      () => Markets.quotes(watchlist),
     ];
     for (final task in tasks) {
       if (gen != _idleGen) return; // user is interacting again

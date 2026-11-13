@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../data/geo.dart';
 import '../../models/category.dart';
 import '../../state/app_state.dart';
+import '../../services/crash_reporter.dart';
 import '../../services/crawler_feed.dart';
 import '../../services/provider_health.dart';
 import '../../services/updater.dart';
@@ -117,7 +118,7 @@ class SettingsScreen extends StatelessWidget {
           trailing: TextButton(onPressed: app.resetLearning, child: const Text('Reset')),
         ),
         const Divider(),
-        if (selfUpdates) SwitchListTile(
+        SwitchListTile(
           title: const Text('Auto-update'),
           subtitle: const Text('Check for a new build at startup and download it'),
           value: app.autoUpdate,
@@ -129,11 +130,10 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Version'),
             subtitle: Text('${snap.data ?? '…'}\n${Updater.lastResult}'),
             isThreeLine: true,
-            trailing: selfUpdates
-                ? TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now'))
-                : null,
+            trailing: TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now')),
           ),
         ),
+        const _CrashToggle(),
         ListTile(
           leading: const Icon(Icons.bug_report_outlined),
           title: const Text('Report a problem'),
@@ -145,12 +145,6 @@ class SettingsScreen extends StatelessWidget {
           title: const Text('How we rate outlets'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => InfoPage.open(context, ratingsPage),
-        ),
-        ListTile(
-          leading: const Icon(Icons.show_chart_rounded),
-          title: const Text('About market data'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => InfoPage.open(context, marketsPage),
         ),
         ListTile(
           leading: const Icon(Icons.privacy_tip_outlined),
@@ -297,4 +291,25 @@ class _CrawlerStatusTileState extends State<CrawlerStatusTile> {
           : IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh_rounded), onPressed: _refresh),
     );
   }
+}
+
+
+class _CrashToggle extends StatefulWidget {
+  const _CrashToggle();
+
+  @override
+  State<_CrashToggle> createState() => _CrashToggleState();
+}
+
+class _CrashToggleState extends State<_CrashToggle> {
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+        title: const Text('Send crash reports'),
+        subtitle: const Text('Error details and app version only, nothing about you'),
+        value: CrashReporter.enabled,
+        onChanged: (v) async {
+          await CrashReporter.setEnabled(v);
+          if (mounted) setState(() {});
+        },
+      );
 }

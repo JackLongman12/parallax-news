@@ -1,62 +1,62 @@
-# Launch checklist
+# Launch and operations
 
-## 1. Official API keys (free; all optional)
+The app is distributed as a signed APK on GitHub Releases. It updates itself.
 
-The crawler and the Worker turn each source on as soon as its key is set. Only you can create the accounts. Keys stay in GitHub or Cloudflare secrets and never ship in the app.
+## How the backend stays up
 
-| Secret | Sign up | Free limit | Used for |
-|---|---|---|---|
-| `GUARDIAN_KEY` | open-platform.theguardian.com | 5,000/day | Guardian headlines (crawler) |
-| `NYT_KEY` | developer.nytimes.com (Times Newswire API) | 500/day | NYT headlines (crawler) |
-| `NEWSDATA_KEY` | newsdata.io | 200 credits/day | Multi-language news (crawler, every 30 min) |
-| `GNEWS_KEY` | gnews.io | 100/day | Top headlines (crawler, every 20 min) |
-| `NEWSAPI_KEY` | newsapi.org | 100/day | Top headlines (crawler, every 20 min) |
-| `FINNHUB_KEY` | finnhub.io | 60/min | Official stock prices (crawler) and backup symbol search (Worker) |
+| Part | Runs on | If it fails |
+|---|---|---|
+| Crawler (`crawler/crawl.py`) | GitHub Actions, every 5 min. Each run starts the next one. | The Worker keeps serving the last good feed. Its cron restarts the crawler after 12 min without a new feed (needs `GH_TOKEN`). |
+| Feed file | The `feed` release on GitHub | The Worker serves its own copy in Cloudflare KV, refreshed every 5 min. |
+| Worker (`worker/`) | Cloudflare, free plan | The app downloads the feed from GitHub directly. |
+| Both down | | The app shows the last feed saved on the phone, then falls back to fetching Google, Bing and GDELT itself. |
+| Updates | GitHub release `latest.json`, then the GitHub API | Updates wait. The app keeps working. |
 
-Add the crawler keys to GitHub, one command per key:
+Each layer covers the one before it. A user sees no news only if GitHub, Cloudflare and Google News are all unreachable on a phone that has never loaded the feed.
+
+**Uptime monitor (free):** create an HTTP monitor at uptimerobot.com (or a similar service) for `https://parallax-news.lp-reports.workers.dev/health`. It returns HTTP 503 when the feed is more than 30 minutes old, so you get an email if the crawler stalls.
+
+## Crash reports
+
+The app posts crashes to the Worker at `/crash`. They are grouped by error and kept for 30 days. To read them:
 
 ```
-gh secret set GUARDIAN_KEY
+python tool/crashes.py
 ```
 
-Add Finnhub to the Worker as well:
+That lists every crash group. To show the full stack trace of one group:
 
 ```
-cd worker && npx wrangler secret put FINNHUB_KEY && npx wrangler deploy
+python tool/crashes.py <id>
 ```
 
-While you're in the Worker, set `GH_TOKEN` (a fine-grained token with Actions read/write on this repo only). It lets the Worker restart the crawler if GitHub's schedule stalls.
+The admin token is in `secrets/worker_admin_token.txt`, which git ignores. Release builds are obfuscated. To turn a stack trace back into readable code, download `symbols-1.0.N.zip` from the matching release, then run:
 
-Check a crawl log for `news APIs: {...}` and `official prices from Finnhub` to confirm the keys work.
+```
+flutter symbolize -i trace.txt -d app.android-arm64.symbols
+```
 
-## 2. Before anyone else installs it
+## Optional: official news API keys (free)
 
-- [ ] Test on a real phone: every tab, updating, offline mode, the largest font size and a small screen.
-- [ ] Back up `secrets/signing.keystore` somewhere other than this PC. If it's lost, installed apps can never update again.
-- [ ] Review the outlet ratings in `assets/sources.json`. They follow the method in Settings > How we rate outlets.
-- [ ] Make sure no other app or company already uses the name "Parallax News".
+Each key turns on one more source in the crawler. Add one with `gh secret set NAME`.
 
-## 3. GitHub releases (works now)
+| Secret | Sign up | Free limit |
+|---|---|---|
+| `GUARDIAN_KEY` | open-platform.theguardian.com | 5,000 per day |
+| `NYT_KEY` | developer.nytimes.com (Times Newswire) | 500 per day |
+| `NEWSDATA_KEY` | newsdata.io | 200 credits per day |
+| `GNEWS_KEY` | gnews.io | 100 per day |
+| `NEWSAPI_KEY` | newsapi.org | 100 per day |
 
-Every push to `main` publishes `vX.Y.N` with the APK, which updates itself, and a Play bundle (`-play.aab`).
+**Crawler watchdog:** add the `GH_TOKEN` secret to the Worker so its cron can restart a stalled crawler. Use a fine-grained token with Actions read/write on this repo only, then run:
 
-## 4. Google Play
+```
+cd worker && npx wrangler secret put GH_TOKEN
+```
 
-1. Create a Play Console developer account ($25, one-time).
-2. Create the app with package `com.parallaxnews.parallax_news`.
-3. Upload the `-play.aab` from the latest release. Play App Signing uses your keystore as the upload key. The Play build has no built-in updater and doesn't request permission to install apps.
-4. Store listing: copy the text and images from `fastlane/metadata/android/en-US/`. Privacy policy URL: `https://github.com/JackLongman12/parallax-news/blob/main/PRIVACY.md`.
-5. Data safety form:
-   - No data collected or shared.
-   - Approximate location is used on the device only, and the user must turn it on.
-   - Data is encrypted in transit (HTTPS only).
-6. Content rating: News. Target audience: 13+.
-7. New personal accounts must run a closed test with 12 testers for 14 days before going to production.
+## Before telling people about it
 
-## 5. F-Droid
-
-F-Droid builds the app from source and reads `fastlane/metadata`. Submit a merge request to `fdroiddata` with a recipe that:
-- runs `flutter create` and `tool/prepare_android.py` with `CHANNEL=fdroid`, which drops the self-updater permission;
-- builds with `--dart-define=CHANNEL=fdroid`.
-
-Expect the "NonFreeNet" label, because the app uses Google News and Yahoo.
+- [ ] Test on a real phone: every tab, an update, offline mode, the largest font size, a small screen.
+- [ ] Back up `secrets/` somewhere other than this PC. It holds the signing keystore and the Worker admin token. If you lose the keystore, installed apps can never update again.
+- [ ] Review the outlet ratings in `assets/sources.json`, following the method in Settings > How we rate outlets.
+- [ ] Check that no one else already uses the name "Parallax News".

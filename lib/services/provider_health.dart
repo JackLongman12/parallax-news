@@ -53,7 +53,6 @@ class ProviderHealth {
     'bing': ProviderStats('Bing News'),
     'gdelt': ProviderStats('GDELT', minInterval: const Duration(milliseconds: 5500)),
     'wikidata': ProviderStats('Wikidata'),
-    'yahoo': ProviderStats('Yahoo Finance'),
   };
 
   bool available(String p) => !(stats[p]?.coolingDown ?? false);

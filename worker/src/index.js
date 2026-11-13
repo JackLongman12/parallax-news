@@ -1,25 +1,30 @@
 // Parallax News edge worker (Cloudflare Workers, free plan).
 //
-//   GET /feed          -> latest crawler feed (JSON), cached at the edge
-//   GET /og?url=...    -> { image } : preview image of an article page,
+//   GET  /feed         -> latest crawler feed (JSON). Served from a copy kept
+//                         in KV, so it keeps working while GitHub is down
+//                         (the feed just gets older until GitHub is back).
+//   GET  /og?url=...   -> { image } : preview image of an article page,
 //                         cached for a day, so phones don't fetch pages
-//   GET /y/<path>      -> Yahoo Finance JSON (chart, trending, screener,
-//                         search only), cached 60 s and shared by all users
-//   GET /fh?fn=quote|search&q=... -> Finnhub (needs FINNHUB_KEY secret)
-//   GET /health        -> "ok"
-//   cron (every 5 min) -> starts the GitHub crawler, because GitHub's own
-//                         schedule is often delayed or skipped. Needs the
-//                         GH_TOKEN secret; without it this does nothing.
+//   POST /crash        -> anonymous crash report from the app (see crash())
+//   GET  /crashes?token=ADMIN_TOKEN[&id=...] -> grouped crash reports
+//   GET  /health       -> JSON status; HTTP 503 if the feed is older than
+//                         30 min (point an uptime monitor at it)
+//   cron (every 5 min) -> copies a new feed from GitHub into KV, and if the
+//                         crawler has stalled (no new feed for 12 min)
+//                         restarts it (needs the GH_TOKEN secret).
 //
 // Deployed as its OWN worker ("parallax-news"), so it never touches any
-// other worker on the account.
+// other worker on the account. KV binding: STORE.
 
-const FEED_TTL = 120; // seconds
+const FEED_TTL = 120; // seconds at the edge
 const OG_TTL = 86400;
+const STALE_RESTART = 12 * 60; // seconds without a new feed -> restart crawler
+const STALE_UNHEALTHY = 30 * 60;
+const GITHUB_FEED = "https://github.com/JackLongman12/parallax-news/releases/download/feed/feed.json.gz";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 function json(body, status = 200, maxAge = 60) {
@@ -45,21 +50,79 @@ function safeUrl(raw) {
   return u;
 }
 
+// ---- Feed ----
+
+function feedResponse(gzBody, age) {
+  return new Response(gzBody.pipeThrough(new DecompressionStream("gzip")), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=${FEED_TTL}`,
+      "X-Feed-Age": String(age ?? -1),
+      ...CORS,
+    },
+  });
+}
+
 async function feed(request, env, ctx) {
   const cache = caches.default;
   const key = new Request("https://parallax-cache/feed");
   const hit = await cache.match(key);
   if (hit) return hit;
-  const src = env.FEED_URL || "https://github.com/JackLongman12/parallax-news/releases/download/feed/feed.json.gz";
-  const r = await fetch(src, { redirect: "follow", cf: { cacheTtl: FEED_TTL } });
-  if (!r.ok) return json({ error: "feed unavailable" }, 502, 30);
-  const body = r.body.pipeThrough(new DecompressionStream("gzip"));
-  const res = new Response(body, {
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": `public, max-age=${FEED_TTL}`, ...CORS },
-  });
+  let res = null;
+  // 1. The copy in KV (refreshed by the cron).
+  if (env.STORE) {
+    try {
+      const { value, metadata } = await env.STORE.getWithMetadata("feed:gz", { type: "stream" });
+      if (value) res = feedResponse(value, metadata?.seen ? Math.round(Date.now() / 1000 - metadata.seen) : null);
+    } catch {
+      res = null;
+    }
+  }
+  // 2. GitHub directly (first run, or KV unavailable).
+  if (!res) {
+    const r = await fetch(env.FEED_URL || GITHUB_FEED, { redirect: "follow", cf: { cacheTtl: FEED_TTL } });
+    if (!r.ok) return json({ error: "feed unavailable" }, 502, 30);
+    res = feedResponse(r.body, null);
+  }
   ctx.waitUntil(cache.put(key, res.clone()));
   return res;
 }
+
+async function feedMeta(env) {
+  try {
+    const { value, metadata } = await env.STORE.getWithMetadata("feed:gz", { type: "stream" });
+    if (value) await value.cancel();
+    return metadata || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Cron: copy a changed feed from GitHub into KV (one write per new feed). */
+async function syncFeed(env) {
+  const meta = await feedMeta(env);
+  const r = await fetch(env.FEED_URL || GITHUB_FEED, { redirect: "follow" });
+  if (!r.ok) return meta;
+  const buf = await r.arrayBuffer();
+  const sig = r.headers.get("etag") || r.headers.get("last-modified") || String(buf.byteLength);
+  if (sig === meta.sig) return meta;
+  // Sanity check: a gzip file that isn't tiny (never replace a good copy
+  // with an error page or a broken upload).
+  const b = new Uint8Array(buf);
+  if (buf.byteLength < 10_000 || b[0] !== 0x1f || b[1] !== 0x8b) return meta;
+  const next = { sig, seen: Math.round(Date.now() / 1000), size: buf.byteLength };
+  await env.STORE.put("feed:gz", buf, { metadata: next });
+  return next;
+}
+
+async function health(env) {
+  const meta = env.STORE ? await feedMeta(env) : {};
+  const age = meta.seen ? Math.round(Date.now() / 1000 - meta.seen) : null;
+  const ok = age !== null && age < STALE_UNHEALTHY;
+  return json({ ok, feedAgeSeconds: age, feedBytes: meta.size ?? null }, ok ? 200 : 503, 0);
+}
+
+// ---- Preview images ----
 
 const META = /<meta\s[^>]*>/gi;
 const PROP = /(?:property|name)\s*=\s*["']([^"']+)["']/i;
@@ -120,85 +183,111 @@ async function og(request, env, ctx) {
   return res;
 }
 
-const YAHOO_PATHS = [
-  /^\/v8\/finance\/chart\/[^/]{1,32}$/,
-  /^\/v1\/finance\/trending\/[A-Z]{2}$/,
-  /^\/v1\/finance\/screener\/predefined\/saved$/,
-  /^\/v1\/finance\/search$/,
-];
+// ---- Crash reports ----
+// The app sends: app version, Android version, error text and stack trace.
+// No user data. Reports are grouped by a fingerprint of the error and its
+// top frames and kept 30 days. IP addresses are never stored: a hashed,
+// daily-salted counter in the edge cache limits each phone to 20 a day.
 
-async function yahoo(request, ctx) {
-  const url = new URL(request.url);
-  const path = url.pathname.slice(2); // drop "/y"
-  if (!YAHOO_PATHS.some((re) => re.test(path)) || url.search.length > 300) {
-    return json({ error: "not allowed" }, 400);
-  }
-  const target = "https://query1.finance.yahoo.com" + path + url.search;
-  const cache = caches.default;
-  const key = new Request("https://parallax-cache/y" + path + url.search);
-  const hit = await cache.match(key);
-  if (hit) return hit;
-  const r = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
-  if (!r.ok) return json({ error: "upstream " + r.status }, r.status === 429 ? 429 : 502, 15);
-  const body = await r.text();
-  if (body.length > 2_000_000) return json({ error: "too large" }, 502);
-  const res = new Response(body, {
-    headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60", ...CORS },
-  });
-  ctx.waitUntil(cache.put(key, res.clone()));
-  return res;
+const CRASH_TTL = 30 * 86400;
+const clip = (v, n) => (typeof v === "string" ? v.slice(0, n) : "");
+
+async function sha(text) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("").slice(0, 24);
 }
 
-// Finnhub (official market API, free key kept as the FINNHUB_KEY secret so
-// it never ships in the open-source app). Quote and symbol search only.
-async function finnhub(request, env, ctx) {
-  if (!env.FINNHUB_KEY) return json({ error: "not configured" }, 503, 300);
-  const url = new URL(request.url);
-  const fn = url.searchParams.get("fn");
-  const q = (url.searchParams.get("q") || "").trim();
-  if (!["quote", "search"].includes(fn) || !q || q.length > 40 || !/^[\w .:^=&-]+$/.test(q)) {
-    return json({ error: "bad request" }, 400);
+async function crash(request, env, ctx) {
+  if (!env.STORE) return json({ error: "not configured" }, 503, 0);
+  if (Number(request.headers.get("content-length") || 0) > 16_000) return json({ error: "too large" }, 413, 0);
+  let r;
+  try {
+    r = JSON.parse((await request.text()).slice(0, 16_000));
+  } catch {
+    return json({ error: "bad json" }, 400, 0);
   }
+  const err = clip(r.error, 600);
+  const stack = clip(r.stack, 4000);
+  if (!err) return json({ error: "missing error" }, 400, 0);
+
+  const day = new Date().toISOString().slice(0, 10);
+  const who = await sha((request.headers.get("cf-connecting-ip") || "") + day + (env.SALT || "parallax"));
   const cache = caches.default;
-  const key = new Request(`https://parallax-cache/fh/${fn}/${encodeURIComponent(q)}`);
-  const hit = await cache.match(key);
-  if (hit) return hit;
-  const param = fn === "quote" ? "symbol" : "q";
-  const r = await fetch(`https://finnhub.io/api/v1/${fn}?${param}=${encodeURIComponent(q)}&token=${env.FINNHUB_KEY}`);
-  if (!r.ok) return json({ error: "upstream " + r.status }, r.status === 429 ? 429 : 502, 15);
-  const res = new Response(await r.text(), {
-    headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${fn === "quote" ? 30 : 3600}`, ...CORS },
+  const rk = new Request(`https://parallax-cache/crash-rate/${who}`);
+  const n = Number((await (await cache.match(rk))?.text()) || 0);
+  if (n >= 20) return json({ ok: true, dropped: true }, 200, 0);
+  ctx.waitUntil(cache.put(rk, new Response(String(n + 1), { headers: { "Cache-Control": "max-age=86400" } })));
+
+  const frames = stack.split("\n").filter((l) => l.trim()).slice(0, 5).join("\n");
+  const fp = await sha(err.split("\n")[0].replace(/\d+/g, "#") + "\n" + frames);
+  const key = `crash:${fp}`;
+  const now = Math.round(Date.now() / 1000);
+  const old = await env.STORE.get(key, { type: "json" });
+  // Same crash again within the hour: skip the write (the free plan allows
+  // 1,000 KV writes a day).
+  if (old && now - old.last < 3600) return json({ ok: true, id: fp }, 200, 0);
+  const version = clip(r.version, 30);
+  const rec = {
+    first: old?.first || now,
+    last: now,
+    count: (old?.count || 0) + 1,
+    version,
+    versions: [...new Set([...(old?.versions || []), version])].slice(-10),
+    os: clip(r.os, 60),
+    fatal: !!r.fatal,
+    error: err,
+    stack,
+  };
+  await env.STORE.put(key, JSON.stringify(rec), {
+    expirationTtl: CRASH_TTL,
+    metadata: { last: now, count: rec.count, version, error: err.slice(0, 160) },
   });
-  ctx.waitUntil(cache.put(key, res.clone()));
-  return res;
+  return json({ ok: true, id: fp }, 200, 0);
+}
+
+async function crashes(request, env) {
+  const url = new URL(request.url);
+  if (!env.ADMIN_TOKEN || url.searchParams.get("token") !== env.ADMIN_TOKEN) return json({ error: "forbidden" }, 403, 0);
+  const id = url.searchParams.get("id");
+  if (id) return json((await env.STORE.get(`crash:${id}`, { type: "json" })) || { error: "not found" }, 200, 0);
+  const list = await env.STORE.list({ prefix: "crash:", limit: 1000 });
+  const rows = list.keys
+    .map((k) => ({ id: k.name.slice(6), ...(k.metadata || {}) }))
+    .sort((a, b) => (b.last || 0) - (a.last || 0));
+  return json({ count: rows.length, crashes: rows }, 200, 0);
 }
 
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
-    if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
     const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path === "/crash") return crash(request, env, ctx);
+    if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
     if (path === "/feed") return feed(request, env, ctx);
     if (path === "/og") return og(request, env, ctx);
-    if (path.startsWith("/y/")) return yahoo(request, ctx);
-    if (path === "/fh") return finnhub(request, env, ctx);
-    if (path === "/health") return new Response("ok", { headers: CORS });
+    if (path === "/crashes") return crashes(request, env);
+    if (path === "/health") return health(env);
     return json({ error: "not found" }, 404);
   },
 
   async scheduled(event, env, ctx) {
-    if (!env.GH_TOKEN) return;
-    const repo = env.GH_REPO || "JackLongman12/parallax-news";
     ctx.waitUntil(
-      fetch(`https://api.github.com/repos/${repo}/actions/workflows/crawler.yml/dispatches`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.GH_TOKEN}`,
-          Accept: "application/vnd.github+json",
-          "User-Agent": "parallax-news-worker",
-        },
-        body: JSON.stringify({ ref: "main" }),
-      }),
+      (async () => {
+        const meta = env.STORE ? await syncFeed(env) : {};
+        // Watchdog: restart the crawler only if it has stalled.
+        const age = meta.seen ? Date.now() / 1000 - meta.seen : Infinity;
+        if (!env.GH_TOKEN || age < STALE_RESTART) return;
+        const repo = env.GH_REPO || "JackLongman12/parallax-news";
+        await fetch(`https://api.github.com/repos/${repo}/actions/workflows/crawler.yml/dispatches`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.GH_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "parallax-news-worker",
+          },
+          body: JSON.stringify({ ref: "main" }),
+        });
+      })(),
     );
   },
 };

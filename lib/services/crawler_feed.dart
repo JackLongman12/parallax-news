@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show gzip;
+import 'dart:io' show File, gzip;
+
+import 'package:path_provider/path_provider.dart';
 
 import '../models/article.dart';
 import '../models/category.dart';
@@ -9,9 +12,8 @@ import 'net.dart';
 /// Pre-built stories from our own crawler (GitHub Actions, every ~5 min):
 /// hundreds of feeds clustered into stories with many outlets each.
 ///
-/// Kept in MEMORY only (never written to disk) and refreshed every 5 min,
-/// so it adds no storage. If the crawler or worker is unreachable, the app
-/// silently falls back to on-device fetching.
+/// Refreshed every 5 min. The last good copy (~1 MB) is kept on disk for
+/// outages; with nothing at all, the app falls back to on-device fetching.
 class CrawlerFeed {
   /// Cloudflare worker endpoint (set at build time once deployed), else the
   /// GitHub release asset directly.
@@ -28,7 +30,7 @@ class CrawlerFeed {
   static DateTime? builtAt;
   static DateTime? get loadedAt => _stories == null ? null : _at;
   static int get count => _stories?.length ?? 0;
-  static String get via => workerUrl.startsWith('https://') ? 'Cloudflare' : 'GitHub';
+  static String get via => _via;
   static String? lastError;
 
   static Future<List<Story>> load({bool force = false}) {
@@ -39,30 +41,73 @@ class CrawlerFeed {
     return _inflight ??= _fetch().whenComplete(() => _inflight = null);
   }
 
+  /// Worker first, then GitHub directly, then the last feed saved on the
+  /// phone (so a cold start during an outage still shows stories).
   static Future<List<Story>> _fetch() async {
-    try {
-      String text;
-      if (workerUrl.startsWith('https://')) {
-        text = await Net.getText('$workerUrl/feed', useCache: false, timeout: const Duration(seconds: 12));
-      } else {
-        final bytes = await Net.getBytes(githubUrl, timeout: const Duration(seconds: 15));
-        text = utf8.decode(gzip.decode(bytes), allowMalformed: true);
+    Object? fail;
+    for (final source in [if (workerUrl.startsWith('https://')) 'Cloudflare', 'GitHub']) {
+      try {
+        final text = source == 'Cloudflare'
+            ? await Net.getText('$workerUrl/feed', useCache: false, timeout: const Duration(seconds: 12))
+            : utf8.decode(gzip.decode(await Net.getBytes(githubUrl, timeout: const Duration(seconds: 15))),
+                allowMalformed: true);
+        if (_use(text, source)) {
+          unawaited(_save(text));
+          return _stories!;
+        }
+        fail = const FormatException('empty feed');
+      } catch (e) {
+        fail = e;
       }
-      final json = jsonDecode(text);
-      final list = parse(json);
-      if (list.isEmpty) throw const FormatException('empty feed');
-      final at = json is Map ? json['at'] : null;
-      builtAt = at is int ? DateTime.fromMillisecondsSinceEpoch(at * 1000) : null;
-      _stories = list;
-      _at = DateTime.now();
-      lastError = null;
-      return _stories!;
-    } on FormatException {
-      lastError = 'feed was unreadable';
-      return _stories ?? const [];
+    }
+    if (_stories == null) {
+      final saved = await _load();
+      if (saved != null && _use(saved, 'saved copy')) {
+        lastError = 'offline, showing the last saved feed';
+        return _stories!;
+      }
+    }
+    lastError = fail is FormatException ? 'feed was unreadable' : 'could not reach Cloudflare or GitHub';
+    return _stories ?? const [];
+  }
+
+  static String _via = 'GitHub';
+
+  static bool _use(String text, String source) {
+    final json = jsonDecode(text);
+    final list = parse(json);
+    if (list.isEmpty) return false;
+    final at = json is Map ? json['at'] : null;
+    builtAt = at is int ? DateTime.fromMillisecondsSinceEpoch(at * 1000) : null;
+    _stories = list;
+    _at = DateTime.now();
+    _via = source;
+    lastError = null;
+    return true;
+  }
+
+  // One gzipped copy (~1 MB), replaced on every successful load.
+  static Future<File?> _file() async {
+    try {
+      return File('${(await getApplicationSupportDirectory()).path}/feed_last.json.gz');
     } catch (_) {
-      lastError = 'could not reach $via';
-      return _stories ?? const [];
+      return null;
+    }
+  }
+
+  static Future<void> _save(String text) async {
+    try {
+      await (await _file())?.writeAsBytes(gzip.encode(utf8.encode(text)), flush: true);
+    } catch (_) {}
+  }
+
+  static Future<String?> _load() async {
+    try {
+      final f = await _file();
+      if (f == null || !await f.exists()) return null;
+      return utf8.decode(gzip.decode(await f.readAsBytes()), allowMalformed: true);
+    } catch (_) {
+      return null;
     }
   }
 

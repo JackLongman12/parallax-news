@@ -17,7 +17,6 @@ import '../theme.dart';
 import '../nav.dart';
 import '../widgets/common.dart';
 import '../widgets/daily_overview.dart';
-import '../widgets/markets_strip.dart';
 import 'explore_screens.dart';
 import 'feed_editor.dart';
 import 'story_list.dart';
@@ -381,7 +380,6 @@ class _TopicPageState extends State<TopicPage> {
               child: Text(path.path, style: Theme.of(context).textTheme.bodySmall),
             ),
           ),
-        if (path == null && (category == Category.business || category == Category.finance)) const MarketsStrip(),
         Expanded(
           child: StoryList(
             key: ValueKey('tp:${category.name}:${path?.leaf.label ?? ''}'),
@@ -483,13 +481,13 @@ class _BlindspotScreenState extends State<BlindspotScreen> {
   @override
   void initState() {
     super.initState();
-    TabReselect.tabs[4].addListener(_reload);
+    TabReselect.tabs[3].addListener(_reload);
     _load();
   }
 
   @override
   void dispose() {
-    TabReselect.tabs[4].removeListener(_reload);
+    TabReselect.tabs[3].removeListener(_reload);
     super.dispose();
   }
 
