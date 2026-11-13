@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/geo.dart';
@@ -18,7 +17,7 @@ import 'insights.dart';
 import 'sources_screen.dart';
 import 'story_list.dart';
 
-/// Search-as-you-type for any place on earth, plus "Near me" and recents.
+/// Search-as-you-type for any place on earth, plus recent places.
 /// Tapping a result calls [onPick] (default: open the place's page).
 class PlaceSearchPanel extends StatefulWidget {
   const PlaceSearchPanel({super.key, this.onPick, this.autofocus = false, this.shrinkWrap = false});
@@ -47,6 +46,10 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
 
   void _pick(Place p) {
     context.read<AppState>().addRecent(p);
+    setState(() {
+      _ctrl.clear();
+      _results = null;
+    });
     if (widget.onPick != null) {
       widget.onPick!(p);
     } else {
@@ -60,7 +63,7 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
       setState(() => _results = null);
       return;
     }
-    // Nominatim allows ~1 request/second; debounce typing.
+    // Debounce typing: one search after a short pause.
     _debounce = Timer(const Duration(milliseconds: 650), () => _search(q));
   }
 
@@ -77,32 +80,6 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
       if (mounted && mySeq == _seq) setState(() => _error = 'Search failed. Check your connection.');
     } finally {
       if (mounted && mySeq == _seq) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _nearMe() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) throw 'Location is turned off';
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        throw 'Location permission denied';
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 15)),
-      );
-      final place = await PlaceService.reverse(pos.latitude, pos.longitude);
-      if (!mounted) return;
-      if (place == null) throw 'Could not find your area';
-      _pick(place);
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -141,10 +118,6 @@ class _PlaceSearchPanelState extends State<PlaceSearchPanel> {
       SizedBox(
         height: 44,
         child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(avatar: const Icon(Icons.my_location_rounded, size: 18), label: const Text('Near me'), onPressed: _busy ? null : _nearMe),
-          ),
           for (final p in app.recentPlaces)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -326,7 +299,7 @@ class ExploreScreen extends StatelessWidget {
       ),
       const Padding(
         padding: EdgeInsets.all(16),
-        child: Text('Place search © OpenStreetMap contributors. Places & local outlets from Wikidata (CC0).',
+        child: Text('Places and local outlets from Wikidata (CC0).',
             style: TextStyle(fontSize: 11)),
       ),
     ]));
@@ -711,6 +684,7 @@ class _NewsSearchBarState extends State<NewsSearchBar> {
     final query = q.trim();
     if (query.length < 2) return;
     _focus.unfocus();
+    _ctrl.clear(); // ready for the next search when you come back
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SearchResultsPage(query: query)));
   }
 

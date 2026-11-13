@@ -81,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
         const Divider(),
         const ListTile(
           title: Text('News sources'),
-          subtitle: Text('Chosen automatically: Google + Bing, plus GDELT where it helps. Slow or rate-limited sources are skipped.'),
+          subtitle: Text('Google News and Bing News, plus our crawler. Slow or rate-limited sources are skipped.'),
         ),
         const CrawlerStatusTile(),
         const _SourceHealth(),
@@ -155,7 +155,7 @@ class SettingsScreen extends StatelessWidget {
         const AboutListTile(
           applicationName: 'Parallax News',
           applicationLegalese: 'Open source (MIT). Ratings are a community seed + Wikidata (CC0). '
-              'Place search © OpenStreetMap contributors. Headlines link to their publishers.',
+              'Headlines link to their publishers.',
         ),
       ]),
     );

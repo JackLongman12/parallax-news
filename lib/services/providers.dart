@@ -47,56 +47,6 @@ class BingNews {
   }
 }
 
-/// GDELT DOC 2.0: global multilingual index (rate limited; off by default).
-class Gdelt {
-  static Future<List<Article>> search(String query, {String? countryCode}) async {
-    final q = countryCode == null ? query : '$query sourcecountry:${_fips(countryCode)}';
-    final url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=${Uri.encodeQueryComponent(q)}'
-        '&mode=ArtList&maxrecords=75&format=json&sort=DateDesc&timespan=3d';
-    final json = await ProviderHealth.instance.run('gdelt', () => Net.getJson(url));
-    final list = (json is Map ? json['articles'] : null) as List? ?? const [];
-    final out = <Article>[];
-    for (final raw in list) {
-      if (raw is! Map) continue;
-      final url = raw['url']?.toString() ?? '';
-      final title = FeedParser.cleanText(raw['title']?.toString() ?? '');
-      if (!isSafeWebUrl(url) || title.isEmpty) continue;
-      final img = raw['socialimage']?.toString();
-      out.add(Article(
-        title: title,
-        url: url,
-        sourceName: raw['domain']?.toString() ?? domainOf(url),
-        domain: domainOf(url),
-        published: _gdeltDate(raw['seendate']?.toString()),
-        imageUrl: _safeImage(img),
-        provider: 'gdelt',
-      ));
-    }
-    return out;
-  }
-
-  static String? _safeImage(String? img) {
-    final u = img == null ? null : Uri.tryParse(img);
-    return u != null && u.scheme == 'https' && isPublicHost(u.host) ? u.toString() : null;
-  }
-
-  static DateTime? _gdeltDate(String? s) {
-    // Format: 20261113T101500Z
-    if (s == null || s.length < 15) return null;
-    return DateTime.tryParse('${s.substring(0, 8)}T${s.substring(9, 15)}Z');
-  }
-
-  // GDELT uses FIPS country codes; most match ISO, a few common ones differ.
-  static String _fips(String iso) {
-    const m = {
-      'GB': 'UK', 'DE': 'GM', 'JP': 'JA', 'KR': 'KS', 'CN': 'CH', 'AU': 'AS', 'ES': 'SP',
-      'IE': 'EI', 'IL': 'IS', 'PH': 'RP', 'ZA': 'SF', 'NG': 'NI', 'RU': 'RS', 'UA': 'UP',
-      'TR': 'TU', 'SE': 'SW', 'AT': 'AU', 'CH': 'SZ', 'PT': 'PO', 'VN': 'VM', 'BD': 'BG',
-    };
-    return m[iso.toUpperCase()] ?? iso.toUpperCase();
-  }
-}
-
 /// Fetches a publisher's own RSS/Atom feed.
 class DirectFeed {
   static Future<List<Article>> fetch(String feedUrl,

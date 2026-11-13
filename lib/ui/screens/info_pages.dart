@@ -52,8 +52,8 @@ const privacyPage = InfoPage(
         'To show news the app downloads public data directly from these services. Like any website, '
             'they see your IP address and the request (for example, a search term), under their own '
             'privacy policies:\n'
-            '- News: Google News, Bing News, GDELT, publisher RSS feeds, and article pages for preview images.\n'
-            '- Outlet and place data: Wikidata and OpenStreetMap Nominatim.\n'
+            '- News: Google News, Bing News, publisher RSS feeds, and article pages for preview images.\n'
+            '- Outlet and place data: Wikidata.\n'
             '- Our crawler feed and app updates: GitHub, and our Cloudflare Worker.'),
     InfoSection('Crash reports',
         'If the app crashes it sends a crash report to our Cloudflare Worker: the error message, where in '
@@ -61,9 +61,8 @@ const privacyPage = InfoPage(
             'history, places, location or anything that identifies you, and the Worker does not store IP '
             'addresses. Reports are kept for 30 days. You can turn this off in Settings.'),
     InfoSection('Location',
-        'Only used if you tap "Near me", and only after Android asks your permission. The app requests your '
-            'approximate location, rounds it to about 1 km, and sends that to OpenStreetMap to find your town. '
-            'It is not stored anywhere else. Your home country is otherwise guessed from your network\'s region.'),
+        'The app never asks for your location. Your home country is guessed from your network\'s region, '
+            'and you can change it in Settings.'),
     InfoSection('Children', 'The app is a general news reader and is not directed at children under 13.'),
     InfoSection('Changes and contact',
         'Changes to this policy ship with app updates and are listed in the project\'s history on GitHub. '

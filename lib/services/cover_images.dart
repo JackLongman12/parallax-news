@@ -15,7 +15,7 @@ import 'text.dart';
 
 /// Finds a real news photo for a story. Google News RSS carries no images, so
 /// we try, cheapest first:
-///   1. an image already in any of the story's feeds (Bing, publisher RSS, GDELT)
+///   1. an image already in any of the story's feeds (Bing, publisher RSS)
 ///   2. the og:image / twitter:image of a publisher article page (first ~200 KB)
 ///   3. a Bing News search for the headline, taking the first item with an image
 /// Results are cached; at most 3 lookups run at once, and only for cards that

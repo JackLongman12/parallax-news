@@ -18,7 +18,6 @@ dependencies:
   ota_update: ">=6.0.0 <9.0.0"
   home_widget: ">=0.7.0 <1.0.0"
   share_plus: ">=11.0.0 <13.0.0"
-  geolocator: ">=13.0.0 <15.0.0"
   cached_network_image: ">=3.4.0 <4.0.0"
   flutter_cache_manager: ">=3.4.0 <4.0.0"
   path_provider: ">=2.1.0 <3.0.0"

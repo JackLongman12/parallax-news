@@ -23,7 +23,7 @@ class Article {
   final String snippet;
   final String? imageUrl;
 
-  /// 'google', 'bing', 'gdelt', 'rss'
+  /// 'google', 'bing', 'rss', 'api', 'crawl'
   final String provider;
   bool isLocal;
 

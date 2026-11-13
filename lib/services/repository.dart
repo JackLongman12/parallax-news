@@ -25,7 +25,6 @@ import 'text.dart';
 
 class FetchSettings {
   bool useBing = true;
-  bool useGdelt = false;
 
   /// Auto mode: route around slow / rate-limited sources automatically.
   bool autoSources = true;
@@ -75,17 +74,6 @@ class NewsRepository {
   static const taskBudget = Duration(seconds: 7);
 
   bool get _useBing => settings.autoSources || settings.useBing;
-
-  /// GDELT is slow and rate limited, so Auto mode only adds it where it helps
-  /// most: places Google covers poorly (no edition / non-English). Thin
-  /// coverage also pulls it in via the widening fallbacks.
-  bool _useGdelt(Place p) {
-    if (!settings.autoSources) return settings.useGdelt;
-    if (!ProviderHealth.instance.available('gdelt')) return false;
-    if (p.level.index < PlaceLevel.country.index) return false;
-    final ed = editionFor(p.countryCode);
-    return ed == null || !ed.isEnglish;
-  }
 
   static final _whenRe = RegExp(r'\s*when:\d+d');
 
@@ -212,7 +200,6 @@ class NewsRepository {
           tasks.add(_gn(() => GoogleNews.search('"${p.name}" when:2d', Edition.us), '"${p.name}"'));
         }
         if (_useBing) tasks.add(() => BingNews.search(p.name));
-        if (_useGdelt(p)) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
       case PlaceLevel.region:
       case PlaceLevel.district:
       case PlaceLevel.city:
@@ -223,7 +210,6 @@ class NewsRepository {
           tasks.add(_gn(() => GoogleNews.geo(parent.isEmpty ? p.name : '${p.name}, $parent', ed), '${p.name} $parent local news', isLocal: true));
         }
         if (_useBing) tasks.add(() => BingNews.search(q, isLocal: p.isLocalLevel));
-        if (_useGdelt(p)) tasks.add(() => Gdelt.search('"${p.name}"', countryCode: p.countryCode));
     }
 
     // Local outlet discovery: real community papers, radio and TV stations.
@@ -284,7 +270,6 @@ class NewsRepository {
       if (parent.isNotEmpty) _gn(() => GoogleNews.search('${p.name} $parent news', ed, isLocal: local), '${p.name} $parent', isLocal: local),
       if (!ed.isEnglish) _gn(() => GoogleNews.search('"${p.name}"', Edition.us, isLocal: local), '${p.name} news', isLocal: local),
       () => BingNews.search('${p.name} news', isLocal: local),
-      if (!_useGdelt(p)) () => Gdelt.search('"${p.name}"', countryCode: p.countryCode),
     ]);
 
     // 3. Curated outlets from the same country / continent, via site: search

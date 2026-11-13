@@ -16,7 +16,7 @@ class ProviderStats {
   ProviderStats(this.name, {this.minInterval = Duration.zero});
   final String name;
 
-  /// Minimum gap between requests (GDELT asks for ~1 request / 5s).
+  /// Minimum gap between requests (for providers that ask for one).
   final Duration minInterval;
 
   double avgLatencyMs = 0;
@@ -43,7 +43,7 @@ class ProviderStats {
 /// Tracks every provider and decides who to use. Used by Auto mode:
 ///  * rate-limit / server errors -> exponential cool-down (30s .. 15 min)
 ///  * 3 failures in a row        -> cool-down
-///  * enforces per-provider spacing (GDELT)
+///  * enforces per-provider spacing where a provider asks for it
 class ProviderHealth {
   ProviderHealth._();
   static final ProviderHealth instance = ProviderHealth._();
@@ -51,7 +51,6 @@ class ProviderHealth {
   final Map<String, ProviderStats> stats = {
     'google': ProviderStats('Google News'),
     'bing': ProviderStats('Bing News'),
-    'gdelt': ProviderStats('GDELT', minInterval: const Duration(milliseconds: 5500)),
     'wikidata': ProviderStats('Wikidata'),
   };
 

@@ -18,8 +18,8 @@ Uninstalling the app, or tapping "Reset" in Settings, deletes them.
 
 To show news, the app downloads public data directly from the services below. Like any website, each one sees your IP address and what was requested (for example a search term), and handles it under its own privacy policy.
 
-- **News:** Google News, Bing News, GDELT, publishers' RSS feeds, and article pages for preview images.
-- **Outlet and place data:** Wikidata and OpenStreetMap Nominatim.
+- **News:** Google News, Bing News, publishers' RSS feeds, and article pages for preview images.
+- **Outlet and place data:** Wikidata.
 - **The crawler feed and app updates:** GitHub, and our Cloudflare Worker.
 
 Our crawler runs on GitHub's servers, not on your phone. It may also use official news APIs (The Guardian, The New York Times, NewsData.io, GNews, NewsAPI), and it never sends them anything about you.
@@ -35,9 +35,7 @@ It never contains your reading history, places, location or anything else that i
 
 ## Location
 
-The app uses your location only when you tap "Near me", and only after Android asks your permission. It takes your approximate location, rounds it to about 1 km, and sends it to OpenStreetMap to find your town. Nothing else stores it.
-
-When you haven't used "Near me", the app guesses your home country from your network's region.
+The app never asks for your location. It guesses your home country from your network's region, and you can change it in Settings.
 
 ## Children
 

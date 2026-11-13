@@ -42,7 +42,12 @@ jobs:
         run: |
           flutter create --platforms=android --org com.parallaxnews --project-name parallax_news .
           rm -f test/widget_test.dart
-          if [ -f pubspec.lock ]; then flutter pub get --enforce-lockfile; else flutter pub get; fi
+          # Locked install; if pubspec.yaml changed (a package added/removed),
+          # resolve once and show the lockfile change so it can be committed.
+          if [ -f pubspec.lock ]; then
+            cp pubspec.lock /tmp/pubspec.lock.orig
+            flutter pub get --enforce-lockfile || { echo "::warning::pubspec.lock out of date; resolving"; flutter pub get; diff /tmp/pubspec.lock.orig pubspec.lock || true; }
+          else flutter pub get; fi
           python3 tool/prepare_android.py
           sudo apt-get update -qq > /dev/null && sudo apt-get install -y -qq python3-pil > /dev/null
           python3 tool/recolor_icon.py

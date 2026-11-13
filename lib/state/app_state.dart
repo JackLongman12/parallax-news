@@ -77,7 +77,6 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
     settings
       ..useBing = p.getBool('useBing') ?? true
-      ..useGdelt = p.getBool('useGdelt') ?? false
       ..autoSources = true
       ..discoverLocal = p.getBool('discoverLocal') ?? true
       ..lite = false
@@ -449,7 +448,6 @@ class AppState extends ChangeNotifier {
     change(settings);
     _prefs
       ..setBool('useBing', settings.useBing)
-      ..setBool('useGdelt', settings.useGdelt)
       ..setBool('autoSources', settings.autoSources)
       ..setBool('discoverLocal', settings.discoverLocal)
       ..setBool('lite', settings.lite)

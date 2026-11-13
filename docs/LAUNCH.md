@@ -9,7 +9,7 @@ The app is distributed as a signed APK on GitHub Releases. It updates itself.
 | Crawler (`crawler/crawl.py`) | GitHub Actions, every 5 min. Each run starts the next one. | The Worker keeps serving the last good feed. Its cron restarts the crawler after 12 min without a new feed (needs `GH_TOKEN`). |
 | Feed file | The `feed` release on GitHub | The Worker serves its own copy in Cloudflare KV, refreshed every 5 min. |
 | Worker (`worker/`) | Cloudflare, free plan | The app downloads the feed from GitHub directly. |
-| Both down | | The app shows the last feed saved on the phone, then falls back to fetching Google, Bing and GDELT itself. |
+| Both down | | The app shows the last feed saved on the phone, then falls back to fetching Google and Bing itself. |
 | Updates | GitHub release `latest.json`, then the GitHub API | Updates wait. The app keeps working. |
 
 Each layer covers the one before it. A user sees no news only if GitHub, Cloudflare and Google News are all unreachable on a phone that has never loaded the feed.

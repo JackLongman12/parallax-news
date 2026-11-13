@@ -20,7 +20,6 @@ PERMISSIONS = [
     "android.permission.INTERNET",
     "android.permission.ACCESS_NETWORK_STATE",
     "android.permission.REQUEST_INSTALL_PACKAGES",
-    "android.permission.ACCESS_COARSE_LOCATION",  # "Near me" only, asked at runtime
 ]
 
 PROVIDER = """        <provider

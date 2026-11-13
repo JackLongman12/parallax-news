@@ -7,8 +7,7 @@ import 'net.dart';
 import 'provider_health.dart';
 
 /// Live geography + local-outlet discovery from open data:
-///  * OpenStreetMap Nominatim for place search (any town, suburb, village)
-///  * Wikidata (CC0) for "places within" drill-down and local news outlets.
+///  * Wikidata (CC0) for place search, "places within" drill-down and local news outlets.
 class PlaceService {
   static const _sparql = 'https://query.wikidata.org/sparql';
 
@@ -16,106 +15,74 @@ class PlaceService {
   static bool isQid(String? s) => s != null && RegExp(r'^Q\d{1,12}$').hasMatch(s);
   static bool _isIso2(String? s) => s != null && RegExp(r'^[A-Z]{2}$').hasMatch(s);
 
-  static DateTime _lastNominatim = DateTime.fromMillisecondsSinceEpoch(0);
+  // Wikidata classes -> how deep a place sits (broadest match wins).
+  static const _classLevel = {
+    'Q6256': PlaceLevel.country, 'Q3624078': PlaceLevel.country,
+    'Q10864048': PlaceLevel.region, 'Q13220204': PlaceLevel.district, 'Q5119': PlaceLevel.city,
+    'Q515': PlaceLevel.city, 'Q1549591': PlaceLevel.city, 'Q3957': PlaceLevel.city, 'Q15284': PlaceLevel.city,
+    'Q1093829': PlaceLevel.city, 'Q486972': PlaceLevel.city,
+    'Q532': PlaceLevel.locality, 'Q123705': PlaceLevel.locality,
+  };
 
-  /// Search any place on earth (respects Nominatim's 1 req/sec policy).
+  /// Search any place on earth by name (Wikidata's own search, limited to
+  /// countries, regions, districts, cities, towns, villages, neighbourhoods).
   static Future<List<Place>> search(String query) async {
-    final q = query.trim();
+    var q = query.trim().replaceAll(RegExp(r'["\\\n\r]'), ' ');
     if (q.length < 2) return const [];
-    final wait = const Duration(milliseconds: 1100) - DateTime.now().difference(_lastNominatim);
-    if (!wait.isNegative) await Future<void>.delayed(wait);
-    _lastNominatim = DateTime.now();
-    final url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1'
-        '&extratags=1&limit=15&accept-language=en&q=${Uri.encodeQueryComponent(q)}';
-    final json = await Net.getJson(url);
-    if (json is! List) return const [];
+    if (q.length > 60) q = q.substring(0, 60);
+    final classes = _classLevel.keys.map((c) => 'wd:$c').join(' ');
+    final rows = await _query('SELECT ?item ?itemLabel ?num ?class ?cc ?adminLabel WHERE {\n'
+        '  SERVICE wikibase:mwapi {\n'
+        '    bd:serviceParam wikibase:endpoint "www.wikidata.org"; wikibase:api "EntitySearch";\n'
+        '      mwapi:search "$q"; mwapi:language "en"; mwapi:limit "20" .\n'
+        '    ?item wikibase:apiOutputItem mwapi:item . ?num wikibase:apiOrdinal true .\n'
+        '  }\n'
+        '  VALUES ?class { $classes }\n'
+        '  ?item wdt:P31/wdt:P279? ?class .\n'
+        '  OPTIONAL { ?item wdt:P17 ?country . ?country wdt:P297 ?cc . }\n'
+        '  OPTIONAL { ?item wdt:P131 ?admin . }\n'
+        '  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }\n'
+        '} ORDER BY ?num LIMIT 400');
+    final byId = <String, ({int order, PlaceLevel level, String name, String? cc, String? admin})>{};
+    for (final r in rows) {
+      final qid = _qidFromUri(_v(r, 'item'));
+      final level = _classLevel[_qidFromUri(_v(r, 'class'))];
+      final raw = _v(r, 'itemLabel');
+      if (qid == null || !isQid(qid) || level == null || raw == null || raw == qid) continue;
+      final prev = byId[qid];
+      if (prev != null && prev.level.index <= level.index) continue;
+      byId[qid] = (
+        order: int.tryParse(_v(r, 'num') ?? '') ?? 99,
+        level: level,
+        name: FeedParser.cleanText(raw),
+        cc: _v(r, 'cc')?.toUpperCase(),
+        admin: _v(r, 'adminLabel'),
+      );
+    }
+    final list = byId.entries.toList()..sort((a, b) => a.value.order.compareTo(b.value.order));
     final out = <Place>[];
-    final seen = <String>{};
-    for (final r in json) {
-      if (r is! Map) continue;
-      final p = _fromNominatim(r);
-      if (p != null && seen.add(p.id)) out.add(p);
+    for (final e in list.take(15)) {
+      final v = e.value;
+      final country = countryByCode(v.cc);
+      if (v.level == PlaceLevel.country && country != null) {
+        out.add(country.place);
+        continue;
+      }
+      final admin = v.admin;
+      out.add(Place(
+        id: 'wd:${e.key}',
+        name: v.name,
+        level: v.level,
+        countryCode: v.cc,
+        continentCode: country?.continent,
+        parents: [
+          if (admin != null && !isQid(admin) && admin != v.name) FeedParser.cleanText(admin),
+          if (country != null) country.name,
+        ],
+        wikidataId: e.key,
+      ));
     }
     return out;
-  }
-
-  /// Place for a coordinate (used by "Near me"). Coordinates are rounded to
-  /// ~1 km before leaving the phone, for privacy.
-  static Future<Place?> reverse(double lat, double lon) async {
-    final wait = const Duration(milliseconds: 1100) - DateTime.now().difference(_lastNominatim);
-    if (!wait.isNegative) await Future<void>.delayed(wait);
-    _lastNominatim = DateTime.now();
-    final la = lat.toStringAsFixed(2), lo = lon.toStringAsFixed(2);
-    final json = await Net.getJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2'
-        '&addressdetails=1&extratags=1&zoom=10&accept-language=en&lat=$la&lon=$lo');
-    if (json is! Map) return null;
-    return _fromNominatim(json);
-  }
-
-  static Place? _fromNominatim(Map r) {
-    final addr = (r['address'] as Map?) ?? const {};
-    final type = (r['addresstype'] ?? r['type'] ?? '').toString();
-    final level = _levelFor(type);
-    if (level == null) return null;
-    final cc = addr['country_code']?.toString().toUpperCase();
-    final name = FeedParser.cleanText((r['name']?.toString().isNotEmpty ?? false)
-        ? r['name'].toString()
-        : (r['display_name']?.toString().split(',').first ?? ''));
-    if (name.isEmpty) return null;
-
-    if (level == PlaceLevel.country && cc != null) {
-      final c = countryByCode(cc);
-      if (c != null) return c.place;
-    }
-
-    final parents = <String>[];
-    for (final k in const ['city', 'town', 'municipality', 'county', 'state_district', 'state', 'province', 'region', 'country']) {
-      final raw = addr[k]?.toString();
-      final v = raw == null ? null : FeedParser.cleanText(raw);
-      if (v != null && v != name && !parents.contains(v)) parents.add(v);
-    }
-    final qid = (r['extratags'] as Map?)?['wikidata']?.toString();
-    final country = countryByCode(cc);
-    return Place(
-      id: isQid(qid) ? 'wd:$qid' : 'osm:${r['osm_type']}${r['osm_id']}',
-      name: name,
-      level: level,
-      countryCode: cc,
-      continentCode: country?.continent,
-      parents: parents,
-      wikidataId: isQid(qid) ? qid : null,
-    );
-  }
-
-  static PlaceLevel? _levelFor(String t) {
-    switch (t) {
-      case 'country':
-        return PlaceLevel.country;
-      case 'state':
-      case 'province':
-      case 'region':
-      case 'territory':
-        return PlaceLevel.region;
-      case 'county':
-      case 'state_district':
-      case 'district':
-        return PlaceLevel.district;
-      case 'city':
-      case 'town':
-      case 'municipality':
-        return PlaceLevel.city;
-      case 'village':
-      case 'suburb':
-      case 'neighbourhood':
-      case 'quarter':
-      case 'hamlet':
-      case 'borough':
-      case 'city_district':
-      case 'island':
-        return PlaceLevel.locality;
-      default:
-        return null;
-    }
   }
 
   static Future<List<Map<String, dynamic>>> _query(String sparql) async {

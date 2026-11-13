@@ -28,4 +28,4 @@ One-time setup:
 
 Edit `assets/sources.json`. Bias codes are `FL L LL C LR R FR`, relative to the outlet's country. Local outlets can be added on Wikidata, and the app picks them up automatically.
 
-Data comes from Google News and Bing News RSS, GDELT, Wikidata (CC0) and OpenStreetMap Nominatim. The app shows headlines and links only. MIT licensed.
+Data comes from Google News and Bing News RSS and Wikidata (CC0). The app shows headlines and links only. MIT licensed.
