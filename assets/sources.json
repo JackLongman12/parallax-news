@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Seed catalog. Bias codes: FL,L,LL,C,LR,R,FR (country-relative). f = factuality VH,H,MF,M,L. s = state-affiliated. t = topic specialisms. Ratings are an initial community seed and need review - send PRs. Unknown outlets are rated live from Wikidata (CC0) or shown as Unrated. Local outlets are discovered live from Wikidata per place.",
+ "note": "Seed catalog. Bias codes: FL,L,LL,C,LR,R,FR (country-relative). f = factuality VH,H,MF,M,L. s = state-affiliated. t = topic specialisms. Ratings are a community seed, reviewed November 2026; corrections welcome as PRs (see Settings > About > How we rate outlets). Unknown outlets are rated live from Wikidata (CC0) or shown as Unrated. Local outlets are discovered live from Wikidata per place.",
  "sources": [
   {
    "d": "apnews.com",
@@ -67,7 +67,7 @@
    "d": "cnn.com",
    "n": "CNN",
    "c": "US",
-   "b": "L",
+   "b": "LL",
    "f": "MF",
    "o": "Warner Bros. Discovery"
   },
@@ -263,7 +263,7 @@
    "d": "nypost.com",
    "n": "New York Post",
    "c": "US",
-   "b": "LR",
+   "b": "R",
    "f": "M",
    "o": "News Corp"
   },
@@ -1363,14 +1363,16 @@
    "c": "QA",
    "b": "LL",
    "f": "MF",
-   "o": "Government of Qatar"
+   "o": "Government of Qatar",
+   "s": true
   },
   {
    "d": "alarabiya.net",
    "n": "Al Arabiya",
    "c": "AE",
    "b": "LR",
-   "f": "MF"
+   "f": "MF",
+   "s": true
   },
   {
    "d": "arabnews.com",
@@ -1384,7 +1386,8 @@
    "n": "The National",
    "c": "AE",
    "b": "C",
-   "f": "MF"
+   "f": "MF",
+   "s": true
   },
   {
    "d": "haaretz.com",
@@ -1726,7 +1729,8 @@
    "n": "Yonhap",
    "c": "KR",
    "b": "C",
-   "f": "H"
+   "f": "H",
+   "s": true
   },
   {
    "d": "koreaherald.com",
@@ -1804,7 +1808,8 @@
    "n": "Thai PBS World",
    "c": "TH",
    "b": "C",
-   "f": "H"
+   "f": "H",
+   "s": true
   },
   {
    "d": "rappler.com",
@@ -1853,7 +1858,8 @@
    "n": "VnExpress",
    "c": "VN",
    "b": "C",
-   "f": "MF"
+   "f": "MF",
+   "s": true
   },
   {
    "d": "malaysiakini.com",

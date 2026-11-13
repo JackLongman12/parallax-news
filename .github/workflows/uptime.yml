@@ -1,0 +1,47 @@
+name: Uptime check
+
+# Every 30 minutes: is the feed fresh? If not, open (or update) an issue,
+# which GitHub e-mails to the repo owner. Closes the issue once it recovers.
+# Checks from GitHub's network, independent of Cloudflare.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check health and report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          TITLE="Uptime: news feed is down or stale"
+          status=$(curl -s -o health.json -w "%{http_code}" -m 20 https://parallax-news.lp-reports.workers.dev/health || echo 000)
+          body=$(cat health.json 2>/dev/null || echo "no response")
+          feed=$(curl -s -o /dev/null -w "%{http_code}" -m 30 https://parallax-news.lp-reports.workers.dev/feed || echo 000)
+          echo "health=$status feed=$feed $body"
+          open=$(gh issue list --repo "$REPO" --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')
+          if [ "$status" = "200" ] && [ "$feed" = "200" ]; then
+            if [ -n "$open" ]; then
+              gh issue close "$open" --repo "$REPO" --comment "Recovered at $(date -u '+%Y-%m-%d %H:%M UTC'): health=$status feed=$feed."
+            fi
+            exit 0
+          fi
+          msg="Checked at $(date -u '+%Y-%m-%d %H:%M UTC'): /health=$status, /feed=$feed. Health says: $body. See docs/LAUNCH.md."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$REPO" --body "$msg"
+          else
+            gh issue create --repo "$REPO" --title "$TITLE" --body "$msg"
+          fi

@@ -14,7 +14,7 @@ The app is distributed as a signed APK on GitHub Releases. It updates itself.
 
 Each layer covers the one before it. A user sees no news only if GitHub, Cloudflare and Google News are all unreachable on a phone that has never loaded the feed.
 
-**Uptime monitor (free):** create an HTTP monitor at uptimerobot.com (or a similar service) for `https://parallax-news.lp-reports.workers.dev/health`. It returns HTTP 503 when the feed is more than 30 minutes old, so you get an email if the crawler stalls.
+**Uptime alerts:** `.github/workflows/uptime.yml` checks `/health` and `/feed` every 30 minutes from GitHub's network. If either fails, it opens an issue titled "Uptime: news feed is down or stale", and GitHub e-mails you. It closes the issue when the feed recovers.
 
 ## Crash reports
 
