@@ -120,38 +120,9 @@ class _ForYouScreenState extends State<ForYouScreen> {
 
 /// Topics: a photo grid. Your topics first, then everything else.
 /// Tap a tile to read it; follow / mute from the topic page.
-class TopicsScreen extends StatefulWidget {
-  const TopicsScreen({super.key});
-
-  @override
-  State<TopicsScreen> createState() => _TopicsScreenState();
-}
-
-class _TopicsScreenState extends State<TopicsScreen> {
-  final _scroll = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    TabReselect.tabs[1].addListener(_toTop);
-    TabReselect.tops[1].addListener(_jump);
-  }
-
-  void _jump() {
-    if (_scroll.hasClients) _scroll.jumpTo(0);
-  }
-
-  void _toTop() {
-    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
-  }
-
-  @override
-  void dispose() {
-    TabReselect.tabs[1].removeListener(_toTop);
-    TabReselect.tops[1].removeListener(_jump);
-    _scroll.dispose();
-    super.dispose();
-  }
+/// Topics, shown inside Explore: suggested niches, your topics, and the rest.
+class TopicsSection extends StatelessWidget {
+  const TopicsSection({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -160,42 +131,37 @@ class _TopicsScreenState extends State<TopicsScreen> {
     final mine = all.where(app.followsTopic).toList();
     final rest = all.where((c) => !app.followsTopic(c)).toList();
     Widget header(String t, [Widget? trailing]) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 8, 10),
+          padding: const EdgeInsets.fromLTRB(16, 20, 8, 10),
           child: Row(children: [
             Expanded(child: Text(t, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))),
             if (trailing != null) trailing,
           ]),
         );
-    SliverPadding grid(List<Category> cats) => SliverPadding(
+    Widget grid(List<Category> cats) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.45),
-            delegate: SliverChildBuilderDelegate((_, i) => TopicTile(category: cats[i]), childCount: cats.length),
+          child: GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.45,
+            children: [for (final c in cats) TopicTile(category: c)],
           ),
         );
     final forYou = SubtopicSuggester.forYou(app.profile);
     final breakOut = SubtopicSuggester.breakOut(app.profile);
-    return CustomScrollView(controller: _scroll, slivers: [
-      if (forYou.isNotEmpty) ...[
-        SliverToBoxAdapter(child: header('Picked for you')),
-        SliverToBoxAdapter(child: SubPathChips(paths: forYou)),
-      ],
-      const SliverToBoxAdapter(
-        child: OneTimeTip(id: 'topicsTip', text: 'Tap a topic to read it, long-press to follow it. Inside a topic, pick a subtopic, then a niche.'),
-      ),
-      SliverToBoxAdapter(child: header('Outside your bubble')),
-      SliverToBoxAdapter(child: SubPathChips(paths: breakOut, icon: Icons.explore_rounded)),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (forYou.isNotEmpty) ...[header('Picked for you'), SubPathChips(paths: forYou)],
+      header('Outside your bubble'),
+      SubPathChips(paths: breakOut, icon: Icons.explore_rounded),
       if (mine.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: header('Your topics',
-              TextButton.icon(icon: const Icon(Icons.tune_rounded, size: 18), label: const Text('Edit'), onPressed: () => showFeedEditor(context))),
-        ),
+        header('Your topics',
+            TextButton.icon(icon: const Icon(Icons.tune_rounded, size: 18), label: const Text('Edit'), onPressed: () => showFeedEditor(context))),
         grid(mine),
       ],
-      SliverToBoxAdapter(child: header(mine.isEmpty ? 'Pick topics you like' : 'Discover more')),
+      header(mine.isEmpty ? 'Pick topics you like' : 'More topics'),
       grid(rest),
-      SliverToBoxAdapter(child: SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom)),
     ]);
   }
 }
@@ -437,8 +403,6 @@ final _collections = <_Collection>[
   const _Collection('blindspot', 'Blindspots', 'Stories one side of the spectrum barely covers', Brand.purple),
   const _Collection('underreported', 'Underreported', 'Few outlets, reliable sources', Color(0xFF15131C)),
   const _Collection('divergent', 'Divergent takes', 'Left and right cover it equally: compare the framing', Color(0xFF4A2A8C)),
-  const _Collection('left', 'Popular with the left', 'Mostly covered by left-leaning outlets', Color(0xFF1E3AA8)),
-  const _Collection('right', 'Popular with the right', 'Mostly covered by right-leaning outlets', Color(0xFFA3173A)),
 ];
 
 bool _inCollection(String id, Story s) {
@@ -454,10 +418,6 @@ bool _inCollection(String id, Story s) {
       return n >= 2 && n <= 5 && good >= 1;
     case 'divergent':
       return d.divergent;
-    case 'left':
-      return d.rated >= 3 && d.share(Side.left) >= 0.6;
-    case 'right':
-      return d.rated >= 3 && d.share(Side.right) >= 0.6;
   }
   return false;
 }
@@ -466,7 +426,7 @@ List<Story> _storiesIn(String id, List<Story> all) => all.where((s) => _inCollec
   ..sort((a, b) => b.uniqueSources.length.compareTo(a.uniqueSources.length));
 
 /// Blindspot tab: one screen, no scrolling. A big Blindspots tile on top and
-/// four smaller ones below, each showing the photo of its top story, how many
+/// two smaller ones below, each showing the photo of its top story, how many
 /// stories it holds and their combined left/center/right coverage.
 class BlindspotScreen extends StatefulWidget {
   const BlindspotScreen({super.key});
@@ -481,13 +441,13 @@ class _BlindspotScreenState extends State<BlindspotScreen> {
   @override
   void initState() {
     super.initState();
-    TabReselect.tabs[3].addListener(_reload);
+    TabReselect.tabs[2].addListener(_reload);
     _load();
   }
 
   @override
   void dispose() {
-    TabReselect.tabs[3].removeListener(_reload);
+    TabReselect.tabs[2].removeListener(_reload);
     super.dispose();
   }
 
@@ -516,11 +476,9 @@ class _BlindspotScreenState extends State<BlindspotScreen> {
     return Padding(
       padding: EdgeInsets.fromLTRB(12, 6, 12, 12 + pad),
       child: Column(children: [
-        Expanded(flex: 5, child: tile(0, big: true)),
+        Expanded(flex: 6, child: tile(0, big: true)),
         const SizedBox(height: 10),
         Expanded(flex: 4, child: Row(children: [Expanded(child: tile(1)), const SizedBox(width: 10), Expanded(child: tile(2))])),
-        const SizedBox(height: 10),
-        Expanded(flex: 4, child: Row(children: [Expanded(child: tile(3)), const SizedBox(width: 10), Expanded(child: tile(4))])),
       ]),
     );
   }
@@ -700,8 +658,10 @@ class BriefingHeader extends StatelessWidget {
     }
     // The circular "stories" row was removed as redundant: places and topics
     // live in Explore / Topics and the Customize sheet.
+    // The full feed starts straight with stories (Customize is in the app
+    // bar); a title row appears only when filtered to one place or topic.
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
+      if (selected != null) Padding(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
         child: Row(children: [
           Expanded(
@@ -710,20 +670,10 @@ class BriefingHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.onSurface)),
           ),
-          if (selected != null) TextButton(onPressed: () => select(null), child: const Text('Show all')),
-          IconButton(
-            tooltip: 'Customize feed',
-            icon: const Icon(Icons.tune_rounded),
-            onPressed: () => showFeedEditor(context),
-          ),
+          TextButton(onPressed: () => select(null), child: const Text('Show all')),
         ]),
       ),
-      if (selected == null)
-        const OneTimeTip(
-          id: 'feedGestures',
-          text: 'Long-press any story for options: more or less like it, follow or mute its topic, or hide an outlet. '
-              'Tap the For You tab again to jump to the top; tap once more to refresh.',
-        ),
+      const SizedBox(height: 4),
       if (selected == null && app.informLevel != 'off') const DailyOverview(),
     ]);
   }

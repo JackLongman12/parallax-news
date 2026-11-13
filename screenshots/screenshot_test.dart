@@ -282,14 +282,14 @@ void main() {
 
   testWidgets('blindspot', (tester) async {
     await setup(tester, phone);
-    await tester.pumpWidget(_app(state, _feedShell(3, stories)));
+    await tester.pumpWidget(_app(state, _feedShell(2, stories)));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/04_blindspot.png'));
   });
 
   testWidgets('explore', (tester) async {
     await setup(tester, phone);
-    await tester.pumpWidget(_app(state, const HomeShell(initialTab: 2, pageOverride: _noOverride)));
+    await tester.pumpWidget(_app(state, const HomeShell(initialTab: 1, pageOverride: _noOverride)));
     await settle(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/05_explore.png'));
   });
@@ -308,9 +308,9 @@ void main() {
     ('promo_2', 'Know who is\ntelling it', 'Bias, factuality, ownership and state affiliation for every outlet.',
         () => StoryScreen(story: stories.first), Brand.black),
     ('promo_3', 'From the world\nto your street', 'Continents, countries, states, cities and neighbourhood papers.',
-        () => const HomeShell(initialTab: 2, pageOverride: _noOverride), Brand.purple),
+        () => const HomeShell(initialTab: 1, pageOverride: _noOverride), Brand.purple),
     ('promo_4', 'Break out of\nyour bubble', 'Blindspots reveal stories one side is ignoring.',
-        () => _feedShell(3, stories), Brand.black),
+        () => _feedShell(2, stories), Brand.black),
   ];
 
   for (final p in promos) {

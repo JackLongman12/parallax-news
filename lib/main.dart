@@ -84,7 +84,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late int _tab = widget.initialTab;
   late final _built = <int>{widget.initialTab};
 
-  static const _titles = ['For You', 'Topics', 'Explore', 'Blindspot'];
+  static const _titles = ['For You', 'Explore', 'Blindspot'];
 
   @override
   void initState() {
@@ -145,8 +145,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       case 0:
         return const ForYouScreen();
       case 1:
-        return const TopicsScreen();
-      case 2:
         return const ExploreScreen();
       default:
         return const BlindspotScreen();
@@ -159,6 +157,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       appBar: AppBar(
         title: _tab == 0 ? const Wordmark() : Text(_titles[_tab], style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          if (_tab == 0)
+            IconButton(
+              tooltip: 'Customize feed',
+              icon: const Icon(Icons.tune_rounded),
+              onPressed: () => showFeedEditor(context),
+            ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings_rounded),
@@ -172,11 +176,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         onPointerDown: (_) => context.read<AppState>().touch(),
         child: IndexedStack(
         index: _tab,
-        children: [for (var i = 0; i < 4; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
+        children: [for (var i = 0; i < 3; i++) _built.contains(i) ? _page(i) : const SizedBox.shrink()],
       ),
       ),
       // Thumb-reach shortcuts above the bottom bar.
-      floatingActionButton: _tab == 2
+      floatingActionButton: _tab == 1
           ? FloatingActionButton.extended(
               heroTag: 'searchPlaces',
               icon: const Icon(Icons.search_rounded),
@@ -193,7 +197,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         selected: _tab,
         items: const [
           BarItem(Icons.home_outlined, Icons.home_rounded, 'For You'),
-          BarItem(Icons.grid_view_outlined, Icons.grid_view_rounded, 'Topics'),
           BarItem(Icons.explore_outlined, Icons.explore_rounded, 'Explore'),
           BarItem(Icons.visibility_off_outlined, Icons.visibility_off_rounded, 'Blindspot'),
         ],

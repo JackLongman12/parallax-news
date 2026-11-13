@@ -13,6 +13,7 @@ import '../../state/app_state.dart';
 import '../nav.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'feed_screens.dart';
 import 'insights.dart';
 import 'sources_screen.dart';
 import 'story_list.dart';
@@ -213,14 +214,19 @@ class ExploreScreen extends StatelessWidget {
     final app = context.watch<AppState>();
     final theme = Theme.of(context);
     final home = countryByCode(app.settings.homeCountry);
+    // Your home country sits with your places (no separate card).
+    final places = [
+      if (home != null && !app.followed.any((p) => p.id == home.place.id)) home.place,
+      ...app.followed,
+    ];
     Widget section(String t) => Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
           child: Text(t, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
         );
 
-    return ReselectScroll(tab: 2, builder: (ctrl) => ListView(controller: ctrl, padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom), children: [
+    return ReselectScroll(tab: 1, builder: (ctrl) => ListView(controller: ctrl, padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom), children: [
       const NewsSearchBar(),
-      if (app.followed.isNotEmpty) ...[
+      if (places.isNotEmpty) ...[
         section('Your places'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -231,17 +237,11 @@ class ExploreScreen extends StatelessWidget {
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             childAspectRatio: 2.4,
-            children: [for (final p in app.followed) _PlaceCard(place: p)],
+            children: [for (final p in places) _PlaceCard(place: p)],
           ),
         ),
       ],
-      if (home != null) ...[
-        section('Your country'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _PlaceCard(place: home.place, big: true),
-        ),
-      ],
+      const TopicsSection(),
       section('Sources & ratings'),
       // Same size and style as the "Browse the world" tiles.
       Padding(

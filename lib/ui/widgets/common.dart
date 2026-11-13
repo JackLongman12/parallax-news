@@ -390,26 +390,6 @@ class _StoryCardState extends State<StoryCard> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StoryScreen(story: story)));
   }
 
-  void _up() {
-    final app = context.read<AppState>()..thumbsUp(story);
-    final m = ScaffoldMessenger.of(context);
-    m.hideCurrentSnackBar();
-    m.showSnackBar(SnackBar(
-      content: const Text('Got it: more like this'),
-      action: SnackBarAction(label: 'Undo', onPressed: () => app.undoThumbsUp(story)),
-    ));
-  }
-
-  void _down() {
-    final app = context.read<AppState>()..thumbsDown(story);
-    final m = ScaffoldMessenger.of(context);
-    m.hideCurrentSnackBar();
-    m.showSnackBar(SnackBar(
-      content: const Text('Hidden. You will see fewer stories like this'),
-      action: SnackBarAction(label: 'Undo', onPressed: () => app.undoThumbsDown(story)),
-    ));
-  }
-
   void _share() {
     context.read<AppState>().recordShare(story);
     SharePlus.instance.share(ShareParams(text: '${story.title}\n${story.lead.url}\n\nCompare coverage on Parallax News'));
@@ -578,6 +558,8 @@ class _StoryCardState extends State<StoryCard> {
                       Row(children: [
                         SourceAvatars(articles: sources, ring: Colors.black),
                         const SizedBox(width: 8),
+                        // Actions (more/less like this, follow, share) live on
+                        // long-press and inside the story, not on every card.
                         Expanded(
                           child: Text(
                             '${sources.length} source${sources.length == 1 ? '' : 's'} · ${_split(dist)}',
@@ -586,13 +568,6 @@ class _StoryCardState extends State<StoryCard> {
                             style: const TextStyle(color: white70, fontSize: 12, fontWeight: FontWeight.w700),
                           ),
                         ),
-                        _RoundAction(icon: Icons.thumb_up_alt_outlined, tooltip: 'More like this', onTap: _up),
-                        const SizedBox(width: 6),
-                        _RoundAction(icon: Icons.thumb_down_alt_outlined, tooltip: 'Less like this', onTap: _down),
-                        const SizedBox(width: 6),
-                        _RoundAction(icon: Icons.ios_share_rounded, tooltip: 'Share', onTap: _share),
-                        const SizedBox(width: 6),
-                        _RoundAction(icon: Icons.more_horiz_rounded, tooltip: 'More options', onTap: _menu),
                       ]),
                     ]),
                   ),
@@ -665,31 +640,6 @@ class _Pill extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
           ),
         ]),
-      );
-}
-
-/// Small round translucent button used over photos.
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({required this.icon, required this.tooltip, required this.onTap});
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: Material(
-          color: Colors.white.withValues(alpha: 0.16),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            child: Padding(padding: const EdgeInsets.all(7), child: Icon(icon, size: 18, color: Colors.white)),
-          ),
-        ),
       );
 }
 

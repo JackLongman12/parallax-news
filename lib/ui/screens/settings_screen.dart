@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/geo.dart';
-import '../../models/category.dart';
 import '../../state/app_state.dart';
 import '../../services/crash_reporter.dart';
 import '../../services/crawler_feed.dart';
@@ -14,7 +13,6 @@ import '../theme.dart';
 import '../update_flow.dart';
 import 'feed_editor.dart';
 import 'info_pages.dart';
-import 'insights.dart';
 import '../widgets/common.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -72,20 +70,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ),
-        SwitchListTile(
-          title: const Text('Discover local outlets'),
-          subtitle: const Text('Find community papers, radio & TV for places you follow (via Wikidata)'),
-          value: s.discoverLocal,
-          onChanged: (v) => app.updateSettings((x) => x.discoverLocal = v),
-        ),
-        const Divider(),
-        const ListTile(
-          title: Text('News sources'),
-          subtitle: Text('Google News and Bing News, plus our crawler. Slow or rate-limited sources are skipped.'),
-        ),
-        const CrawlerStatusTile(),
-        const _SourceHealth(),
-        const ReadingBalanceTile(),
         ListTile(
           title: const Text('Clear cache'),
           subtitle: FutureBuilder<int>(
@@ -101,15 +85,6 @@ class SettingsScreen extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cache cleared')));
             }
           },
-        ),
-        const Divider(),
-        const ListTile(title: Text('Muted topics')),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final c in Category.values.where((c) => c != Category.general))
-              FilterChip(label: Text(c.label), selected: app.profile.muted.contains(c), onSelected: (_) => app.toggleMute(c)),
-          ]),
         ),
         ListTile(
           title: const Text('On-device learning'),
@@ -135,27 +110,11 @@ class SettingsScreen extends StatelessWidget {
         ),
         const _CrashToggle(),
         ListTile(
-          leading: const Icon(Icons.bug_report_outlined),
-          title: const Text('Report a problem'),
-          subtitle: const Text('Opens a GitHub issue with your app version filled in'),
-          onTap: () => reportProblem(context),
-        ),
-        ListTile(
-          leading: const Icon(Icons.balance_rounded),
-          title: const Text('How we rate outlets'),
+          leading: const Icon(Icons.info_outline_rounded),
+          title: const Text('About'),
+          subtitle: const Text('How we rate outlets, privacy, report a problem'),
           trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => InfoPage.open(context, ratingsPage),
-        ),
-        ListTile(
-          leading: const Icon(Icons.privacy_tip_outlined),
-          title: const Text('Privacy policy'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => InfoPage.open(context, privacyPage),
-        ),
-        const AboutListTile(
-          applicationName: 'Parallax News',
-          applicationLegalese: 'Open source (MIT). Ratings are a community seed + Wikidata (CC0). '
-              'Headlines link to their publishers.',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const _AboutScreen())),
         ),
       ]),
     );
@@ -209,7 +168,7 @@ class _SourceHealthState extends State<_SourceHealth> {
 }
 
 
-/// "How should we keep you informed?"
+/// "How should we keep you informed?" as one compact choice.
 class _InformLevel extends StatelessWidget {
   const _InformLevel();
 
@@ -217,30 +176,44 @@ class _InformLevel extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     const options = [
-      ('detailed', 'Fully up to date', 'Everything, including single-outlet and niche stories'),
-      ('aware', 'Aware', 'Stories covered by at least 2 outlets (recommended)'),
+      ('detailed', 'Everything', 'Including single-outlet and niche stories'),
+      ('aware', 'Aware', 'Stories covered by at least 2 outlets'),
       ('key', 'Key issues only', 'Major stories covered by 5+ outlets'),
-      ('off', 'Minimal', 'No briefing card; just the feed'),
+      ('off', 'Minimal', 'No Catch up card, just the feed'),
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('How should we keep you informed?', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        for (final o in options)
-          Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            child: ListTile(
-              onTap: () => app.setInformLevel(o.$1),
-              leading: Icon(app.informLevel == o.$1 ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                  color: app.informLevel == o.$1 ? Brand.purple : null),
-              title: Text(o.$2, style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text(o.$3),
-            ),
-          ),
-      ]),
+    final current = options.firstWhere((o) => o.$1 == app.informLevel, orElse: () => options[1]);
+    return ListTile(
+      title: const Text('How much news'),
+      subtitle: Text(current.$3),
+      trailing: DropdownButton<String>(
+        value: current.$1,
+        underline: const SizedBox.shrink(),
+        items: [for (final o in options) DropdownMenuItem(value: o.$1, child: Text(o.$2))],
+        onChanged: (v) {
+          if (v != null) app.setInformLevel(v);
+        },
+      ),
     );
   }
+}
+
+/// Technical status, kept out of the main Settings list.
+class DiagnosticsScreen extends StatelessWidget {
+  const DiagnosticsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Diagnostics')),
+        body: ListView(children: const [
+          ListTile(
+            title: Text('News sources'),
+            subtitle: Text('Our crawler, plus Google News and Bing News on the phone. Slow or rate-limited sources '
+                'are skipped automatically.'),
+          ),
+          CrawlerStatusTile(),
+          _SourceHealth(),
+        ]),
+      );
 }
 
 
@@ -311,5 +284,47 @@ class _CrashToggleState extends State<_CrashToggle> {
           await CrashReporter.setEnabled(v);
           if (mounted) setState(() {});
         },
+      );
+}
+
+
+class _AboutScreen extends StatelessWidget {
+  const _AboutScreen();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('About')),
+        body: ListView(children: [
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Report a problem'),
+            subtitle: const Text('Opens a GitHub issue with your app version filled in'),
+            onTap: () => reportProblem(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.balance_rounded),
+            title: const Text('How we rate outlets'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => InfoPage.open(context, ratingsPage),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy policy'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => InfoPage.open(context, privacyPage),
+          ),
+          ListTile(
+            leading: const Icon(Icons.monitor_heart_outlined),
+            title: const Text('Diagnostics'),
+            subtitle: const Text('Crawler feed and news source status'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DiagnosticsScreen())),
+          ),
+          const AboutListTile(
+            applicationName: 'Parallax News',
+            applicationLegalese: 'Open source (MIT). Ratings are a community seed + Wikidata (CC0). '
+                'Headlines link to their publishers.',
+          ),
+        ]),
       );
 }
