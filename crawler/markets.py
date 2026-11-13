@@ -231,6 +231,44 @@ def backup_trending():
     return {"finance": {"result": [{"quotes": [{"symbol": s} for s in syms]}]}} if len(syms) >= 5 else None
 
 
+FINNHUB_SYMBOL = {"BTC-USD": "BINANCE:BTCUSDT", "ETH-USD": "BINANCE:ETHUSDT"}
+
+
+def finnhub_prices(out, symbols):
+    """Official prices from Finnhub (free key, 60 calls/min) laid over the
+    chart answers for US stocks and crypto. Indices, futures and FX stay on
+    Yahoo/CNBC (not in Finnhub's free plan)."""
+    key = os.environ.get("FINNHUB_KEY", "").strip()
+    if not key:
+        return 0
+    n = 0
+    for sym in symbols:
+        fsym = FINNHUB_SYMBOL.get(sym) or (sym if sym.replace("-", "").replace(".", "").isalpha() else None)
+        ans = out.get(chart_path(sym))
+        if not fsym or not ans:
+            continue
+        try:
+            req = urllib.request.Request("https://finnhub.io/api/v1/quote?" + urllib.parse.urlencode(
+                {"symbol": fsym.replace("-", "."), "token": key}), headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                q = json.loads(r.read(100_000))
+        except Exception as e:  # noqa: BLE001
+            k = f"finnhub {getattr(e, 'code', type(e).__name__)}"
+            ERRORS[k] = ERRORS.get(k, 0) + 1
+            continue
+        if not q.get("c") or not q.get("pc"):
+            continue
+        meta = ans["chart"]["result"][0]["meta"]
+        meta.update({"regularMarketPrice": q["c"], "chartPreviousClose": q["pc"], "previousClose": q["pc"],
+                     "regularMarketDayHigh": q.get("h") or meta.get("regularMarketDayHigh"),
+                     "regularMarketDayLow": q.get("l") or meta.get("regularMarketDayLow")})
+        if q.get("t"):
+            meta["regularMarketTime"] = q["t"]
+        n += 1
+        time.sleep(1.05)  # stay under 60/min
+    return n
+
+
 def chart_path(sym):
     # Same encoding as Dart's Uri.encodeComponent for these symbols.
     return "/v8/finance/chart/" + urllib.parse.quote(sym, safe="") + "?range=1d&interval=5m"
@@ -291,6 +329,9 @@ def main():
         backup = cnbc_charts(missing)
         out.update(backup)
         print(f"markets: {len(backup)}/{len(missing)} from CNBC backup")
+    fh = finnhub_prices(out, [x for x in syms if x not in INDICES or x in FINNHUB_SYMBOL])
+    if fh:
+        print(f"markets: {fh} official prices from Finnhub")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     data = json.dumps({"v": 1, "at": int(time.time()), "r": out}, separators=(",", ":")).encode()
     with gzip.open(OUT, "wb") as f:

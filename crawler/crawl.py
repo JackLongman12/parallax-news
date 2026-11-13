@@ -30,6 +30,9 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from email.utils import parsedate_to_datetime
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import apis  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "crawler/out"
 UA = "Mozilla/5.0 (compatible; ParallaxNewsCrawler/1.0; open-source news reader)"
@@ -418,6 +421,12 @@ def main():
     with ThreadPoolExecutor(WORKERS) as ex:
         results = list(ex.map(fetch_feed, feeds))
     raw = [a for r in results for a in r]
+    try:
+        api_items = apis.fetch_all(state)
+        raw.extend(api_items)
+        print(f"news APIs: {apis.STATS or 'no keys set'} -> {len(api_items)} items", flush=True)
+    except Exception as e:  # noqa: BLE001 - APIs are extras; never break the crawl
+        print(f"news APIs failed: {e}", flush=True)
     print(f"fetched {len(feeds)} feeds -> {len(raw)} items in {time.time() - t0:.0f}s", flush=True)
 
     seen, articles = set(), []
@@ -443,7 +452,7 @@ def main():
                 c["a"].append(a)
     print(f"expanded {len(top)} stories in {time.time() - t0:.0f}s", flush=True)
 
-    clusters = [c for c in clusters if len(outlets(c)) >= 2 or any(x["v"] == "rss" for x in c["a"])]
+    clusters = [c for c in clusters if len(outlets(c)) >= 2 or any(x["v"] in ("rss", "api") for x in c["a"])]
     clusters.sort(key=lambda c: -(math.log2(1 + len(outlets(c))) * 2 + max((a["p"] or 0) for a in c["a"]) / 86400))
     clusters = clusters[:700]
 

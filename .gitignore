@@ -24,3 +24,4 @@ crawler/out/
 
 worker/.wrangler/
 worker/node_modules/
+__pycache__/

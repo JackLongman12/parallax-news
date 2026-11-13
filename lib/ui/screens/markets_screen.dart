@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../nav.dart';
 import '../theme.dart';
 import 'feed_screens.dart';
+import 'info_pages.dart';
 import 'story_list.dart';
 
 const _up = Color(0xFF16A34A);
@@ -199,6 +200,13 @@ class _MarketsScreenState extends State<MarketsScreen> {
           if (q.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('Movers unavailable right now.'));
           return Column(children: [for (final x in q) QuoteRow(q: x, showVolume: _moverScreen == 'most_actives')]);
         },
+      ),
+      InkWell(
+        onTap: () => InfoPage.open(context, marketsPage),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(marketDisclaimer, style: theme.textTheme.bodySmall),
+        ),
       ),
       section('Market news'),
       SubPathChips(paths: [for (final s in subtopics[Category.finance] ?? const <Sub>[]) SubPath(Category.finance, [s])]),

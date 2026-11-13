@@ -12,6 +12,7 @@ import 'state/app_state.dart';
 import 'ui/screens/explore_screens.dart';
 import 'ui/screens/feed_editor.dart';
 import 'ui/screens/feed_screens.dart';
+import 'ui/screens/info_pages.dart';
 import 'ui/screens/markets_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/sources_screen.dart';
@@ -100,7 +101,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// Android usually *resumes* the app rather than restarting it, so check on
   /// every return to the app too (at most every 2 minutes).
   void _maybeCheckUpdate() {
-    if (!mounted || !context.read<AppState>().autoUpdate) return;
+    if (!mounted || !selfUpdates || !context.read<AppState>().autoUpdate) return;
     if (DateTime.now().difference(_lastUpdateCheck) < const Duration(minutes: 2)) return;
     _lastUpdateCheck = DateTime.now();
     checkForUpdate(context);

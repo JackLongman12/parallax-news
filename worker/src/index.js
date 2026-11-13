@@ -5,6 +5,7 @@
 //                         cached for a day, so phones don't fetch pages
 //   GET /y/<path>      -> Yahoo Finance JSON (chart, trending, screener,
 //                         search only), cached 60 s and shared by all users
+//   GET /fh?fn=quote|search&q=... -> Finnhub (needs FINNHUB_KEY secret)
 //   GET /health        -> "ok"
 //   cron (every 5 min) -> starts the GitHub crawler, because GitHub's own
 //                         schedule is often delayed or skipped. Needs the
@@ -148,6 +149,30 @@ async function yahoo(request, ctx) {
   return res;
 }
 
+// Finnhub (official market API, free key kept as the FINNHUB_KEY secret so
+// it never ships in the open-source app). Quote and symbol search only.
+async function finnhub(request, env, ctx) {
+  if (!env.FINNHUB_KEY) return json({ error: "not configured" }, 503, 300);
+  const url = new URL(request.url);
+  const fn = url.searchParams.get("fn");
+  const q = (url.searchParams.get("q") || "").trim();
+  if (!["quote", "search"].includes(fn) || !q || q.length > 40 || !/^[\w .:^=&-]+$/.test(q)) {
+    return json({ error: "bad request" }, 400);
+  }
+  const cache = caches.default;
+  const key = new Request(`https://parallax-cache/fh/${fn}/${encodeURIComponent(q)}`);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const param = fn === "quote" ? "symbol" : "q";
+  const r = await fetch(`https://finnhub.io/api/v1/${fn}?${param}=${encodeURIComponent(q)}&token=${env.FINNHUB_KEY}`);
+  if (!r.ok) return json({ error: "upstream " + r.status }, r.status === 429 ? 429 : 502, 15);
+  const res = new Response(await r.text(), {
+    headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${fn === "quote" ? 30 : 3600}`, ...CORS },
+  });
+  ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -156,6 +181,7 @@ export default {
     if (path === "/feed") return feed(request, env, ctx);
     if (path === "/og") return og(request, env, ctx);
     if (path.startsWith("/y/")) return yahoo(request, ctx);
+    if (path === "/fh") return finnhub(request, env, ctx);
     if (path === "/health") return new Response("ok", { headers: CORS });
     return json({ error: "not found" }, 404);
   },

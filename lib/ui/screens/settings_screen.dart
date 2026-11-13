@@ -12,6 +12,7 @@ import '../../services/updater.dart';
 import '../theme.dart';
 import '../update_flow.dart';
 import 'feed_editor.dart';
+import 'info_pages.dart';
 import 'insights.dart';
 import '../widgets/common.dart';
 
@@ -116,7 +117,7 @@ class SettingsScreen extends StatelessWidget {
           trailing: TextButton(onPressed: app.resetLearning, child: const Text('Reset')),
         ),
         const Divider(),
-        SwitchListTile(
+        if (selfUpdates) SwitchListTile(
           title: const Text('Auto-update'),
           subtitle: const Text('Check for a new build at startup and download it'),
           value: app.autoUpdate,
@@ -128,8 +129,34 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Version'),
             subtitle: Text('${snap.data ?? '…'}\n${Updater.lastResult}'),
             isThreeLine: true,
-            trailing: TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now')),
+            trailing: selfUpdates
+                ? TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now'))
+                : null,
           ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.bug_report_outlined),
+          title: const Text('Report a problem'),
+          subtitle: const Text('Opens a GitHub issue with your app version filled in'),
+          onTap: () => reportProblem(context),
+        ),
+        ListTile(
+          leading: const Icon(Icons.balance_rounded),
+          title: const Text('How we rate outlets'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => InfoPage.open(context, ratingsPage),
+        ),
+        ListTile(
+          leading: const Icon(Icons.show_chart_rounded),
+          title: const Text('About market data'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => InfoPage.open(context, marketsPage),
+        ),
+        ListTile(
+          leading: const Icon(Icons.privacy_tip_outlined),
+          title: const Text('Privacy policy'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => InfoPage.open(context, privacyPage),
         ),
         const AboutListTile(
           applicationName: 'Parallax News',

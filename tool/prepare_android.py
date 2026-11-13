@@ -7,6 +7,7 @@ Run from the repo root after:
 Idempotent: safe to run more than once.
 """
 import json
+import os
 import pathlib
 import re
 import sys
@@ -69,12 +70,28 @@ def plugin_declares_provider() -> bool:
     return False
 
 
+def store_build(text: str) -> str:
+    """Store builds (CHANNEL=play / fdroid) are updated by the store, so they
+    must not ask to install packages (Google Play policy). The ota_update
+    plugin declares that permission itself, so remove it explicitly."""
+    perm = "android.permission.REQUEST_INSTALL_PACKAGES"
+    text = text.replace(f'<uses-permission android:name="{perm}" />', "")
+    if "xmlns:tools" not in text:
+        text = text.replace("<manifest ", '<manifest xmlns:tools="http://schemas.android.com/tools" ', 1)
+    if 'tools:node="remove"' not in text:
+        text = text.replace("<application", f'<uses-permission android:name="{perm}" tools:node="remove" />' + "\n    <application", 1)
+    return text
+
+
 def main() -> None:
     if not MANIFEST.exists():
         sys.exit(f"{MANIFEST} not found - run flutter create first")
     text = MANIFEST.read_text(encoding="utf-8")
+    store = os.environ.get("CHANNEL", "github") != "github"
 
     for perm in PERMISSIONS:
+        if store and perm.endswith("REQUEST_INSTALL_PACKAGES"):
+            continue
         tag = f'<uses-permission android:name="{perm}" />'
         if perm not in text:
             text = text.replace("<application", f"{tag}\n    <application", 1)
@@ -100,6 +117,9 @@ def main() -> None:
             text = text.replace("</manifest>", "    <queries>\n" + QUERIES + "    </queries>\n</manifest>", 1)
 
     text = add_widgets(text)
+    if store:
+        text = store_build(text)
+        print("store build: no self-update permission")
     MANIFEST.write_text(text, encoding="utf-8")
     print("AndroidManifest.xml patched")
     patch_gradle()

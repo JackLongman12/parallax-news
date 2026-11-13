@@ -491,6 +491,23 @@ class Markets {
             SymbolMatch(m['symbol'] as String, '${m['shortname'] ?? m['longname'] ?? m['symbol']}', '${m['quoteType'] ?? ''}'),
       ];
     } catch (_) {
+      return _finnhubSearch(q.trim());
+    }
+  }
+
+  /// Backup search through our worker's Finnhub route (official API).
+  static Future<List<SymbolMatch>> _finnhubSearch(String q) async {
+    if (!CrawlerFeed.workerUrl.startsWith('https://')) return const [];
+    try {
+      final j = await Net.getJson('${CrawlerFeed.workerUrl}/fh?fn=search&q=${Uri.encodeQueryComponent(q)}');
+      final list = j is Map ? j['result'] : null;
+      if (list is! List) return const [];
+      return [
+        for (final m in list.whereType<Map>().take(10))
+          if (m['symbol'] is String && isValidSymbol(m['symbol'] as String))
+            SymbolMatch(m['symbol'] as String, '${m['description'] ?? m['symbol']}', '${m['type'] ?? ''}'),
+      ];
+    } catch (_) {
       return const [];
     }
   }
