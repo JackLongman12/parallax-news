@@ -10,6 +10,7 @@ those calls from the snapshot instantly and only go live for anything else.
 Standard library only.
 """
 
+import datetime
 import gzip
 import http.cookiejar
 import json
@@ -85,6 +86,83 @@ def get(path):
     return None
 
 
+# CNBC's public quote service: backup when Yahoo refuses GitHub's servers.
+CNBC_SYMBOL = {
+    "^GSPC": ".SPX", "^DJI": ".DJI", "^IXIC": ".IXIC", "^RUT": ".RUT", "^VIX": ".VIX",
+    "GC=F": "@GC.1", "CL=F": "@CL.1", "BTC-USD": "BTC.CM=", "EURUSD=X": "EUR=",
+    "^TNX": "US10Y", "^FTSE": ".FTSE", "^N225": ".N225",
+}
+
+
+def _num(v):
+    try:
+        return float(str(v).replace(",", "").replace("%", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _cnbc_json(url):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read(3_000_000))
+    except Exception as e:  # noqa: BLE001
+        k = f"cnbc {getattr(e, 'code', type(e).__name__)}"
+        ERRORS[k] = ERRORS.get(k, 0) + 1
+        return None
+
+
+def cnbc_charts(symbols):
+    """Yahoo-shaped chart answers built from CNBC quotes + 1-day bars."""
+    want = {CNBC_SYMBOL.get(s, s): s for s in symbols}
+    out = {}
+    q = _cnbc_json("https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols="
+                   + urllib.parse.quote("|".join(want), safe="")
+                   + "&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json&events=1")
+    try:
+        quotes = q["FormattedQuoteResult"]["FormattedQuote"]
+    except (KeyError, TypeError):
+        return out
+    for item in quotes:
+        ysym = want.get(item.get("symbol"))
+        price, prev = _num(item.get("last")), _num(item.get("previous_day_closing"))
+        if not ysym or item.get("code") != 0 or price is None or not prev:
+            continue
+        try:
+            ts = int(datetime.datetime.fromisoformat(item["last_time"].replace(".000", "")).timestamp())
+        except (KeyError, ValueError):
+            ts = int(time.time())
+        times, closes = [], []
+        bars = _cnbc_json("https://ts-api.cnbc.com/harmony/app/charts/1D.json?symbol="
+                          + urllib.parse.quote(item["symbol"], safe=""))
+        try:
+            pb = bars["barData"]["priceBars"]
+            for b in pb[::5]:  # 1-minute bars -> every 5 minutes, like Yahoo's 5m
+                c = _num(b.get("close"))
+                if c is not None:
+                    times.append(int(b["tradeTimeinMills"]) // 1000)
+                    closes.append(c)
+        except (KeyError, TypeError, ValueError):
+            pass
+        time.sleep(0.2)
+        vol = _num(item.get("volume"))
+        meta = {
+            "symbol": ysym, "regularMarketPrice": price, "chartPreviousClose": prev,
+            "previousClose": prev, "longName": item.get("name"), "shortName": item.get("shortName"),
+            "currency": item.get("currencyCode"), "regularMarketDayHigh": _num(item.get("high")),
+            "regularMarketDayLow": _num(item.get("low")),
+            "regularMarketVolume": int(vol) if vol is not None else None,
+            "fiftyTwoWeekHigh": _num(item.get("yrhiprice")), "fiftyTwoWeekLow": _num(item.get("yrloprice")),
+            "fullExchangeName": item.get("exchange"), "regularMarketTime": ts,
+        }
+        out[chart_path(ysym)] = {"chart": {"result": [{
+            "meta": {k: v for k, v in meta.items() if v is not None},
+            "timestamp": times,
+            "indicators": {"quote": [{"close": closes, "open": [_num(item.get("open"))]}]},
+        }]}}
+    return out
+
+
 def chart_path(sym):
     # Same encoding as Dart's Uri.encodeComponent for these symbols.
     return "/v8/finance/chart/" + urllib.parse.quote(sym, safe="") + "?range=1d&interval=5m"
@@ -123,12 +201,19 @@ def main():
             out[p] = j
         time.sleep(0.3)
     syms = list(dict.fromkeys(INDICES + WATCHLIST + trending))
+    missing = []
     for s in syms:
         j = get(chart_path(s))
         c = trim_chart(j) if j else None
         if c:
             out[chart_path(s)] = c
+        else:
+            missing.append(s)
         time.sleep(0.3)
+    if missing:
+        backup = cnbc_charts(missing)
+        out.update(backup)
+        print(f"markets: {len(backup)}/{len(missing)} from CNBC backup")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     data = json.dumps({"v": 1, "at": int(time.time()), "r": out}, separators=(",", ":")).encode()
     with gzip.open(OUT, "wb") as f:
