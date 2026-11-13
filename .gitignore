@@ -25,3 +25,15 @@ crawler/out/
 worker/.wrangler/
 worker/node_modules/
 __pycache__/
+
+# launch video: local inputs and render output
+tool/launch-video/node_modules/
+tool/launch-video/img/
+tool/launch-video/fonts/
+tool/launch-video/stills/
+tool/launch-video/edgeprof*/
+tool/launch-video/*.mp4
+tool/launch-video/*.mp4.ok
+tool/launch-video/*.wav
+tool/launch-video/log_*.txt
+tool/launch-video/parts.txt

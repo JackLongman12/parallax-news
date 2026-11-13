@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Parallax launch film</title>
+<style>
+@font-face { font-family: Inter; src: url(fonts/Inter-Regular.ttf); font-weight: 400; }
+@font-face { font-family: Inter; src: url(fonts/Inter-Medium.ttf); font-weight: 500; }
+@font-face { font-family: Inter; src: url(fonts/Inter-Bold.ttf); font-weight: 700; }
+@font-face { font-family: Inter; src: url(fonts/Inter-ExtraBold.ttf); font-weight: 800; }
+@font-face { font-family: Inter; src: url(fonts/Inter-Black.ttf); font-weight: 900; }
+:root {
+  --purple: #7c3aed; --violet: #a26bff; --lav: #c9b6ff; --deep: #1b0638;
+  --left: #3f63f5; --center: #b39bff; --right: #e5375a; --lime: #b8f53a; --yellow: #ffe14d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+body { font-family: Inter, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+canvas.layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+#view { position: absolute; inset: 0; perspective: 1300px; perspective-origin: 50% 50%; overflow: hidden; }
+#cam { position: absolute; left: 960px; top: 540px; width: 0; height: 0; transform-style: preserve-3d; }
+#cam > * { position: absolute; left: 0; top: 0; transform-origin: 0 0; backface-visibility: hidden; will-change: transform, opacity; }
+
+/* Type */
+.big { font-weight: 900; letter-spacing: -0.045em; line-height: 0.95; white-space: nowrap;
+  text-shadow: 0 0 2px rgba(255,255,255,.8), 0 0 36px rgba(162,107,255,.85), 0 0 90px rgba(124,58,237,.65); }
+.big span { display: inline-block; }
+/* gradient text: applied per word/letter, since each one animates on its own */
+.grad { text-shadow: none; filter: drop-shadow(0 0 26px rgba(150,90,255,.75)) drop-shadow(0 0 2px rgba(255,255,255,.5)); }
+.grad .word { background: linear-gradient(180deg, #ffffff 30%, #e2d6ff 70%, #b49bff); -webkit-background-clip: text; background-clip: text; color: transparent;
+  padding: 0 0.02em; }
+.letters { display: inline-flex; }
+.sub { font-weight: 600; font-size: 44px; letter-spacing: -0.01em; color: #efe8ff; white-space: nowrap;
+  text-shadow: 0 0 24px rgba(124,58,237,.9); }
+.word { display: inline-block; }
+
+/* Phone */
+.phone { width: 392px; height: 818px; border-radius: 60px; padding: 15px; position: relative;
+  background: linear-gradient(135deg, #3a3446 0%, #0c0a10 30%, #050407 70%, #2a2533 100%);
+  box-shadow: 0 0 0 2px #46405a inset, 0 60px 120px rgba(0,0,0,.7), 0 0 80px rgba(124,58,237,.45); }
+.phone .screen { width: 362px; height: 788px; border-radius: 46px; overflow: hidden; position: relative; background: #000; }
+.phone img { width: 100%; height: auto; display: block; position: absolute; top: 0; left: 0; }
+.phone .gloss { position: absolute; inset: 15px; border-radius: 46px; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.04) 28%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 80%, rgba(255,255,255,.08) 100%); }
+.phone .notch { position: absolute; top: 27px; left: 50%; width: 110px; height: 30px; margin-left: -55px; border-radius: 20px; background: #000; }
+
+/* Glass */
+.glass { border-radius: 30px; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, rgba(64,30,120,.78), rgba(22,8,44,.86));
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,.28) inset, 0 30px 80px rgba(0,0,0,.55), 0 0 60px rgba(124,58,237,.35); }
+.glass::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 48%;
+  background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0)); border-radius: 30px 30px 60% 60% / 30px 30px 40px 40px; }
+.card { width: 540px; padding: 30px 34px 30px; }
+.tag { display: inline-block; font-weight: 800; font-size: 22px; letter-spacing: .08em; padding: 8px 18px; border-radius: 99px; color: #fff; }
+.card h3 { font-size: 36px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 14px; color: #fff; white-space: normal; }
+.card .src { font-size: 22px; font-weight: 600; opacity: .8; }
+.pill { display: inline-flex; align-items: center; gap: 16px; padding: 18px 30px 18px 22px; border-radius: 99px; white-space: nowrap;
+  font-weight: 800; font-size: 32px; letter-spacing: -0.01em; }
+.dot { width: 20px; height: 20px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 18px var(--lime); flex: none; }
+.bar { height: 30px; border-radius: 99px; overflow: hidden; display: flex; box-shadow: 0 0 40px rgba(124,58,237,.6); }
+.bar > div { height: 100%; }
+.tile { width: 300px; height: 210px; padding: 24px; display: flex; flex-direction: column; justify-content: flex-end; }
+.tile b { font-size: 34px; font-weight: 900; letter-spacing: -0.03em; position: relative; }
+.tile small { font-size: 18px; opacity: .8; position: relative; margin-top: 6px; }
+.gate-label { font-weight: 900; font-size: 64px; letter-spacing: -0.03em; white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="bg" class="layer" width="1920" height="1080"></canvas>
+<div id="view"><div id="cam"></div></div>
+<canvas id="fx" class="layer" width="1920" height="1080"></canvas>
+<script src="app.js"></script>
+</body>
+</html>
