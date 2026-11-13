@@ -440,6 +440,8 @@ class BlindspotScreen extends StatefulWidget {
 
 class _BlindspotScreenState extends State<BlindspotScreen> {
   Map<String, List<Story>>? _groups;
+  Timer? _retry;
+  int _tries = 0;
 
   @override
   void initState() {
@@ -451,6 +453,7 @@ class _BlindspotScreenState extends State<BlindspotScreen> {
   @override
   void dispose() {
     TabReselect.tabs[2].removeListener(_reload);
+    _retry?.cancel();
     super.dispose();
   }
 
@@ -461,10 +464,22 @@ class _BlindspotScreenState extends State<BlindspotScreen> {
     try {
       final all = await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force);
       if (!mounted) return;
-      setState(() => _groups = {for (final c in _collections) c.id: _storiesIn(c.id, all)});
+      final groups = {for (final c in _collections) c.id: _storiesIn(c.id, all)};
+      setState(() => _groups = groups);
+      // Opened before the news finished loading (e.g. straight after app
+      // start)? Try again shortly instead of showing empty tiles.
+      if (groups.values.every((g) => g.isEmpty)) _scheduleRetry();
     } catch (_) {
       if (mounted) setState(() => _groups ??= const {});
+      _scheduleRetry();
     }
+  }
+
+  void _scheduleRetry() {
+    if (_tries >= 4) return;
+    _tries++;
+    _retry?.cancel();
+    _retry = Timer(Duration(seconds: 4 * _tries), () => _load(force: _tries > 2));
   }
 
   @override
@@ -523,7 +538,8 @@ class _CollectionTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CollectionPage(c: c))),
+        // The page shows exactly the stories counted on this tile.
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CollectionPage(c: c, stories: stories))),
         child: Stack(fit: StackFit.expand, children: [
           if (photo != null) NetImage(photo, width: big ? 900 : 500),
           // Tint + darkening toward the text so it stays readable on any photo.
@@ -583,8 +599,11 @@ class _CollectionTile extends StatelessWidget {
 }
 
 class CollectionPage extends StatelessWidget {
-  const CollectionPage({super.key, required this.c});
+  const CollectionPage({super.key, required this.c, this.stories});
   final _Collection c;
+
+  /// What the tile counted. Pull-to-refresh rebuilds the list from fresh news.
+  final List<Story>? stories;
 
   @override
   Widget build(BuildContext context) {
@@ -592,8 +611,10 @@ class CollectionPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(c.title)),
       body: StoryList(
-        loader: (force) async =>
-            _storiesIn(c.id, await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force)),
+        initial: stories,
+        loader: (force) async => !force && stories != null && stories!.isNotEmpty
+            ? stories!
+            : _storiesIn(c.id, await app.repo.broadPool(places: app.followed, topics: app.followedTopics, force: force)),
         emptyMessage: 'Nothing here right now. More outlets get rated as you browse, so check back later.',
         header: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
