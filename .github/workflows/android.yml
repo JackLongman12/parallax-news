@@ -86,7 +86,7 @@ jobs:
           # obfuscation and debug symbols split out.
           flutter build apk --release \
             --split-per-abi \
-            --target-platform android-arm,android-arm64 \
+            --target-platform android-arm64 \
             --obfuscate --split-debug-info=build/symbols \
             --build-name="0.1.${RUN}" \
             --build-number="${RUN}" \
@@ -95,7 +95,6 @@ jobs:
             --dart-define=FEED_WORKER_URL="https://parallax-news.lp-reports.workers.dev"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "dist/parallax-news-0.1.${RUN}.apk"
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "dist/parallax-news-0.1.${RUN}-arm32.apk"
           ls -la dist
 
       # Never leave the signing key on disk for later (third-party) post steps.
@@ -115,12 +114,11 @@ jobs:
           def sha(p):
               return hashlib.sha256(open(p, "rb").read()).hexdigest()
           a64 = f"parallax-news-0.1.{n}.apk"
-          a32 = f"parallax-news-0.1.{n}-arm32.apk"
           notes = (os.environ.get("NOTES") or "").split("\n")[0][:300]
           manifest = {
               "version": f"0.1.{n}",
-              # Split-per-ABI APKs get Android version code 2000+n (arm64) or
-              # 1000+n (arm32), and apps up to 0.1.38 compare "build" against
+              # Split-per-ABI APKs get Android version code 2000+n (64-bit
+              # ARM; 32-bit was dropped), and apps up to 0.1.38 compare "build" against
               # that code, so it is published as 2000+n for them. Newer apps
               # compare "run" against the n in their own version name.
               "build": 2000 + int(n),
@@ -132,7 +130,6 @@ jobs:
                   "sha256": sha(f"dist/{a64}"),
                   "abis": {
                       "arm64": {"url": f"{base}/{a64}", "sha256": sha(f"dist/{a64}")},
-                      "arm": {"url": f"{base}/{a32}", "sha256": sha(f"dist/{a32}")},
                   },
               },
           }
