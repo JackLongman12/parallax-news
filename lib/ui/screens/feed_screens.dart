@@ -143,6 +143,7 @@ class TopicsSection extends StatelessWidget {
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             childAspectRatio: 1.45,
@@ -152,9 +153,9 @@ class TopicsSection extends StatelessWidget {
     final forYou = SubtopicSuggester.forYou(app.profile);
     final breakOut = SubtopicSuggester.breakOut(app.profile);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (forYou.isNotEmpty) ...[header('Picked for you'), SubPathChips(paths: forYou)],
+      if (forYou.isNotEmpty) ...[header('Picked for you'), SubPathChips(paths: forYou, max: 4)],
       header('Outside your bubble'),
-      SubPathChips(paths: breakOut, icon: Icons.explore_rounded),
+      SubPathChips(paths: breakOut, icon: Icons.explore_rounded, max: 4),
       if (mine.isNotEmpty) ...[
         header('Your topics',
             TextButton.icon(icon: const Icon(Icons.tune_rounded, size: 18), label: const Text('Edit'), onPressed: () => showFeedEditor(context))),
@@ -367,9 +368,10 @@ class _TopicPageState extends State<TopicPage> {
 
 /// Chips for a list of subtopic paths; tap opens the topic page on it.
 class SubPathChips extends StatelessWidget {
-  const SubPathChips({super.key, required this.paths, this.icon});
+  const SubPathChips({super.key, required this.paths, this.icon, this.max = 100});
   final List<SubPath> paths;
   final IconData? icon;
+  final int max;
 
   @override
   Widget build(BuildContext context) {
@@ -378,10 +380,11 @@ class SubPathChips extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final sp in paths)
+        for (final sp in paths.take(max))
           ActionChip(
-            avatar: Icon(icon ?? Brand.categoryIcon(sp.category), size: 16),
-            label: Text(sp.chain.map((s) => s.label).join(' > '), style: const TextStyle(fontWeight: FontWeight.w700)),
+            avatar: Icon(icon ?? Brand.categoryIcon(sp.category), size: 16, color: Brand.purple),
+            label: Text(sp.chain.map((s) => s.label).join(' > '),
+                style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => TopicPage(category: sp.category, initial: sp))),
           ),
