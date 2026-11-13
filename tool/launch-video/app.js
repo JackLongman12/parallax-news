@@ -5,13 +5,28 @@
 
 const W = 1920, H = 1080, P = 1300;
 let D = null, BAR0 = 0.2066, BEAT = 0.64962;
-const T = (k) => BAR0 + k * 4 * BEAT;   // start of bar k
+const T = (k) => BAR0 + (SHORT ? warp(k) : k) * 4 * BEAT;   // start of bar k (retimed in the short cut)
 const BT = (n) => BAR0 + n * BEAT;      // beat n
 let END = 0;
 // Flat cut (index.html?flat): solid colour scenes, no glow/gloss/grain/stars, its own camera.
 const FLAT = /[?&](flat|short)\b/.test(location.search);
 // 1-minute cut (index.html?short): flat look, its own bolder camera; edl.py picks the bars shown.
 const SHORT = /[?&]short\b/.test(location.search);
+// Short cut retiming: [bar of the full film, bar of the short film]. Holds are
+// squeezed, busy moments keep full speed; every big moment still lands on a beat.
+const WARP = [[0, 0], [4, 2], [7, 3], [8, 4], [9, 5], [11, 6], [12, 7], [14, 9], [16, 9.5], [17.6, 9.9], [18, 10],
+  [22, 13], [24, 13.25], [26, 14.25], [28, 15.75], [31.4, 16], [32, 16.25], [34, 17.25], [35, 18.25], [36, 19],
+  [40, 21], [42, 23], [44, 24], [46, 25], [48, 27]];
+function warp(k) {
+  if (k <= 0) return k;
+  for (let i = 1; i < WARP.length; i++) {
+    const [a0, b0] = WARP[i - 1], [a1, b1] = WARP[i];
+    if (k <= a1) return b0 + ((k - a0) * (b1 - b0)) / (a1 - a0);
+  }
+  return k - 48 + 27;
+}
+// the short cut's music starts 4 bars into the song, so the drop lands on "One story"
+const songT = (t) => t + (SHORT ? 16 * BEAT : 0);
 
 // ---------- math ----------
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -35,7 +50,7 @@ const mix = (a, b, t) => { const x = hex(a), y = hex(b); return `rgb(${x.map((v,
 // ---------- music ----------
 function energyAt(t) {
   if (!D) return 0.5;
-  const e = D.energy, i = t * 30, a = Math.floor(i);
+  const e = D.energy, i = songT(t) * 30, a = Math.floor(i);
   if (a < 0) return e[0];
   if (a >= e.length - 1) return e[e.length - 1];
   return lerp(e[a], e[a + 1], i - a);
@@ -43,7 +58,7 @@ function energyAt(t) {
 function bandAt(b, t) {
   if (!D) return 0.5;
   const b0 = Math.floor(clamp(b, 0, 7)), b1 = Math.min(7, b0 + 1), f = clamp(b, 0, 7) - b0;
-  const i = Math.min(D.bands[0].length - 1, Math.max(0, Math.round(t * 30)));
+  const i = Math.min(D.bands[0].length - 1, Math.max(0, Math.round(songT(t) * 30)));
   return lerp(D.bands[b0][i], D.bands[b1][i], f);
 }
 /** Decaying pulse on every beat (stronger on the bar's first beat). */
@@ -557,7 +572,8 @@ function build() {
   });
   // callouts: screen top = 60 - 394 + 15 = -319; y = top + f * 788
   const scrY = (f, cy = 60) => cy - 394 + 15 + f * 788;
-  [['Catch up in one tap', 0.10, T(13)], ['Real photos, real outlets', 0.3, T(13) + BEAT * 2], ['Left, center, right on every story', 0.468, T(14)]].forEach(([txt, f, a], i) => {
+  [['Catch up in one tap', 0.10, SHORT ? T(12) + BEAT * 2 : T(13)], ['Real photos, real outlets', 0.3, SHORT ? T(13) : T(13) + BEAT * 2],
+    ['Left, center, right on every story', 0.468, SHORT ? T(13) + BEAT * 2 : T(14)]].forEach(([txt, f, a], i) => {
     const y = scrY(f);
     add(pillEl(txt, 400, 'right'), {
       x: -170, y, z: Z1, ax: 100, t0: a - 0.05, t1: T(16) + 1.5,
@@ -582,7 +598,7 @@ function build() {
 
   // ===== S2/S3 story deep dive (x = 1400, z = -8000) =====
   const X3 = 1400, Z3 = -8000;
-  add(wordsEl('Open any story.', 'big grad', 130), {
+  if (!SHORT) add(wordsEl('Open any story.', 'big grad', 130), {
     x: X3, y: -60, z: Z3 + 500, t0: T(16.4), t1: T(18) + 0.7,
     upd(t, e) { revealSpans(e, t, T(16.5), BEAT, 1.4); e.z = e.b.z + E.inExpo(prog(t, T(17.6), T(18) + 0.4)) * 900; fadeOut(e, t, T(17.8), 0.5); },
   });
@@ -593,7 +609,7 @@ function build() {
       e.y = lerp(900, e.b.y, p); e.ry = lerp(40, 0, p) + Math.sin(t * 0.7) * 5; e.o = clamp(p * 3);
       e.s = 1 + kick(t) * 0.012;
       // make room for the second phone
-      const q = E.inOutCubic(prog(t, T(22), T(22) + 1.2));
+      const q = SHORT ? 0 : E.inOutCubic(prog(t, T(22), T(22) + 1.2));
       e.x = e.b.x - q * 260; e.ry -= q * 10;
     },
   });
@@ -616,11 +632,11 @@ function build() {
       },
     });
   });
-  add(phoneEl('06_sources.png'), {
+  if (!SHORT) add(phoneEl('06_sources.png'), {
     x: X3 + 420, y: 80, z: Z3 - 200, ry: -16, t0: T(22) - 0.1, t1: T(24) + 0.6,
     upd(t, e) { const p = E.outExpo(prog(t, T(22), T(22) + 1.4)); e.x = lerp(X3 + 1500, e.b.x, p); e.o = clamp(p * 3); e.ry = e.b.ry + Math.sin(t * 0.6) * 4; },
   });
-  add(pillEl('Every outlet rated: lean, factuality, owner', 0), {
+  if (!SHORT) add(pillEl('Every outlet rated: lean, factuality, owner', 0), {
     x: X3 + 120, y: 470, z: Z3 + 60, t0: T(22) + BEAT * 2 - 0.05, t1: T(24) + 0.6,
     upd(t, e) { popIn(e, t, T(22) + BEAT * 2, 0.7, 0.5); },
   });
@@ -683,7 +699,7 @@ function build() {
       },
     });
   });
-  add(wordsEl('Break out of | your bubble.', 'big', 92, 'line-height:1.02'), {
+  if (!SHORT) add(wordsEl('Break out of | your bubble.', 'big', 92, 'line-height:1.02'), {
     x: -480, y: -300, z: Z4, t0: T(29) + 0.3, t1: T(32) + 0.4,
     upd(t, e) { revealSpans(e, t, T(29) + BEAT, BEAT / 3); },
   });
@@ -703,9 +719,10 @@ function build() {
   // ===== S5 from the world to your street (z = -16000) =====
   const Z5 = -16000;
   const globe = canvasEl(1000, 1000);
+  const G0 = SHORT ? T(31.4) - 0.35 : T(31.4);
   add(globe, {
-    z: Z5, t0: T(31.4), t1: T(34) + 1.5,
-    upd(t, e) { drawGlobe(globe.getContext('2d'), t); e.o = smooth(T(31.4), T(32), t); e.s = (FLAT ? 0.86 : 1) + kick(t) * 0.03; },
+    z: Z5, t0: G0, t1: T(34) + 1.5,
+    upd(t, e) { drawGlobe(globe.getContext('2d'), t); e.o = smooth(G0, T(32), t); e.s = (FLAT ? 0.86 : 1) + kick(t) * 0.03; },
   });
   add(wordsEl('From the world', 'big', 120), {
     y: FLAT ? -428 : -405, z: Z5, t0: T(32) - 0.05, t1: T(34) + 0.6,
@@ -715,7 +732,7 @@ function build() {
     y: FLAT ? 432 : 410, z: Z5, t0: T(33) - 0.05, t1: T(34) + 0.6,
     upd(t, e) { revealSpans(e, t, T(33), BEAT / 2); fadeOut(e, t, T(34), 0.4); },
   });
-  const gates = [['Europe', -16700], ['United Kingdom', -17300], ['London', -17900], ['Hackney', -18500]];
+  const gates = [['North America', -16700], ['United States', -17300], ['New York', -17900], ['Brooklyn', -18500]];
   gates.forEach(([name, z], i) => {
     const a = T(34) + BEAT * i;
     add(el(portalSVG(620, ['#7c3aed', '#3f63f5', '#b8f53a', '#ffe14d'][i])), {
@@ -776,7 +793,8 @@ function build() {
         e.s = lerp(1.8, 1, p) * (1 + kick(t) * 0.03); e.o = clamp(p * 2); e.rx = lerp(-60, 0, p);
         const line = e.line || (e.line = e.el.lastElementChild);
         line.style.transform = `scaleX(${E.outExpo(prog(t, a + 0.15, a + 0.8)).toFixed(3)})`;
-        if (i < 3) { const q = E.inCubic(prog(t, b - 0.12, b + 0.25)); e.rx += q * 80; e.z = Z6 + q * 500; e.o *= 1 - q; }
+        // the short cut clears each word just before the next lands, so they never overlap
+        if (i < 3) { const q = SHORT ? E.inCubic(prog(t, b - 0.24, b + 0.03)) : E.inCubic(prog(t, b - 0.12, b + 0.25)); e.rx += q * 80; e.z = Z6 + q * 500; e.o *= 1 - q; }
         else fadeOut(e, t, T(42), 0.7);
       },
     });
@@ -787,17 +805,18 @@ function build() {
 
   // ===== S7 breakdown: open source (z = -22600) =====
   const Z7 = -22600;
+  const OS_OUT = SHORT ? T(44) - 0.15 : T(43.6);
   add(el(logoSVG(160)), {
     y: -250, z: Z7, t0: T(42), t1: T(44) + 0.6,
-    upd(t, e) { e.o = smooth(T(42) + 0.2, T(42) + 1.4, t); e.ry = Math.sin(t) * 10; fadeOut(e, t, T(43.6), 0.6); },
+    upd(t, e) { e.o = SHORT ? smooth(T(42), T(42) + 0.6, t) : smooth(T(42) + 0.2, T(42) + 1.4, t); e.ry = Math.sin(t) * 10; fadeOut(e, t, OS_OUT, 0.6); },
   });
   add(wordsEl('Open source.', 'big', 150), {
     y: -40, z: Z7, t0: T(42), t1: T(44) + 0.6,
-    upd(t, e) { revealSpans(e, t, T(42) + BEAT, BEAT, 1.2); fadeOut(e, t, T(43.6), 0.6); },
+    upd(t, e) { if (SHORT) revealSpans(e, t, T(42), BEAT / 2, 0.6); else revealSpans(e, t, T(42) + BEAT, BEAT, 1.2); fadeOut(e, t, OS_OUT, 0.6); },
   });
   add(wordsEl('Free, forever.', 'big grad', 150), {
     y: 140, z: Z7, t0: T(43), t1: T(44) + 0.6,
-    upd(t, e) { revealSpans(e, t, T(43), BEAT, 1.2); fadeOut(e, t, T(43.6), 0.6); },
+    upd(t, e) { if (SHORT) revealSpans(e, t, T(42) + BEAT * 2, BEAT / 2, 0.6); else revealSpans(e, t, T(43), BEAT, 1.2); fadeOut(e, t, OS_OUT, 0.6); },
   });
   decorSwirl(91, 640, '#ffffff', 12, -720, 60, Z7 - 200, T(42), T(43.5));
   decorSwirl(92, 600, '#b8f53a', 10, 720, -40, Z7 - 250, T(42.3), T(43.8), 180);
@@ -927,8 +946,9 @@ function flatScenes() {
     [T(8), PU, WH, YE, WH, K, PU, 'iris'],
     [T(12), PA, K, PU, K, WH, LI, 'left'],
     [T(16) + 0.9, K, WH, LI, WH, K, PU, 'right'],
-    [T(24), YE, K, PU, K, WH, LI, 'iris'],
-    [T(31.4), PU, WH, LI, WH, K, PU, 'up'],
+    // the short cut starts these two wipes a moment early so they carry the flight between scenes
+    [SHORT ? T(24) - 0.25 : T(24), YE, K, PU, K, WH, LI, 'iris'],
+    [SHORT ? T(31.4) - 0.2 : T(31.4), PU, WH, LI, WH, K, PU, 'up'],
     [T(35) + BEAT * 2, PA, K, PU, K, WH, LI, 'down'],
     [T(40), LI, K, PU, K, WH, LI, 'left'],
     [T(42), K, WH, YE, WH, K, PU, 'iris'],
@@ -1043,82 +1063,70 @@ function flatCamera() {
   k(T(48), { z: Z8 + 60 });
 }
 
-/* Camera for the 1-minute cut. Only the bars listed in edl.py are shown, so
-   each kept stretch gets its own bold move, and a key placed just before a
-   stretch makes it open mid-move. Times are film times (bars of the song). */
+/* Camera for the 1-minute cut: one continuous flight, no cuts. Times are
+   bars of the full film; T() retimes them to the short film. */
 function shortCamera() {
-  const k = fkey, F = 1 / 60, R = 360, R2 = 720, B = BEAT;
-  const cut = (t, v) => { const tc = Math.ceil(t / F - 1e-6) * F; k(tc - F + 0.002, {}); k(tc - 0.002, v); };
+  const k = fkey, R = 360, R2 = 720, B = BEAT;
   const Z1 = -4000, X3 = 1400, Z3 = -8000, Z4 = -12000, Z5 = -16000, ZE = -19000, Z6 = -21000, Z7 = -22600, Z8 = -24000;
-
-  // [0,1) logo: spiral push-in
+  // intro: spiral push-in onto the logo, an arc across the wordmark and tagline,
+  // then a crash zoom through the rings with a barrel roll into the drop
   k(0, { x: 160, y: -260, z: 1150, rx: 18, ry: 24, rz: -28 });
-  k(T(1), { x: 0, y: -60, z: 520, rx: 0, ry: 0, rz: 0 });
-  // [7,10) swing onto the wordmark, crash zoom with a barrel roll into the drop
-  k(T(7) - 0.3, { x: -260, y: 0, z: 720, ry: -24, rz: 10 });
-  k(T(7), { x: -160, z: 600, ry: -14, rz: 6 });
-  k(T(7.5), { x: 0, z: 320, ry: 0, rz: 0 });
+  k(T(1), { x: 0, y: -60, z: 640, rx: 0, ry: 0, rz: -4 });
+  k(T(2), { x: -60, y: 20, z: 560, ry: -10, rz: 0 });
+  k(T(4), { x: 60, y: 40, z: 470, ry: 10, rz: 2 });
+  k(T(6.6), { x: 0, y: 0, z: 380, ry: 0, rz: 0 });
   k(T(8) - 0.04, { z: -3350, rz: R });
-  // title: orbit sweep while it builds; headlines: pull back from below, then orbit
+  // one story: orbit sweep over the title, drop low as the headlines fly in,
+  // rise to a high angle, crane down onto the lean bar
   k(T(8) + 0.6, { z: Z1 + 150, ry: -18 });
   k(T(9), { z: Z1 + 60, ry: 14 });
   k(T(9) + 0.6, { y: 60, z: Z1 + 420, rx: -8, ry: 0 });
-  k(T(10), { y: 0, z: Z1 + 320, rx: 0, ry: -16 });
-  // [11,12) high angle craning down onto the lean bar
-  k(T(11) - 0.25, { x: 0, y: -300, z: Z1 + 520, rx: 42, ry: 0 });
-  k(T(11), { y: -220, z: Z1 + 440, rx: 34 });
-  k(T(12), { y: 110, z: Z1 + 220, rx: 6 });
-  // [13,15) feed: big orbit right to left with a push in
-  k(T(13) - 0.3, { x: 320, y: 0, z: Z1 + 520, rx: 0, ry: 48 });
-  k(T(13), { x: 240, z: Z1 + 440, ry: 38 });
-  k(T(15), { x: 60, z: Z1 + 250, ry: -22 });
-  // [19,23) story page: low angle that cranes up while orbiting, then swings to the second phone
-  k(T(19) - 0.3, { x: X3, y: 300, z: Z3 + 120, rx: -30, ry: -12 });
-  k(T(19), { y: 240, z: Z3 + 180, rx: -24, ry: -6 });
-  k(T(21), { y: -60, z: Z3 + 300, rx: 10, ry: 16 });
-  k(T(22), { x: X3 + 40, y: 0, z: Z3 + 380, rx: 0, ry: -8 });
-  k(T(23), { x: X3 + 160, y: 20, z: Z3 + 460, ry: -24 });
-  // [24,25) blindspots: rolls upright while pushing in
-  k(T(24) - 0.2, { x: 0, y: -40, z: Z4 + 720, rx: 0, ry: 0, rz: R - 40 });
-  k(T(24), { z: Z4 + 620, rz: R - 32 });
-  k(T(25), { y: 0, z: Z4 + 40, rz: R - 6 });
-  // [26,28) whips in from the right, then orbits across the tiles
-  k(T(26) - 0.3, { x: 520, y: 100, z: Z4 + 320, ry: -42, rz: R });
-  k(T(26), { x: 440, y: 80, z: Z4 + 270, ry: -32 });
-  k(T(26) + 1.2, { x: 120, y: 40, z: Z4 + 140, ry: -6 });
-  k(T(28), { x: -60, y: 60, z: Z4 + 20, rx: -6, ry: 14 });
-  // [33,36) world: from below, rising to face the globe; gates: a quarter roll per beat
-  k(T(33) - 0.3, { x: 0, y: 200, z: Z5 + 500, rx: -40, ry: 0 });
-  k(T(33), { y: 160, z: Z5 + 420, rx: -32 });
-  k(T(34), { y: 0, z: Z5 - 40, rx: 0 });
-  const zAt = (t) => Z5 - 40 - (600 * (t - T(34))) / B;
-  for (let i = 0; i < 4; i++) {
-    const a = T(34) + B * i;
-    if (i) k(a, { z: zAt(a), rz: R + 90 * i });
-    k(a + 0.28, { z: zAt(a + 0.28), rz: R + 90 * (i + 1) });
-  }
-  k(T(35), { z: zAt(T(35)), rz: R2 });
-  k(T(35) + B * 2, { x: 0, z: ZE + 260, ry: 0 });
-  k(T(36), { x: -120, z: ZE + 140, ry: -14 });
-  // [37,39) local outlets: orbit right to left
-  k(T(37) - 0.3, { x: 320, y: 0, z: ZE + 420, ry: 36 });
-  k(T(37), { x: 270, z: ZE + 380, ry: 30 });
-  k(T(39), { x: -40, z: ZE + 160, ry: -14 });
-  // [40,42) values: every word lands on a hard angle and settles
-  [[{ x: 0, y: 0, z: Z6 + 300, rx: 0, ry: 26, rz: R2 - 18 }, { z: Z6 + 120, ry: 6, rz: R2 - 4 }],
-    [{ y: 160, z: Z6 + 220, rx: -30, ry: -22, rz: R2 }, { y: 60, z: Z6 + 90, rx: -12, ry: -8 }],
-    [{ y: -150, z: Z6 + 220, rx: 28, ry: 24, rz: R2 }, { y: -50, z: Z6 + 90, rx: 10, ry: 9 }],
-    [{ y: 0, z: Z6 + 320, rx: 0, ry: 0, rz: R2 + 22 }, { z: Z6 + 60, rz: R2 + 5 }]].forEach(([from, to], i) => {
-    const a = T(40) + B * 2 * i;
-    if (i) cut(a, from); else k(a - 0.1, from);   // the first word opens the stretch, so no cut needed
-    k(a + 0.5, to);
-    k(a + B * 2 - 0.03, { z: to.z - 30 });
-  });
-  // [43,48) open source: slow arc on the breakdown; finale: spinning crane down to eye level
-  k(T(43) - 0.3, { x: -280, y: 0, z: Z7 + 720, rx: 0, ry: -26, rz: R2 + 6 });
-  k(T(43), { x: -230, z: Z7 + 650, ry: -20, rz: R2 + 5 });
-  k(T(44) - 0.1, { x: 0, z: Z7 + 260, ry: 4, rz: R2 });
-  cut(T(44), { x: 0, y: -700, z: Z8 + 700, rx: 48, ry: 0, rz: R2 - 20 });
+  k(T(11), { y: -120, z: Z1 + 420, rx: 22, ry: -10 });
+  k(T(12) - 0.2, { y: 100, z: Z1 + 260, rx: 8, ry: 0 });
+  // feed: swing round to the right, then a long orbit back across the phones
+  k(T(12) + 0.5, { x: 220, y: 0, z: Z1 + 460, rx: 0, ry: 32 });
+  k(T(14), { x: 140, z: Z1 + 330, ry: -4 });
+  k(T(16), { x: 180, z: Z1 + 260, ry: -16 });
+  // banking turn across to the story page, arriving low
+  k(T(17), { x: 900, y: -150, z: -6300, ry: 20, rz: R - 14 });
+  k(T(18) + 0.2, { x: X3, y: 220, z: Z3 + 200, rx: -20, ry: -6, rz: R });
+  // story page: crane up while orbiting
+  k(T(20), { y: 0, z: Z3 + 300, rx: 0, ry: 12 });
+  k(T(22), { x: X3 - 60, y: -80, z: Z3 + 340, rx: 10, ry: -10 });
+  // linger on the story page, then dive across to blindspots, arriving as the
+  // title lands and rolling upright
+  k(T(22) + 0.25, { x: X3 - 80, y: -90, z: Z3 + 300, rx: 8, ry: -12 });
+  k(T(24), { x: 200, y: -60, z: Z4 + 1100, rx: 0, ry: -8, rz: R - 22 });
+  k(T(24) + 0.5, { x: 0, y: -40, z: Z4 + 420, ry: 0, rz: R - 14 });
+  k(T(25), { y: 0, z: Z4 + 60, rz: R - 6 });
+  // orbit right as the phone rises, then left across the tiles
+  k(T(26) + 0.7, { x: 140, y: 40, z: Z4 + 180, ry: -18, rz: R });
+  k(T(28), { x: -40, y: 60, z: Z4 + 60, rx: -6, ry: 12 });
+  k(T(30), { x: -60, y: 40, z: Z4 + 20, rx: -4, ry: 14 });
+  // swoop up and over, diving down onto the globe
+  k(T(31.4), { x: 0, y: -520, z: Z5 + 1300, rx: 32, ry: 0 });
+  k(T(32) + 0.3, { y: 0, z: Z5 + 380, rx: 0 });
+  k(T(34), { z: Z5 - 40 });
+  // gates: one smooth barrel roll through all four
+  for (let i = 1; i <= 4; i++) k(T(34) + B * i, { z: Z5 - 40 - 600 * i, rz: R + 90 * i });
+  // explore: drift left, then orbit right
+  k(T(35) + B * 2, { x: 0, z: ZE + 300 });
+  k(T(36), { x: -60, z: ZE + 200, ry: -12 });
+  k(T(38), { x: 120, z: ZE + 120, ry: 14 });
+  k(T(39.5), { x: 60, z: ZE + 60, ry: 6 });
+  // hold just short of the explore plane until the first value appears ahead, then rush to it
+  k(T(40), { x: 0, z: ZE - 420, ry: 0 });
+  // values: the camera swings like a pendulum, landing on each word
+  k(T(40) + 0.45, { x: 0, y: 0, z: Z6 + 220, rx: 0, ry: 18, rz: R2 - 12 });
+  k(T(40) + B * 2 + 0.3, { y: 60, z: Z6 + 160, rx: -10, ry: -14, rz: R2 + 8 });
+  k(T(40) + B * 4 + 0.3, { y: -50, z: Z6 + 140, rx: 10, ry: 16, rz: R2 - 6 });
+  k(T(40) + B * 6 + 0.3, { y: 0, z: Z6 + 100, rx: 0, ry: -8, rz: R2 + 8 });
+  k(T(42), { ry: 0, rz: R2, z: Z6 + 40 });
+  // open source: an arc on the breakdown
+  k(T(42) + 0.4, { x: -200, z: Z7 + 600, ry: -20, rz: R2 + 6 });
+  k(T(44) - 0.1, { x: 0, z: Z7 + 220, ry: 6, rz: R2 });
+  // finale: swoop up and over, then crane down to eye level
+  k(T(44) + 0.45, { y: -600, z: Z8 + 760, rx: 40, ry: 0, rz: R2 - 16 });
   k(T(45), { y: 0, z: Z8 + 160, rx: 0, rz: R2 });
   k(T(46.5), { x: -40, z: Z8 + 100, ry: -6 });
   k(T(48), { x: 40, z: Z8 + 20, ry: 6 });
@@ -1138,7 +1146,7 @@ function frame(t) {
     // fog in the distance, fade out when very close / behind the camera
     o *= 1 - smooth(-3200, -6800, dz);
     // the flat cut pops things out as the camera passes them instead of ghosting them
-    if (e.near) o *= FLAT ? (dz > P * 0.7 ? 0 : 1) : 1 - smooth(P * 0.55, P * 0.9, dz);
+    if (e.near) o *= SHORT ? 1 - smooth(P * 0.45, P * 0.65, dz) : FLAT ? (dz > P * 0.7 ? 0 : 1) : 1 - smooth(P * 0.55, P * 0.9, dz);
     if (o < 0.004 || dz > P * 0.95) { if (e.vis) { e.el.style.display = 'none'; e.vis = false; } continue; }
     if (!e.vis) { e.el.style.display = ''; e.vis = true; }
     e.el.style.opacity = o.toFixed(3);
