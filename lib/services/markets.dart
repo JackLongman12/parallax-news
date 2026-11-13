@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
 
 import 'crawler_feed.dart';
 import 'provider_health.dart';
@@ -178,7 +182,76 @@ class Markets {
   static int _active = 0;
   static final _waiters = <Completer<void>>[];
 
-  static Future<dynamic> _get(String path) {
+  // ---- Snapshot from our crawler (refreshed every ~5 min on GitHub) ----
+  // Holds Yahoo's answers for everything the Markets tab opens with, so the
+  // tab fills instantly and works even while Yahoo rate-limits this phone.
+  // Kept on disk (~100 KB) so it is there the moment the app starts.
+  static const snapshotUrl = 'https://github.com/JackLongman12/parallax-news/releases/download/feed/markets.json.gz';
+  static Map<String, dynamic> _snap = const {};
+  static DateTime? snapshotAt; // when the crawler built it
+  static DateTime _snapCheckedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static Future<void>? _snapLoading;
+  static bool _diskRead = false;
+
+  static Future<File?> _snapFile() async {
+    try {
+      return File('${(await getApplicationSupportDirectory()).path}/markets_snapshot.json');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _useSnap(dynamic j) {
+    if (j is! Map || j['r'] is! Map || j['at'] is! num) return false;
+    final at = DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt() * 1000);
+    if (snapshotAt != null && !at.isAfter(snapshotAt!)) return false;
+    _snap = Map<String, dynamic>.from(j['r'] as Map);
+    snapshotAt = at;
+    return true;
+  }
+
+  static Future<void> _ensureSnapshot() async {
+    if (!_diskRead) {
+      _diskRead = true;
+      try {
+        final f = await _snapFile();
+        if (f != null && await f.exists()) _useSnap(jsonDecode(await f.readAsString()));
+      } catch (_) {}
+    }
+    if (DateTime.now().difference(_snapCheckedAt) < const Duration(minutes: 3)) return;
+    final load = _snapLoading ??= () async {
+      try {
+        final bytes = await Net.getBytes(snapshotUrl, timeout: const Duration(seconds: 8));
+        final text = utf8.decode(gzip.decode(bytes), allowMalformed: true);
+        if (_useSnap(jsonDecode(text))) {
+          _snapCheckedAt = DateTime.now();
+          final f = await _snapFile();
+          await f?.writeAsString(text);
+        }
+      } catch (_) {
+      } finally {
+        _snapCheckedAt = DateTime.now();
+        _snapLoading = null;
+      }
+    }();
+    // With a usable snapshot on disk, don't wait for the download.
+    if (_snap.isEmpty) await load;
+  }
+
+  static Future<dynamic> _get(String path) async {
+    await _ensureSnapshot();
+    final s = _snap[path];
+    final at = snapshotAt;
+    if (s != null && at != null && DateTime.now().difference(at) < const Duration(minutes: 30)) return s;
+    try {
+      return await _live(path);
+    } catch (_) {
+      if (s != null) return s; // older snapshot beats an empty screen
+      rethrow;
+    }
+  }
+
+  static Future<dynamic> _live(String path) {
     final hit = _cache[path];
     if (hit != null && DateTime.now().difference(hit.$1) < const Duration(seconds: 45)) return Future.value(hit.$2);
     return _inflight[path] ??= _fetch(path).whenComplete(() => _inflight.remove(path));
@@ -210,7 +283,8 @@ class Markets {
       if (CrawlerFeed.workerUrl.startsWith('https://')) '${CrawlerFeed.workerUrl}/y',
     ]) {
       try {
-        return await Net.getJson('$h$path', useCache: false);
+        // Short timeout: a blocked host should fail fast, not stall the tab.
+        return jsonDecode(await Net.getText('$h$path', useCache: false, timeout: const Duration(seconds: 5)));
       } catch (e) {
         first ??= e;
       }

@@ -37,6 +37,11 @@ jobs:
       - name: Crawl
         run: python3 crawler/crawl.py
 
+      - name: Market snapshot
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python3 crawler/markets.py
+
       - name: Publish feed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,7 +50,9 @@ jobs:
           gh release view feed --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create feed --repo "$GITHUB_REPOSITORY" --title "Crawler feed (auto)" \
               --notes "Updated automatically every ~5 minutes. Not an app release." --prerelease --latest=false
-          gh release upload feed crawler/out/feed.json.gz crawler/out/state.json.gz --clobber --repo "$GITHUB_REPOSITORY"
+          files="crawler/out/feed.json.gz crawler/out/state.json.gz"
+          [ -f crawler/out/markets.json.gz ] && files="$files crawler/out/markets.json.gz"
+          gh release upload feed $files --clobber --repo "$GITHUB_REPOSITORY"
 
       # GitHub's cron often runs late or not at all, so each crawl starts the
       # next one ~5 minutes after it began. The cron above restarts the chain
