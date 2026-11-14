@@ -2,14 +2,16 @@
 """Put the (purple) app icon on the right side of the feature graphic.
 
 Runs in CI after the screenshot test and tool/recolor_icon.py. Needs Pillow.
+Locally: python tool/compose_feature.py BANNER.png ICON.png (edits BANNER in place).
 """
 import pathlib
+import sys
 
 from PIL import Image, ImageDraw
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-BANNER = ROOT / "screenshots/out/feature_graphic.png"
-ICON = ROOT / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+BANNER = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "screenshots/out/feature_graphic.png"
+ICON = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
 
 
 def main() -> None:
