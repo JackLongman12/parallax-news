@@ -7,6 +7,7 @@ import '../../models/article.dart';
 import '../../models/bias.dart';
 import '../../models/story.dart';
 import '../../services/cover_images.dart';
+import '../../services/on_device_ai.dart';
 import '../../services/summarizer.dart';
 import 'insights.dart';
 import '../../state/app_state.dart';
@@ -111,6 +112,8 @@ class _StoryScreenState extends State<StoryScreen> {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 14),
+                  AiTldr(story: story),
                   const SizedBox(height: 14),
                   SummaryCard(summary: _summary),
                   const SizedBox(height: 14),
@@ -309,6 +312,112 @@ class SummaryCard extends StatelessWidget {
             'Read the full coverage below for every detail.',
             style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
       ]),
+    );
+  }
+}
+
+/// Gemini Nano summary written on this phone. Hidden on phones that can't run it.
+class AiTldr extends StatefulWidget {
+  const AiTldr({super.key, required this.story});
+  final Story story;
+
+  @override
+  State<AiTldr> createState() => _AiTldrState();
+}
+
+class _AiTldrState extends State<AiTldr> {
+  static const _minChars = 450; // the model needs a few hundred words to work with
+  bool _busy = false;
+  List<String>? _bullets;
+  String? _note;
+
+  String _input() {
+    final buf = StringBuffer();
+    final seen = <String>{};
+    for (final a in widget.story.articles) {
+      if (!seen.add(a.title)) continue;
+      buf.writeln(a.snippet.isEmpty ? a.title : '${a.title}. ${a.snippet}');
+    }
+    return buf.toString().trim();
+  }
+
+  Future<void> _run() async {
+    final text = _input();
+    if (text.length < _minChars) {
+      setState(() => _note = 'Not enough coverage text yet to summarise. Read the outlets below.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _note = null;
+    });
+    final out = await OnDeviceAi.summarize(text, bullets: 3);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _bullets = out;
+      _note = out == null ? 'This phone could not write a summary just now. Try again later.' : null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<AiStatus>(
+      future: OnDeviceAi.status(),
+      builder: (context, snap) {
+        final status = snap.data;
+        if (status == null || status == AiStatus.unavailable) return const SizedBox.shrink();
+        final downloading = status == AiStatus.downloading;
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Brand.purple.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Brand.purple.withValues(alpha: 0.35)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.auto_awesome_rounded, size: 18, color: Brand.purple),
+              const SizedBox(width: 6),
+              Text('AI TL;DR', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+              const Spacer(),
+              Text('on this phone', style: theme.textTheme.labelSmall),
+            ]),
+            const SizedBox(height: 8),
+            if (_bullets != null)
+              for (final b in _bullets!)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('•  ', style: TextStyle(fontWeight: FontWeight.w900)),
+                    Expanded(child: Text(b)),
+                  ]),
+                )
+            else if (_busy)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: LinearProgressIndicator(minHeight: 3),
+              )
+            else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: downloading ? null : _run,
+                  icon: const Icon(Icons.bolt_rounded, size: 18),
+                  label: Text(downloading ? 'Model downloading…' : 'Summarise this story'),
+                ),
+              ),
+            if (_note != null) Text(_note!, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 4),
+            Text(
+              'Written by Gemini Nano on your phone from the outlets\' own text. Nothing is sent away. '
+              'It can still get details wrong, so check the coverage below.',
+              style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+            ),
+          ]),
+        );
+      },
     );
   }
 }

@@ -334,6 +334,10 @@ class Curator {
           final unseen = catCount.containsKey(s.category) ? 0.0 : 1.5;
           adj = s.score * 0.35 + novelty * 3 + unseen + rng.nextDouble();
         } else {
+          // Hard topic cap: a topic may fill at most 2 slots early on, then
+          // no more than 40% of the feed, so one topic can't take over.
+          final inTopic = catCount[s.category] ?? 0;
+          if (inTopic >= 2 && inTopic / (picked.length + 1) > 0.4) continue;
           adj = s.score *
               math.pow(0.72, catCount[s.category] ?? 0) *
               math.pow(0.85, srcCount[s.lead.domain] ?? 0);

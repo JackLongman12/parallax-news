@@ -108,7 +108,57 @@ def main() -> None:
     text = add_widgets(text)
     MANIFEST.write_text(text, encoding="utf-8")
     print("AndroidManifest.xml patched")
+    patch_main_activity()
     patch_gradle()
+    patch_genai()
+
+
+MAIN_ACTIVITY_BODY = """class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        GenAiBridge.register(this, flutterEngine)
+    }
+}
+"""
+
+
+def patch_main_activity() -> None:
+    """Register the on-device AI channel (GenAiBridge.kt is copied by add_widgets)."""
+    found = list((ROOT / "android/app/src/main/kotlin").rglob("MainActivity.kt"))
+    if not found:
+        sys.exit("MainActivity.kt not found")
+    kt = found[0]
+    text = kt.read_text(encoding="utf-8")
+    if "GenAiBridge.register" in text:
+        return
+    text, n = re.subn(r"class MainActivity\s*:\s*FlutterActivity\(\)\s*(\{\s*\})?\s*", MAIN_ACTIVITY_BODY, text, count=1)
+    if n != 1:
+        sys.exit("unexpected MainActivity.kt layout; update patch_main_activity")
+    imports = "import io.flutter.embedding.engine.FlutterEngine\n"
+    if imports not in text:
+        text = text.replace("import io.flutter.embedding.android.FlutterActivity\n", "import io.flutter.embedding.android.FlutterActivity\n" + imports, 1)
+    kt.write_text(text, encoding="utf-8")
+    print("MainActivity.kt patched (GenAiBridge)")
+
+
+def patch_genai() -> None:
+    """ML Kit GenAI Summarization needs API 26+ and the ML Kit dependency."""
+    kts = ROOT / "android/app/build.gradle.kts"
+    groovy = ROOT / "android/app/build.gradle"
+    gradle = kts if kts.exists() else groovy
+    text = gradle.read_text(encoding="utf-8")
+    if "genai-summarization" in text:
+        return
+    if gradle == kts:
+        text = re.sub(r"minSdk\s*=\s*[^\n]+", "minSdk = 26", text, count=1)
+        text += '\ndependencies {\n    implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")\n}\n'
+    else:
+        text = re.sub(r"minSdk(Version)?\s+[^\n]+", "minSdkVersion 26", text, count=1)
+        text += "\ndependencies {\n    implementation 'com.google.mlkit:genai-summarization:1.0.0-beta1'\n}\n"
+    if "minSdk" not in text:
+        sys.exit("could not find minSdk in " + str(gradle))
+    gradle.write_text(text, encoding="utf-8")
+    print(f"{gradle.name} patched (ML Kit GenAI, minSdk 26)")
 
 
 WIDGET_RECEIVER = """        <receiver android:name=".{cls}" android:exported="false" android:label="@string/{label}">

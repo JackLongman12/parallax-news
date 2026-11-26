@@ -30,7 +30,8 @@ class AppState extends ChangeNotifier {
   final InterestProfile profile = InterestProfile();
 
   List<Place> followed = [];
-  List<Category> followedTopics = [Category.technology, Category.ai, Category.science];
+  // A broad default mix; tech and AI are one tap away in Customize.
+  List<Category> followedTopics = [Category.world, Category.politics, Category.business, Category.health];
   bool autoUpdate = true;
   Timer? _saveModelTimer;
 
