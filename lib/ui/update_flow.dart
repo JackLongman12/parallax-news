@@ -37,8 +37,14 @@ Future<void> checkForUpdate(BuildContext context, {bool manual = false}) async {
   }
 }
 
-void _snack(BuildContext context, String msg) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+/// Replaces any queued messages: each press used to queue another SnackBar,
+/// so the same text kept reappearing after the taps had stopped.
+void _snack(BuildContext context, String msg) {
+  final messenger = ScaffoldMessenger.of(context)
+    ..removeCurrentSnackBar()
+    ..clearSnackBars();
+  messenger.showSnackBar(SnackBar(content: Text(msg)));
+}
 
 class _UpdateDialog extends StatefulWidget {
   const _UpdateDialog({required this.info});
