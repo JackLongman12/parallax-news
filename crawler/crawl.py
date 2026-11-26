@@ -159,6 +159,12 @@ def clean(s):
     return WS.sub(" ", s).strip()
 
 
+def full_text(el):
+    # el.text stops at the first child tag, so "Foo <b>bar</b> baz" would keep
+    # only "Foo". Join every text node so the whole headline survives.
+    return "".join(el.itertext()) if el is not None else ""
+
+
 def local(tag):
     return tag.rsplit("}", 1)[-1]
 
@@ -192,7 +198,7 @@ def parse_feed(data, provider, hint, gl):
         for c in list(it):
             n = local(c.tag)
             if n == "title":
-                title = clean(c.text)
+                title = clean(full_text(c))
             elif n == "link":
                 href = c.get("href")
                 if href and c.get("rel") in (None, "alternate"):
@@ -202,10 +208,10 @@ def parse_feed(data, provider, hint, gl):
             elif n in ("pubDate", "published", "updated", "date"):
                 date = date or parse_date(c.text)
             elif n == "source":
-                src_name = clean(c.text)
+                src_name = clean(full_text(c))
                 src_url = c.get("url")
             elif n in ("description", "summary"):
-                desc = clean(c.text)[:300]
+                desc = clean(full_text(c))[:300]
             elif n in ("thumbnail", "content", "enclosure", "group"):
                 cands = [c] + list(c)
                 for m in cands:
