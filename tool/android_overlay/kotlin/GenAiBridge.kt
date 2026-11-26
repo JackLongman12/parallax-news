@@ -1,14 +1,18 @@
 package com.parallaxnews.parallax_news
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.google.mlkit.genai.common.DownloadCallback
 import com.google.mlkit.genai.common.FeatureStatus
-import com.google.mlkit.genai.summarization.SummarizationRequest
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.summarization.Summarization
+import com.google.mlkit.genai.summarization.SummarizationRequest
 import com.google.mlkit.genai.summarization.Summarizer
 import com.google.mlkit.genai.summarization.SummarizerOptions
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executor
 
 /**
  * On-device summaries with Gemini Nano through Android AICore (ML Kit GenAI
@@ -22,15 +26,22 @@ import io.flutter.plugin.common.MethodChannel
 object GenAiBridge {
     private const val CHANNEL = "parallax/genai"
     private const val MAX_CHARS = 12000 // well under the model's 4000-token input limit
+    private val main = Handler(Looper.getMainLooper())
+    private val onMain = Executor { r -> main.post(r) }
 
     fun register(context: Context, engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "status" -> {
                     val s = client(context, 1)
-                    s.checkFeatureStatus()
-                        .addOnSuccessListener { code -> s.close(); result.success(name(code)) }
-                        .addOnFailureListener { s.close(); result.success("unavailable") }
+                    val future = s.checkFeatureStatus()
+                    whenDone(future, { code ->
+                        s.close()
+                        result.success(name(code))
+                    }, {
+                        s.close()
+                        result.success("unavailable")
+                    })
                 }
                 "summarize" -> {
                     val text = (call.argument<String>("text") ?: "").take(MAX_CHARS)
@@ -44,26 +55,48 @@ object GenAiBridge {
 
     private fun summarize(context: Context, text: String, bullets: Int, result: MethodChannel.Result) {
         val s = client(context, bullets)
-        s.checkFeatureStatus().addOnSuccessListener { code ->
+        whenDone(s.checkFeatureStatus(), { code ->
             when (code) {
                 FeatureStatus.AVAILABLE -> infer(s, text, result)
                 FeatureStatus.DOWNLOADABLE -> s.downloadFeature(object : DownloadCallback {
                     override fun onDownloadCompleted() = infer(s, text, result)
-                    override fun onDownloadFailed(e: com.google.mlkit.common.MlKitException) {
-                        s.close(); result.error("unavailable", e.message, null)
+                    override fun onDownloadFailed(e: GenAiException) {
+                        s.close()
+                        result.error("unavailable", e.message, null)
                     }
                     override fun onDownloadProgress(bytes: Long) {}
                     override fun onDownloadStarted(bytes: Long) {}
                 })
-                else -> { s.close(); result.error("unavailable", name(code), null) }
+                else -> {
+                    s.close()
+                    result.error("unavailable", name(code), null)
+                }
             }
-        }.addOnFailureListener { e -> s.close(); result.error("unavailable", e.message, null) }
+        }, { e ->
+            s.close()
+            result.error("unavailable", e.message, null)
+        })
     }
 
     private fun infer(s: Summarizer, text: String, result: MethodChannel.Result) {
-        s.runInference(SummarizationRequest.builder(text).build())
-            .addOnSuccessListener { r -> s.close(); result.success(r.summary) }
-            .addOnFailureListener { e -> s.close(); result.error("failed", e.message, null) }
+        whenDone(s.runInference(SummarizationRequest.builder(text).build()), { r ->
+            s.close()
+            result.success(r.summary)
+        }, { e ->
+            s.close()
+            result.error("failed", e.message, null)
+        })
+    }
+
+    /** Runs [onOk]/[onErr] on the main thread once the ML Kit future completes. */
+    private fun <T> whenDone(future: com.google.common.util.concurrent.ListenableFuture<T>, onOk: (T) -> Unit, onErr: (Throwable) -> Unit) {
+        future.addListener({
+            try {
+                onOk(future.get())
+            } catch (e: Exception) {
+                onErr(e.cause ?: e)
+            }
+        }, onMain)
     }
 
     private fun client(context: Context, bullets: Int): Summarizer {
