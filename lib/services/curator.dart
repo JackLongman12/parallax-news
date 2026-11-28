@@ -318,8 +318,11 @@ class Curator {
     final srcCount = <String, int>{};
     Side? lastSkew;
     while (picked.length < limit && pool.isNotEmpty) {
-      var bestI = 0;
+      var bestI = -1;
       var bestScore = double.negativeInfinity;
+      // Best story whose topic is over the cap; used only if nothing else fits.
+      var cappedI = -1;
+      var cappedScore = double.negativeInfinity;
       final explore = picked.length % every == every - 1;
       // At most ~1 in 5 stories may come from a single outlet (local news
       // excepted): multi-outlet stories are what show real political contrast.
@@ -337,19 +340,27 @@ class Curator {
           // Hard topic cap: a topic may fill at most 2 slots early on, then
           // no more than 40% of the feed, so one topic can't take over.
           final inTopic = catCount[s.category] ?? 0;
-          if (inTopic >= 2 && inTopic / (picked.length + 1) > 0.4) continue;
+          final capped = inTopic >= 2 && inTopic / (picked.length + 1) > 0.4;
           adj = s.score *
               math.pow(0.72, catCount[s.category] ?? 0) *
               math.pow(0.85, srcCount[s.lead.domain] ?? 0);
           // Avoid two one-sided stories from the same side in a row.
           final skew = s.distribution.skewedTo;
           if (skew != null && skew == lastSkew) adj *= 0.8;
+          if (capped) {
+            if (adj > cappedScore) {
+              cappedScore = adj.toDouble();
+              cappedI = i;
+            }
+            continue;
+          }
         }
         if (adj > bestScore) {
           bestScore = adj.toDouble();
           bestI = i;
         }
       }
+      if (bestI < 0) bestI = cappedI >= 0 ? cappedI : 0;
       final s = pool.removeAt(bestI);
       if (s.uniqueSources.length == 1 && !s.hasLocal) singles++;
       picked.add(s);

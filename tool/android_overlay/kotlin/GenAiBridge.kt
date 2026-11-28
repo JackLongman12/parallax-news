@@ -33,14 +33,18 @@ object GenAiBridge {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "status" -> {
-                    val s = client(context, 1)
-                    val future = s.checkFeatureStatus()
-                    whenDone(future, { code ->
+                    val s = try {
+                        client(context, 1)
+                    } catch (e: Throwable) {
+                        result.success("unavailable:${e.message ?: e.javaClass.simpleName}")
+                        return@setMethodCallHandler
+                    }
+                    whenDone(s.checkFeatureStatus(), { code ->
                         s.close()
                         result.success(name(code))
-                    }, {
+                    }, { e ->
                         s.close()
-                        result.success("unavailable")
+                        result.success("unavailable:${e.message ?: e.javaClass.simpleName}")
                     })
                 }
                 "summarize" -> {
@@ -54,7 +58,12 @@ object GenAiBridge {
     }
 
     private fun summarize(context: Context, text: String, bullets: Int, result: MethodChannel.Result) {
-        val s = client(context, bullets)
+        val s = try {
+            client(context, bullets)
+        } catch (e: Throwable) {
+            result.error("unavailable", e.message ?: e.javaClass.simpleName, null)
+            return
+        }
         whenDone(s.checkFeatureStatus(), { code ->
             when (code) {
                 FeatureStatus.AVAILABLE -> infer(s, text, result)
@@ -67,6 +76,10 @@ object GenAiBridge {
                     override fun onDownloadProgress(bytes: Long) {}
                     override fun onDownloadStarted(bytes: Long) {}
                 })
+                FeatureStatus.DOWNLOADING -> {
+                    s.close()
+                    result.error("downloading", "The model is still downloading.", null)
+                }
                 else -> {
                     s.close()
                     result.error("unavailable", name(code), null)
@@ -117,6 +130,7 @@ object GenAiBridge {
         FeatureStatus.AVAILABLE -> "available"
         FeatureStatus.DOWNLOADABLE -> "downloadable"
         FeatureStatus.DOWNLOADING -> "downloading"
-        else -> "unavailable"
+        FeatureStatus.UNAVAILABLE -> "unavailable:AICore says Gemini Nano is not supported or not set up on this phone"
+        else -> "unavailable:unknown AICore status $code"
     }
 }

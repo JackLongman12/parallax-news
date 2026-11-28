@@ -118,7 +118,7 @@ class SettingsScreen extends StatelessWidget {
               AiStatus.available => 'Ready. Open any story and tap "Summarise this story".',
               AiStatus.downloadable => 'Needs a one-time model download. Open a story and tap "Summarise this story".',
               AiStatus.downloading => 'Downloading the model. Try again in a few minutes.',
-              AiStatus.unavailable => 'Not available on this phone. It needs Gemini Nano through the AICore app, updated and set up.',
+              AiStatus.unavailable => 'Not available: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. Update AICore in the Play Store and restart the phone.',
             };
             return ListTile(
               leading: const Icon(Icons.auto_awesome_rounded),

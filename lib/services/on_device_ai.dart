@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 /// Whether this phone can write summaries on-device (Gemini Nano via AICore).
@@ -5,28 +7,43 @@ enum AiStatus { available, downloadable, downloading, unavailable }
 
 /// Talks to the native side (android/.../GenAiBridge.kt). Every call fails
 /// soft: on iOS, desktop, tests, or a phone without Gemini Nano the feature
-/// reports [AiStatus.unavailable] and the UI hides itself.
+/// reports [AiStatus.unavailable], with the reason in [detail].
 class OnDeviceAi {
   static const _channel = MethodChannel('parallax/genai');
-  static Future<AiStatus>? _status;
+  static bool _ready = false;
 
-  static Future<AiStatus> status() => _status ??= _probe();
+  /// Why the last check did not return "available" (shown to the user).
+  static String? detail;
 
-  static Future<AiStatus> _probe() async {
+  static bool get supportedPlatform => Platform.isAndroid;
+
+  /// Asks the phone each time until it says "available", so a finished
+  /// download or an AICore update shows up without restarting the app.
+  static Future<AiStatus> status() async {
+    if (_ready) return AiStatus.available;
     try {
-      final s = await _channel.invokeMethod<String>('status');
-      return switch (s) {
+      final s = await _channel.invokeMethod<String>('status') ?? '';
+      final parts = s.split(':');
+      detail = parts.length > 1 ? parts.sublist(1).join(':').trim() : null;
+      final st = switch (parts.first) {
         'available' => AiStatus.available,
         'downloadable' => AiStatus.downloadable,
         'downloading' => AiStatus.downloading,
         _ => AiStatus.unavailable,
       };
-    } catch (_) {
+      _ready = st == AiStatus.available;
+      return st;
+    } on MissingPluginException {
+      detail = 'This build has no on-device AI bridge.';
+      return AiStatus.unavailable;
+    } catch (e) {
+      detail = '$e';
       return AiStatus.unavailable;
     }
   }
 
-  /// Returns up to [bullets] short bullet lines, or null if it could not run.
+  /// Returns up to [bullets] short bullet lines, or null if it could not run
+  /// (the reason is then in [detail]).
   static Future<List<String>?> summarize(String text, {int bullets = 3}) async {
     try {
       final out = await _channel.invokeMethod<String>('summarize', {'text': text, 'bullets': bullets});
@@ -36,8 +53,13 @@ class OnDeviceAi {
           .map((l) => l.replaceFirst(RegExp(r'^\s*[-•*]\s*'), '').trim())
           .where((l) => l.isNotEmpty)
           .toList();
+      if (lines.isNotEmpty) _ready = true;
       return lines.isEmpty ? null : lines;
-    } catch (_) {
+    } on PlatformException catch (e) {
+      detail = e.code == 'downloading' ? 'The model is still downloading. Try again in a few minutes.' : (e.message ?? e.code);
+      return null;
+    } catch (e) {
+      detail = '$e';
       return null;
     }
   }

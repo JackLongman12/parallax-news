@@ -330,6 +330,7 @@ class _AiTldrState extends State<AiTldr> {
   bool _busy = false;
   List<String>? _bullets;
   String? _note;
+  late Future<AiStatus> _status = OnDeviceAi.status();
 
   String _input() {
     final buf = StringBuffer();
@@ -356,7 +357,8 @@ class _AiTldrState extends State<AiTldr> {
     setState(() {
       _busy = false;
       _bullets = out;
-      _note = out == null ? 'This phone could not write a summary just now. Try again later.' : null;
+      _note = out == null ? 'Could not write a summary: ${OnDeviceAi.detail ?? 'unknown error'}' : null;
+      if (out == null) _status = OnDeviceAi.status();
     });
   }
 
@@ -364,11 +366,13 @@ class _AiTldrState extends State<AiTldr> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return FutureBuilder<AiStatus>(
-      future: OnDeviceAi.status(),
+      future: _status,
       builder: (context, snap) {
         final status = snap.data;
-        if (status == null || status == AiStatus.unavailable) return const SizedBox.shrink();
+        // Always shown on Android, so it's clear whether the phone can run it.
+        if (!OnDeviceAi.supportedPlatform || status == null) return const SizedBox.shrink();
         final downloading = status == AiStatus.downloading;
+        final unavailable = status == AiStatus.unavailable;
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -394,6 +398,12 @@ class _AiTldrState extends State<AiTldr> {
                     Expanded(child: Text(b)),
                   ]),
                 )
+            else if (unavailable)
+              Text(
+                'Not available on this phone right now: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. '
+                'Update the AICore app in the Play Store, restart the phone, then reopen this story.',
+                style: theme.textTheme.bodySmall,
+              )
             else if (_busy)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
