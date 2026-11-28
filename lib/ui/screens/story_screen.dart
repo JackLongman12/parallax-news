@@ -86,7 +86,7 @@ class _StoryScreenState extends State<StoryScreen> {
           headerSliverBuilder: (context, _) => [
             SliverAppBar(
               pinned: true,
-              expandedHeight: 300,
+              expandedHeight: 230,
               backgroundColor: Brand.black,
               foregroundColor: Colors.white,
               flexibleSpace: FlexibleSpaceBar(background: _hero()),
@@ -95,6 +95,12 @@ class _StoryScreenState extends State<StoryScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Full headline, never cut off (the photo header has a fixed height).
+                  SelectableText(
+                    story.title,
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.3),
+                  ),
+                  const SizedBox(height: 8),
                   Text('${all.length} sources · updated ${timeAgo(story.latest)}', style: theme.textTheme.bodySmall),
                   const SizedBox(height: 10),
                   BiasBar(dist: dist, height: 12, showLabels: true),
@@ -154,7 +160,7 @@ class _StoryScreenState extends State<StoryScreen> {
     );
   }
 
-  /// Cover image with the headline over it (same look as the feed card).
+  /// Cover image with the topic chip; the full headline sits below it.
   Widget _hero() => FutureBuilder<String?>(
         future: _cover,
         initialData: CoverImages.cached(story),
@@ -197,13 +203,6 @@ class _StoryScreenState extends State<StoryScreen> {
                     Text(story.category.label,
                         style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
                   ]),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  story.title,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 23, height: 1.2, fontWeight: FontWeight.w800),
                 ),
               ]),
             ),

@@ -109,25 +109,7 @@ class SettingsScreen extends StatelessWidget {
             trailing: TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now')),
           ),
         ),
-        FutureBuilder<AiStatus>(
-          future: OnDeviceAi.status(),
-          builder: (_, snap) {
-            final s = snap.data;
-            final text = switch (s) {
-              null => 'Checking…',
-              AiStatus.available => 'Ready. Open any story and tap "Summarise this story".',
-              AiStatus.downloadable => 'Needs a one-time model download. Open a story and tap "Summarise this story".',
-              AiStatus.downloading => 'Downloading the model. Try again in a few minutes.',
-              AiStatus.unavailable => 'Not available: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. Update AICore in the Play Store and restart the phone.',
-            };
-            return ListTile(
-              leading: const Icon(Icons.auto_awesome_rounded),
-              title: const Text('On-device AI'),
-              subtitle: Text(text),
-              isThreeLine: true,
-            );
-          },
-        ),
+        const _AiStatusTile(),
         const _CrashToggle(),
         ListTile(
           leading: const Icon(Icons.info_outline_rounded),
@@ -346,5 +328,39 @@ class _AboutScreen extends StatelessWidget {
                 'Headlines link to their publishers.',
           ),
         ]),
+      );
+}
+
+
+/// On-device AI status, checked once each time Settings opens.
+class _AiStatusTile extends StatefulWidget {
+  const _AiStatusTile();
+
+  @override
+  State<_AiStatusTile> createState() => _AiStatusTileState();
+}
+
+class _AiStatusTileState extends State<_AiStatusTile> {
+  final Future<AiStatus> _status = OnDeviceAi.status();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<AiStatus>(
+        future: _status,
+        builder: (_, snap) {
+          final text = switch (snap.data) {
+            null => 'Checking…',
+            AiStatus.available => 'Ready. Open any story and tap "Summarise this story".',
+            AiStatus.downloadable => 'Needs a one-time model download. Open a story and tap "Summarise this story".',
+            AiStatus.downloading => 'Downloading the model. Try again in a few minutes.',
+            AiStatus.unavailable =>
+              'Not available: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. Update AICore in the Play Store and restart the phone.',
+          };
+          return ListTile(
+            leading: const Icon(Icons.auto_awesome_rounded),
+            title: const Text('On-device AI'),
+            subtitle: Text(text),
+            isThreeLine: true,
+          );
+        },
       );
 }
