@@ -12,6 +12,11 @@ class OnDeviceAi {
   static const _channel = MethodChannel('parallax/genai');
   static bool _ready = false;
 
+  /// Summaries already written this session, by story (and its size, so a
+  /// story that gained outlets gets a fresh summary).
+  static final Map<String, List<String>> _cache = {};
+  static List<String>? cached(String key) => _cache[key];
+
   /// Why the last check did not return "available" (shown to the user).
   static String? detail;
 
@@ -44,7 +49,8 @@ class OnDeviceAi {
 
   /// Returns up to [bullets] short bullet lines, or null if it could not run
   /// (the reason is then in [detail]).
-  static Future<List<String>?> summarize(String text, {int bullets = 3}) async {
+  static Future<List<String>?> summarize(String text, {int bullets = 3, String? key}) async {
+    if (key != null && _cache[key] != null) return _cache[key];
     try {
       final out = await _channel.invokeMethod<String>('summarize', {'text': text, 'bullets': bullets});
       if (out == null) return null;
@@ -53,7 +59,13 @@ class OnDeviceAi {
           .map((l) => l.replaceFirst(RegExp(r'^\s*[-•*]\s*'), '').trim())
           .where((l) => l.isNotEmpty)
           .toList();
-      if (lines.isNotEmpty) _ready = true;
+      if (lines.isNotEmpty) {
+        _ready = true;
+        if (key != null) {
+          if (_cache.length > 100) _cache.clear();
+          _cache[key] = lines;
+        }
+      }
       return lines.isEmpty ? null : lines;
     } on PlatformException catch (e) {
       detail = e.code == 'downloading' ? 'The model is still downloading. Try again in a few minutes.' : (e.message ?? e.code);

@@ -608,11 +608,12 @@ class NewsRepository {
     }
 
     var crawl = const <Story>[];
-    List<Story> ranked() => Curator.rank(merge(crawl, _clusterAndLabel(collected)), profile);
+    List<Story> ranked() => Curator.rank(merge(crawl, _clusterAndLabel(collected)), profile, topLead: 3);
 
     // Our crawler's pre-built stories (dozens of outlets each) arrive first.
     crawl = await crawlerStories(force: force);
-    if (crawl.isNotEmpty) yield Curator.rank(crawl, profile);
+    if (force) Curator.reshuffle();
+    if (crawl.isNotEmpty) yield Curator.rank(crawl, profile, topLead: 3);
     final main = crawlIsMain(crawl);
     bool needTopic(Category t) => !main || _crawlThinOn(crawl, t);
 

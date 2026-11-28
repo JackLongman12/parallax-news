@@ -263,8 +263,12 @@ class InterestProfile {
 /// then a diversity pass and exploration slots so the feed never collapses
 /// into a bubble — the main difference from engagement-only social feeds.
 class Curator {
-  static List<Story> rank(List<Story> stories, InterestProfile profile, {int limit = 60}) {
+  /// [topLead]: how many of the day's biggest stories (by outlet count and
+  /// freshness, ignoring personal interest) open the feed, so the front page
+  /// shows the news first and your interests after.
+  static List<Story> rank(List<Story> stories, InterestProfile profile, {int limit = 60, int topLead = 0}) {
     final now = DateTime.now().toUtc();
+    final news = <Story, double>{};
     // Personalisation strength grows with the number of signals collected.
     final trust = math.min(1.0, profile.signals / 40.0);
     for (final s in stories) {
@@ -273,6 +277,7 @@ class Curator {
       final fresh = math.exp(-math.max(0, ageH) / 18.0);
       final coverage = math.log(1 + sources) / math.ln2;
       final personal = profile.score(s);
+      news[s] = coverage * 1.4 + fresh * 3.0 + developing(s, now) * 1.2 + (sources >= 3 ? 0.8 : 0);
       final dist = s.distribution;
       var score = coverage * 1.4 + fresh * 3.0 + personal * (0.6 + 1.4 * trust) + balanceOf(dist) * 0.5;
       if (s.hasLocal) score += 1.0;
@@ -303,7 +308,9 @@ class Curator {
       // Session fatigue: topics you've already scrolled past a lot cool off.
       score -= 0.25 * math.min(8, profile.sessionSeen(s.category));
       // A little randomness so each refresh feels different.
-      score += (rng.nextDouble() - 0.5) * 0.6;
+      // Stable per story and session, so the order doesn't jump each time
+      // the feed re-ranks while loading.
+      score += (jitter(s) - 0.5) * 0.6;
       if (profile.muted.contains(s.category) || profile.isHidden(s)) score -= 100;
       s.score = score;
     }
@@ -317,6 +324,26 @@ class Curator {
     final catCount = <Category, int>{};
     final srcCount = <String, int>{};
     Side? lastSkew;
+    void take(Story s) {
+      pool.remove(s);
+      if (s.uniqueSources.length == 1 && !s.hasLocal) singles++;
+      picked.add(s);
+      catCount[s.category] = (catCount[s.category] ?? 0) + 1;
+      srcCount[s.lead.domain] = (srcCount[s.lead.domain] ?? 0) + 1;
+      lastSkew = s.distribution.skewedTo;
+    }
+
+    // Front page: the biggest multi-outlet stories, one per topic.
+    if (topLead > 0) {
+      final big = pool.where((s) => s.uniqueSources.length >= 3 && !profile.muted.contains(s.category)).toList()
+        ..sort((a, b) => (news[b] ?? 0).compareTo(news[a] ?? 0));
+      for (final s in big) {
+        if (picked.length >= topLead) break;
+        if (catCount.containsKey(s.category)) continue;
+        take(s);
+      }
+    }
+
     while (picked.length < limit && pool.isNotEmpty) {
       var bestI = -1;
       var bestScore = double.negativeInfinity;
@@ -335,7 +362,7 @@ class Curator {
           // Prefer topics with little interest so far, weighted by quality.
           final novelty = 1 - profile.affinity(s.category).clamp(0.0, 1.0);
           final unseen = catCount.containsKey(s.category) ? 0.0 : 1.5;
-          adj = s.score * 0.35 + novelty * 3 + unseen + rng.nextDouble();
+          adj = s.score * 0.35 + novelty * 3 + unseen + jitter(s, 1);
         } else {
           // Hard topic cap: a topic may fill at most 2 slots early on, then
           // no more than 40% of the feed, so one topic can't take over.
@@ -361,17 +388,19 @@ class Curator {
         }
       }
       if (bestI < 0) bestI = cappedI >= 0 ? cappedI : 0;
-      final s = pool.removeAt(bestI);
-      if (s.uniqueSources.length == 1 && !s.hasLocal) singles++;
-      picked.add(s);
-      catCount[s.category] = (catCount[s.category] ?? 0) + 1;
-      srcCount[s.lead.domain] = (srcCount[s.lead.domain] ?? 0) + 1;
-      lastSkew = s.distribution.skewedTo;
+      take(pool[bestI]);
     }
     return picked;
   }
 
   static final math.Random rng = math.Random();
+
+  /// Changes on each app start (and on pull-to-refresh via [reshuffle]).
+  static int _session = DateTime.now().millisecondsSinceEpoch;
+  static void reshuffle() => _session = DateTime.now().millisecondsSinceEpoch;
+
+  /// 0..1, fixed for a story within a session.
+  static double jitter(Story s, [int salt = 0]) => (Object.hash(s.id, _session, salt) & 0xffff) / 0xffff;
 
   /// 0..1: how much of a story's coverage appeared in the last 2 hours
   /// (only counts once 3+ outlets are on it).

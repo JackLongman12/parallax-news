@@ -331,6 +331,18 @@ class _AiTldrState extends State<AiTldr> {
   String? _note;
   late Future<AiStatus> _status = OnDeviceAi.status();
 
+  String get _key => '${widget.story.id}:${widget.story.articles.length}';
+
+  @override
+  void initState() {
+    super.initState();
+    _bullets = OnDeviceAi.cached(_key);
+    // Write it straight away when the model is ready; no tap needed.
+    _status.then((s) {
+      if (mounted && s == AiStatus.available && _bullets == null && !_busy && _input().length >= _minChars) _run();
+    });
+  }
+
   String _input() {
     final buf = StringBuffer();
     final seen = <String>{};
@@ -351,7 +363,7 @@ class _AiTldrState extends State<AiTldr> {
       _busy = true;
       _note = null;
     });
-    final out = await OnDeviceAi.summarize(text, bullets: 3);
+    final out = await OnDeviceAi.summarize(text, bullets: 3, key: _key);
     if (!mounted) return;
     setState(() {
       _busy = false;

@@ -495,7 +495,9 @@ class _StoryCardState extends State<StoryCard> {
             _menu();
           },
           child: SizedBox(
-            height: lite ? 250 : 340,
+            // Tall enough for a photo and three lines of headline; short
+            // enough that two to three stories fit on screen.
+            height: lite ? 220 : 280,
             child: FutureBuilder<String?>(
               future: _cover,
               initialData: CoverImages.quick(story),
@@ -609,7 +611,13 @@ class _StoryCardState extends State<StoryCard> {
     if (d.rated == 0) return 'Lean unknown';
     // Few rated outlets: show counts, not percentages ("50%" of 2 outlets
     // would sound more certain than it is).
-    if (!d.isReliable) return 'L ${d.left} · C ${d.center} · R ${d.right}';
+    if (!d.isReliable) {
+      return [
+        if (d.left > 0) '${d.left} left',
+        if (d.center > 0) '${d.center} center',
+        if (d.right > 0) '${d.right} right',
+      ].join(' · ');
+    }
     String p(Side s) => '${(d.share(s) * 100).round()}%';
     return 'L ${p(Side.left)} · C ${p(Side.center)} · R ${p(Side.right)}';
   }
