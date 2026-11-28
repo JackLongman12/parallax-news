@@ -411,8 +411,10 @@ class _AiTldrState extends State<AiTldr> {
                 )
             else if (unavailable)
               Text(
-                'Not available on this phone right now: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. '
-                'Update the AICore app in the Play Store, restart the phone, then reopen this story.',
+                'Not available on this phone right now. ${OnDeviceAi.advice}
+
+'
+                'Phone says: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}',
                 style: theme.textTheme.bodySmall,
               )
             else if (_busy)

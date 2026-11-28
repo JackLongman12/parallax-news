@@ -45,7 +45,9 @@ object GenAiBridge {
                         result.success("unavailable:${reason(e)}")
                         return@setMethodCallHandler
                     }
-                    whenDone(m.checkStatus(), { code -> result.success(name(code)) }, { e ->
+                    whenDone(m.checkStatus(), { code ->
+                        if (code == FeatureStatus.UNAVAILABLE) probe(m, result) else result.success(name(code))
+                    }, { e ->
                         result.success("unavailable:${reason(e)}")
                     })
                 }
@@ -80,7 +82,9 @@ object GenAiBridge {
                     override fun onDownloadStarted(bytes: Long) {}
                 })
                 FeatureStatus.DOWNLOADING -> result.error("downloading", "The model is still downloading.", null)
-                else -> result.error("unavailable", name(code).substringAfter(':'), null)
+                // AICore sometimes reports UNAVAILABLE before its config has synced; try anyway,
+                // the real AICore error (with its code) comes back if it truly can't run.
+                else -> generate(m, text, bullets, result)
             }
         }, { e -> result.error("unavailable", reason(e), null) })
     }
@@ -102,6 +106,25 @@ object GenAiBridge {
             if (out.isNullOrBlank()) result.error("failed", "The model returned no text.", null) else result.success(out)
         }, { e -> result.error("failed", reason(e), null) })
     }
+
+    /**
+     * checkStatus() said UNAVAILABLE. Ask the model for one word: if it answers, Nano works
+     * and the status was stale; if not, report AICore's own error message and code.
+     */
+    private fun probe(m: GenerativeModelFutures, result: MethodChannel.Result) {
+        val request = try {
+            generateContentRequest(TextPart("Reply with the single word: ok")) { temperature = 0f }
+        } catch (e: Throwable) {
+            result.success("unavailable:${reason(e)} ${device()}")
+            return
+        }
+        whenDone(m.generateContent(request), { _ -> result.success("available") }, { e ->
+            result.success("unavailable:${reason(e)} ${device()}")
+        })
+    }
+
+    private fun device(): String =
+        "[${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, Android ${android.os.Build.VERSION.SDK_INT}]"
 
     /** Runs [onOk]/[onErr] on the main thread once the future completes. */
     private fun <T> whenDone(future: ListenableFuture<T>, onOk: (T) -> Unit, onErr: (Throwable) -> Unit) {

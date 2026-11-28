@@ -22,6 +22,25 @@ class OnDeviceAi {
 
   static bool get supportedPlatform => Platform.isAndroid;
 
+  /// What the user can do about [detail], based on AICore's documented error codes.
+  static String get advice {
+    final d = (detail ?? '').toLowerCase();
+    if (d.contains('606') || d.contains('feature_not_found')) {
+      return 'AICore has not finished downloading its setup yet. Leave the phone on Wi-Fi and charging '
+          'for a few hours, then check again.';
+    }
+    if (d.contains('601') || d.contains('binding')) {
+      return 'Parallax could not connect to AICore. Update AICore in the Play Store, then uninstall '
+          'and reinstall Parallax.';
+    }
+    if (d.contains('bootloader')) return 'Gemini Nano does not run on phones with an unlocked bootloader.';
+    if (d.contains('host') || d.contains('download_error')) {
+      return 'AICore could not reach Google to download the model. Check your connection and try again.';
+    }
+    if (d.contains('background')) return 'Keep Parallax open on screen while it summarises.';
+    return 'Update AICore in the Play Store, keep the phone on Wi-Fi for a while, then check again.';
+  }
+
   /// Asks the phone each time until it says "available", so a finished
   /// download or an AICore update shows up without restarting the app.
   static Future<AiStatus> status() async {

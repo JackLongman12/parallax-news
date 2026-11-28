@@ -353,7 +353,9 @@ class _AiStatusTileState extends State<_AiStatusTile> {
             AiStatus.downloadable => 'Needs a one-time model download. Open a story and tap "Summarise this story".',
             AiStatus.downloading => 'Downloading the model. Try again in a few minutes.',
             AiStatus.unavailable =>
-              'Not available: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}. Update AICore in the Play Store and restart the phone.',
+              'Not available. ${OnDeviceAi.advice}
+
+Phone says: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}',
           };
           return ListTile(
             leading: const Icon(Icons.auto_awesome_rounded),
