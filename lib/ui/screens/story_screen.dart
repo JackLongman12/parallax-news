@@ -411,9 +411,7 @@ class _AiTldrState extends State<AiTldr> {
                 )
             else if (unavailable)
               Text(
-                'Not available on this phone right now. ${OnDeviceAi.advice}
-
-'
+                'Not available on this phone right now. ${OnDeviceAi.advice}\n\n'
                 'Phone says: ${OnDeviceAi.detail ?? 'Gemini Nano is not set up'}',
                 style: theme.textTheme.bodySmall,
               )
