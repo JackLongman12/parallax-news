@@ -142,23 +142,23 @@ def patch_main_activity() -> None:
 
 
 def patch_genai() -> None:
-    """ML Kit GenAI Summarization needs API 26+ and the ML Kit dependency."""
+    """ML Kit GenAI Prompt API (Gemini Nano) needs API 26+ and the ML Kit dependency."""
     kts = ROOT / "android/app/build.gradle.kts"
     groovy = ROOT / "android/app/build.gradle"
     gradle = kts if kts.exists() else groovy
     text = gradle.read_text(encoding="utf-8")
-    if "genai-summarization" in text:
+    if "genai-prompt" in text:
         return
     if gradle == kts:
         text = re.sub(r"minSdk\s*=\s*[^\n]+", "minSdk = 26", text, count=1)
-        text += '\ndependencies {\n    implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")\n}\n'
+        text += '\ndependencies {\n    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")\n}\n'
     else:
         text = re.sub(r"minSdk(Version)?\s+[^\n]+", "minSdkVersion 26", text, count=1)
-        text += "\ndependencies {\n    implementation 'com.google.mlkit:genai-summarization:1.0.0-beta1'\n}\n"
+        text += "\ndependencies {\n    implementation 'com.google.mlkit:genai-prompt:1.0.0-beta4'\n}\n"
     if "minSdk" not in text:
         sys.exit("could not find minSdk in " + str(gradle))
     gradle.write_text(text, encoding="utf-8")
-    print(f"{gradle.name} patched (ML Kit GenAI, minSdk 26)")
+    print(f"{gradle.name} patched (ML Kit GenAI Prompt, minSdk 26)")
 
 
 WIDGET_RECEIVER = """        <receiver android:name=".{cls}" android:exported="false" android:label="@string/{label}">

@@ -3,106 +3,108 @@ package com.parallaxnews.parallax_news
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.genai.common.DownloadCallback
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
-import com.google.mlkit.genai.summarization.Summarization
-import com.google.mlkit.genai.summarization.SummarizationRequest
-import com.google.mlkit.genai.summarization.Summarizer
-import com.google.mlkit.genai.summarization.SummarizerOptions
+import com.google.mlkit.genai.prompt.Generation
+import com.google.mlkit.genai.prompt.TextPart
+import com.google.mlkit.genai.prompt.generateContentRequest
+import com.google.mlkit.genai.prompt.java.GenerativeModelFutures
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executor
 
 /**
- * On-device summaries with Gemini Nano through Android AICore (ML Kit GenAI
- * Summarization). Nothing leaves the phone. Devices without AICore or Gemini
- * Nano report "unavailable"; the Dart side then hides the feature.
+ * On-device summaries with Gemini Nano through Android AICore, using the
+ * ML Kit GenAI Prompt API (Google's current API for Nano; it supports newer
+ * phones such as the Galaxy S26 series). Nothing leaves the phone.
  *
  * Channel "parallax/genai":
- *   status()              -> "available" | "downloadable" | "downloading" | "unavailable"
+ *   status()              -> "available" | "downloadable" | "downloading" | "unavailable:<reason>"
  *   summarize(text, n)    -> String (n = 1..3 bullets, one per line)
  */
 object GenAiBridge {
     private const val CHANNEL = "parallax/genai"
-    private const val MAX_CHARS = 12000 // well under the model's 4000-token input limit
+    private const val MAX_CHARS = 9000 // leaves room for the prompt inside the ~4000-token window
     private val main = Handler(Looper.getMainLooper())
     private val onMain = Executor { r -> main.post(r) }
+    private var model: GenerativeModelFutures? = null
 
+    private fun model(): GenerativeModelFutures =
+        model ?: GenerativeModelFutures.from(Generation.getClient()).also { model = it }
+
+    @Suppress("UNUSED_PARAMETER")
     fun register(context: Context, engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "status" -> {
-                    val s = try {
-                        client(context, 1)
+                    val m = try {
+                        model()
                     } catch (e: Throwable) {
-                        result.success("unavailable:${e.message ?: e.javaClass.simpleName}")
+                        result.success("unavailable:${reason(e)}")
                         return@setMethodCallHandler
                     }
-                    whenDone(s.checkFeatureStatus(), { code ->
-                        s.close()
-                        result.success(name(code))
-                    }, { e ->
-                        s.close()
-                        result.success("unavailable:${e.message ?: e.javaClass.simpleName}")
+                    whenDone(m.checkStatus(), { code -> result.success(name(code)) }, { e ->
+                        result.success("unavailable:${reason(e)}")
                     })
                 }
                 "summarize" -> {
                     val text = (call.argument<String>("text") ?: "").take(MAX_CHARS)
                     val bullets = (call.argument<Int>("bullets") ?: 3).coerceIn(1, 3)
-                    summarize(context, text, bullets, result)
+                    summarize(text, bullets, result)
                 }
                 else -> result.notImplemented()
             }
         }
     }
 
-    private fun summarize(context: Context, text: String, bullets: Int, result: MethodChannel.Result) {
-        val s = try {
-            client(context, bullets)
+    private fun summarize(text: String, bullets: Int, result: MethodChannel.Result) {
+        val m = try {
+            model()
         } catch (e: Throwable) {
-            result.error("unavailable", e.message ?: e.javaClass.simpleName, null)
+            result.error("unavailable", reason(e), null)
             return
         }
-        whenDone(s.checkFeatureStatus(), { code ->
+        whenDone(m.checkStatus(), { code ->
             when (code) {
-                FeatureStatus.AVAILABLE -> infer(s, text, result)
-                FeatureStatus.DOWNLOADABLE -> s.downloadFeature(object : DownloadCallback {
-                    override fun onDownloadCompleted() = infer(s, text, result)
+                FeatureStatus.AVAILABLE -> generate(m, text, bullets, result)
+                FeatureStatus.DOWNLOADABLE -> m.download(object : DownloadCallback {
+                    override fun onDownloadCompleted() {
+                        main.post { generate(m, text, bullets, result) }
+                    }
                     override fun onDownloadFailed(e: GenAiException) {
-                        s.close()
-                        result.error("unavailable", e.message, null)
+                        main.post { result.error("unavailable", reason(e), null) }
                     }
                     override fun onDownloadProgress(bytes: Long) {}
                     override fun onDownloadStarted(bytes: Long) {}
                 })
-                FeatureStatus.DOWNLOADING -> {
-                    s.close()
-                    result.error("downloading", "The model is still downloading.", null)
-                }
-                else -> {
-                    s.close()
-                    result.error("unavailable", name(code), null)
-                }
+                FeatureStatus.DOWNLOADING -> result.error("downloading", "The model is still downloading.", null)
+                else -> result.error("unavailable", name(code).substringAfter(':'), null)
             }
-        }, { e ->
-            s.close()
-            result.error("unavailable", e.message, null)
-        })
+        }, { e -> result.error("unavailable", reason(e), null) })
     }
 
-    private fun infer(s: Summarizer, text: String, result: MethodChannel.Result) {
-        whenDone(s.runInference(SummarizationRequest.builder(text).build()), { r ->
-            s.close()
-            result.success(r.summary)
-        }, { e ->
-            s.close()
-            result.error("failed", e.message, null)
-        })
+    private fun generate(m: GenerativeModelFutures, text: String, bullets: Int, result: MethodChannel.Result) {
+        val prompt = "Summarize the news coverage below in exactly $bullets short bullet points. " +
+            "Start each bullet with \"- \". Use only facts stated in the text. " +
+            "Do not add opinions, guesses or a title.\n\nCoverage:\n$text"
+        val request = try {
+            generateContentRequest(TextPart(prompt)) {
+                temperature = 0.2f
+            }
+        } catch (e: Throwable) {
+            result.error("failed", reason(e), null)
+            return
+        }
+        whenDone(m.generateContent(request), { r ->
+            val out = r.candidates.firstOrNull()?.text
+            if (out.isNullOrBlank()) result.error("failed", "The model returned no text.", null) else result.success(out)
+        }, { e -> result.error("failed", reason(e), null) })
     }
 
-    /** Runs [onOk]/[onErr] on the main thread once the ML Kit future completes. */
-    private fun <T> whenDone(future: com.google.common.util.concurrent.ListenableFuture<T>, onOk: (T) -> Unit, onErr: (Throwable) -> Unit) {
+    /** Runs [onOk]/[onErr] on the main thread once the future completes. */
+    private fun <T> whenDone(future: ListenableFuture<T>, onOk: (T) -> Unit, onErr: (Throwable) -> Unit) {
         future.addListener({
             try {
                 onOk(future.get())
@@ -112,25 +114,13 @@ object GenAiBridge {
         }, onMain)
     }
 
-    private fun client(context: Context, bullets: Int): Summarizer {
-        val output = when (bullets) {
-            1 -> SummarizerOptions.OutputType.ONE_BULLET
-            2 -> SummarizerOptions.OutputType.TWO_BULLETS
-            else -> SummarizerOptions.OutputType.THREE_BULLETS
-        }
-        val options = SummarizerOptions.builder(context)
-            .setInputType(SummarizerOptions.InputType.ARTICLE)
-            .setOutputType(output)
-            .setLanguage(SummarizerOptions.Language.ENGLISH)
-            .build()
-        return Summarization.getClient(options)
-    }
+    private fun reason(e: Throwable): String = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
 
     private fun name(code: Int): String = when (code) {
         FeatureStatus.AVAILABLE -> "available"
         FeatureStatus.DOWNLOADABLE -> "downloadable"
         FeatureStatus.DOWNLOADING -> "downloading"
-        FeatureStatus.UNAVAILABLE -> "unavailable:AICore says Gemini Nano is not supported or not set up on this phone"
+        FeatureStatus.UNAVAILABLE -> "unavailable:AICore reports Gemini Nano is not supported or not set up yet on this phone"
         else -> "unavailable:unknown AICore status $code"
     }
 }
