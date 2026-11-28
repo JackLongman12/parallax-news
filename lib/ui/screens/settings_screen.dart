@@ -7,6 +7,7 @@ import '../../data/geo.dart';
 import '../../state/app_state.dart';
 import '../../services/crash_reporter.dart';
 import '../../services/crawler_feed.dart';
+import '../../services/on_device_ai.dart';
 import '../../services/provider_health.dart';
 import '../../services/updater.dart';
 import '../theme.dart';
@@ -107,6 +108,25 @@ class SettingsScreen extends StatelessWidget {
             isThreeLine: true,
             trailing: TextButton(onPressed: () => checkForUpdate(context, manual: true), child: const Text('Check now')),
           ),
+        ),
+        FutureBuilder<AiStatus>(
+          future: OnDeviceAi.status(),
+          builder: (_, snap) {
+            final s = snap.data;
+            final text = switch (s) {
+              null => 'Checking…',
+              AiStatus.available => 'Ready. Open any story and tap "Summarise this story".',
+              AiStatus.downloadable => 'Needs a one-time model download. Open a story and tap "Summarise this story".',
+              AiStatus.downloading => 'Downloading the model. Try again in a few minutes.',
+              AiStatus.unavailable => 'Not available on this phone. It needs Gemini Nano through the AICore app, updated and set up.',
+            };
+            return ListTile(
+              leading: const Icon(Icons.auto_awesome_rounded),
+              title: const Text('On-device AI'),
+              subtitle: Text(text),
+              isThreeLine: true,
+            );
+          },
         ),
         const _CrashToggle(),
         ListTile(
