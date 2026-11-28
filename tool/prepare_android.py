@@ -159,6 +159,25 @@ def patch_genai() -> None:
         sys.exit("could not find minSdk in " + str(gradle))
     gradle.write_text(text, encoding="utf-8")
     print(f"{gradle.name} patched (ML Kit GenAI Prompt, minSdk 26)")
+    # Release builds run R8, which strips/renames classes ML Kit GenAI and AICore look up
+    # at runtime (a NullPointerException on the phone). Flutter's Gradle plugin picks up
+    # android/app/proguard-rules.pro automatically.
+    rules = gradle.parent / "proguard-rules.pro"
+    keep = (
+        "-keep class com.google.mlkit.genai.** { *; }\n"
+        "-keep class com.google.ai.edge.aicore.** { *; }\n"
+        "-keep class com.google.android.apps.aicore.** { *; }\n"
+        "-keep class com.google.mlkit.common.** { *; }\n"
+        "-keep class com.google.android.gms.internal.mlkit_genai** { *; }\n"
+        "-keep class com.google.android.gms.common.** { *; }\n"
+        "-keep class com.parallaxnews.parallax_news.GenAiBridge { *; }\n"
+        "-dontwarn com.google.mlkit.genai.**\n"
+        "-dontwarn com.google.ai.edge.aicore.**\n"
+    )
+    old = rules.read_text(encoding="utf-8") if rules.exists() else ""
+    if "com.google.mlkit.genai" not in old:
+        rules.write_text(old + "\n" + keep, encoding="utf-8")
+        print("proguard-rules.pro: keep ML Kit GenAI / AICore")
 
 
 WIDGET_RECEIVER = """        <receiver android:name=".{cls}" android:exported="false" android:label="@string/{label}">

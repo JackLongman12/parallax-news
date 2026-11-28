@@ -42,13 +42,13 @@ object GenAiBridge {
                     val m = try {
                         model()
                     } catch (e: Throwable) {
-                        result.success("unavailable:${reason(e)}")
+                        result.success("unavailable:${reason(e)} ${device()}")
                         return@setMethodCallHandler
                     }
                     whenDone(m.checkStatus(), { code ->
                         if (code == FeatureStatus.UNAVAILABLE) probe(m, result) else result.success(name(code))
                     }, { e ->
-                        result.success("unavailable:${reason(e)}")
+                        result.success("unavailable:${reason(e)} ${device()}")
                     })
                 }
                 "summarize" -> {
@@ -137,7 +137,12 @@ object GenAiBridge {
         }, onMain)
     }
 
-    private fun reason(e: Throwable): String = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+    /** The error's message (or class), plus where it was thrown so a crash can be traced. */
+    private fun reason(e: Throwable): String {
+        val msg = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+        val at = e.stackTrace.take(3).joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+        return if (at.isEmpty()) msg else "$msg (at $at)"
+    }
 
     private fun name(code: Int): String = when (code) {
         FeatureStatus.AVAILABLE -> "available"
